@@ -1,5 +1,8 @@
+using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
+using server.Core.Enums;
 
 namespace server.Core.Entities
 {
@@ -19,6 +22,10 @@ namespace server.Core.Entities
         [Required] public string BusNumber { get; set; } = string.Empty;
         public string BusType { get; set; } = "AC Sleeper"; 
         public int TotalSeats { get; set; }
+        public string? LayoutConfig { get; set; } // JSON string for grid layout
+        public bool IsApproved { get; set; } = false;
+        public ApprovalStatus Status { get; set; } = ApprovalStatus.Pending;
+        public string? RejectionReason { get; set; }
         
         public Guid OperatorId { get; set; }
         public BusOperator? Operator { get; set; }
@@ -42,5 +49,10 @@ namespace server.Core.Entities
         public DateTime ArrivalTime { get; set; }
         public decimal Price { get; set; }
         public int AvailableSeats { get; set; }
+        public JourneyStatus Status { get; set; } = JourneyStatus.Scheduled;
+
+        // Custom boarding and dropping points for this specific trip
+        public List<Guid>? BoardingHubIds { get; set; } = new();
+        public List<Guid>? DroppingHubIds { get; set; } = new();
     }
 }

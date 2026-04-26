@@ -11,6 +11,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<server.Features.Auth.AuthService>();
+builder.Services.AddScoped<server.Features.Booking.ISeatLockManager, server.Features.Booking.SeatLockManager>();
+builder.Services.AddScoped<server.Features.Booking.ICancellationService, server.Features.Booking.CancellationService>();
+builder.Services.AddScoped<server.Core.Interfaces.INotificationService, server.Infrastructure.Services.NotificationService>();
+builder.Services.AddScoped<server.Features.Administration.IOperatorWorkflowService, server.Features.Administration.OperatorWorkflowService>();
 builder.Services.AddMemoryCache();
 
 // 2. Configure Authentication (JWT)
@@ -47,16 +51,23 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+});
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Seed Database
+// Apply Migrations & Seed Database
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     var context = services.GetRequiredService<AppDbContext>();
+
+    // Automatically apply any pending EF Core migrations
+    context.Database.Migrate();
+
     await server.Infrastructure.DbSeeder.SeedAsync(context);
 }
 

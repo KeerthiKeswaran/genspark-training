@@ -11,7 +11,51 @@ namespace server.Infrastructure
         public static async Task SeedAsync(AppDbContext context)
         {
             Console.WriteLine("--- Database Seeding Started ---");
-            
+
+            // Seed Global Configuration if empty
+            if (!await context.GlobalConfigurations.AnyAsync())
+            {
+                Console.WriteLine("Seeding platform global configuration...");
+                context.GlobalConfigurations.Add(new GlobalConfiguration
+                {
+                    PlatformFeeType = "Fixed",
+                    PlatformFeeValue = 50.00m,
+                    OperatorCommissionPercentage = 10.00m
+                });
+                await context.SaveChangesAsync();
+            }
+
+            // 0. Seed Cities and Hubs
+            Console.WriteLine("Checking/Seeding cities and hubs...");
+            var cityNames = new[] { 
+                "Delhi", "Mumbai", "Bangalore", "Chennai", "Hyderabad", 
+                "Pune", "Ahmedabad", "Kolkata", "Lucknow", "Jaipur", 
+                "Coimbatore", "Madurai", "Kochi", "Visakhapatnam", "Patna" 
+            };
+
+            foreach (var cityName in cityNames)
+            {
+                var city = await context.Cities.FirstOrDefaultAsync(c => c.Name == cityName);
+                if (city == null)
+                {
+                    city = new City { Name = cityName, State = "State of " + cityName };
+                    context.Cities.Add(city);
+                    await context.SaveChangesAsync();
+
+                    // Add hubs for this city
+                    var hubEntities = new List<Hub>
+                    {
+                        new Hub { Name = cityName + " Central Bus Stand", CityId = city.Id, Type = HubType.Both },
+                        new Hub { Name = cityName + " Bypass Boarding Point", CityId = city.Id, Type = HubType.Boarding },
+                        new Hub { Name = cityName + " City Center Drop", CityId = city.Id, Type = HubType.Dropping },
+                        new Hub { Name = cityName + " Highway Hub", CityId = city.Id, Type = HubType.Both },
+                        new Hub { Name = cityName + " North Terminus", CityId = city.Id, Type = HubType.Both }
+                    };
+                    context.Hubs.AddRange(hubEntities);
+                    await context.SaveChangesAsync();
+                }
+            }
+
             // 1. Seed Operators (Ensuring at least 10 with full metadata)
             Console.WriteLine("Checking/Seeding operators...");
             var operatorPool = new List<BusOperator>

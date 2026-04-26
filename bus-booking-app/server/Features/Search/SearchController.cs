@@ -35,6 +35,9 @@ namespace server.Features.Search
             var startDate = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
             var endDate = startDate.AddDays(1);
 
+            var now = DateTime.UtcNow;
+            var minDeparture = now.AddMinutes(10);
+
             var results = await _context.Schedules
                 .Include(s => s.Bus)
                 .ThenInclude(b => b!.Operator)
@@ -42,7 +45,9 @@ namespace server.Features.Search
                 .Where(s => EF.Functions.ILike(s.Route!.Source, fromTerm) && 
                             EF.Functions.ILike(s.Route!.Destination, toTerm) &&
                             s.DepartureTime >= startDate && 
-                            s.DepartureTime < endDate)
+                            s.DepartureTime < endDate &&
+                            s.DepartureTime >= minDeparture &&
+                            s.Status == server.Core.Enums.JourneyStatus.Scheduled)
                 .Select(s => new BusSearchResult(
                     s.Id,
                     s.Bus!.BusNumber,

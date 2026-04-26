@@ -31,10 +31,20 @@ namespace server.Features.Auth
             switch (request.Role)
             {
                 case UserRole.Admin:
-                    user = new Admin { FullName = request.FullName, Email = request.Email, Phone = request.Phone, Role = request.Role };
+                    user = new server.Core.Entities.Admin { FullName = request.FullName, Email = request.Email, Phone = request.Phone, Role = request.Role };
                     break;
                 case UserRole.Operator:
-                    user = new BusOperator { FullName = request.FullName, Email = request.Email, Phone = request.Phone, Role = request.Role };
+                    user = new BusOperator 
+                    { 
+                        FullName = request.FullName, 
+                        Email = request.Email, 
+                        Phone = request.Phone, 
+                        Role = request.Role,
+                        CompanyName = request.CompanyName ?? request.FullName,
+                        Address = request.Address ?? string.Empty,
+                        Status = ApprovalStatus.Pending,
+                        IsApproved = false
+                    };
                     break;
                 default:
                     user = new User { FullName = request.FullName, Email = request.Email, Phone = request.Phone, Role = request.Role };
@@ -58,8 +68,23 @@ namespace server.Features.Auth
                 return Unauthorized("Invalid credentials.");
 
             var token = _authService.GenerateToken(user);
+            
+            bool isApproved = true;
+            string status = "Approved";
+            string? rejectionReason = null;
 
-            return Ok(new AuthResponse(token, user.FullName, user.Email, user.Role));
+            if (user.Role == UserRole.Operator)
+            {
+                var op = await _context.BusOperators.FirstOrDefaultAsync(o => o.Id == user.Id);
+                if (op != null)
+                {
+                    isApproved = op.IsApproved;
+                    status = op.Status.ToString();
+                    rejectionReason = op.RejectionReason;
+                }
+            }
+
+            return Ok(new AuthResponse(token, user.FullName, user.Email, user.Role, user.Id, isApproved, status, rejectionReason));
         }
     }
 }
