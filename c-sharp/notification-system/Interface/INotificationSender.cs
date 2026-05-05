@@ -6,6 +6,6 @@ namespace NotificationSystem.Interface
     {
         void HandleEmailNotification(User sender);
         void HandleSmsNotification(User sender);
-        void Send(User user, Notification notification);
+        void Send(Notification notification);
     }
 }
