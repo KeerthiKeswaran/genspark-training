@@ -86,7 +86,7 @@ namespace WordleGame.Services
                 _gameModel.Attempts++;
                 
                 string feedback = _gameModel.GetFeedback(guess, _feedbackService);
-                Console.Write("Feedback: ");
+                Console.Write("Feedback : ");
                 foreach (char c in feedback)
                 {
                     if (c == 'G') Console.ForegroundColor = ConsoleColor.Green;
