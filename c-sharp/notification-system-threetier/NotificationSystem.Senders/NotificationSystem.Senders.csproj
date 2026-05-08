@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\NotificationSystem.Contracts\NotificationSystem.Contracts.csproj" />
+    <ProjectReference Include="..\NotificationSystem.Models\NotificationSystem.Models.csproj" />
+    <ProjectReference Include="..\NotificationSystem.Shared\NotificationSystem.Shared.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
