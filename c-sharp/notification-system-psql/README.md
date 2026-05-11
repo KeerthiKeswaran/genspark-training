@@ -20,7 +20,7 @@ The solution is implemented as an enterprise-grade multi-project structure. This
 ## Setup and Configuration
 
 ### 1. Database Setup
-Ensure you have **PostgreSQL** installed and running. Create a database with your choice and execute the following SQL commands to set up the necessary tables:
+Ensure you have **PostgreSQL** installed and running. Create a database named 'genspark' and execute the following SQL commands to set up the necessary tables:
 
 ```sql
 CREATE TABLE users(
@@ -47,7 +47,7 @@ The application uses an `appsettings.json` file located in the `NotificationSyst
 ```json
 {
   "ConnectionStrings": {
-    "GensparkDb": "Host=localhost;Port=5432;Database=your_db_name;Username=YOUR_USERNAME;Password=YOUR_PASSWORD"
+    "GensparkDb": "Host=localhost;Port=5432;Database=genspark;Username=YOUR_USERNAME;Password=YOUR_PASSWORD"
   }
 }
 ```
