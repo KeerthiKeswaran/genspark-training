@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="NotificationSystem.Business/NotificationSystem.Business.csproj" />
+  <Project Path="NotificationSystem.Contracts/NotificationSystem.Contracts.csproj" />
+  <Project Path="NotificationSystem.Data/NotificationSystem.Data.csproj" />
+  <Project Path="NotificationSystem.Models/NotificationSystem.Models.csproj" />
+  <Project Path="NotificationSystem.Presentation/NotificationSystem.Presentation.csproj" />
+  <Project Path="NotificationSystem.Senders/NotificationSystem.Senders.csproj" />
+  <Project Path="NotificationSystem.Shared/NotificationSystem.Shared.csproj" />
+</Solution>
