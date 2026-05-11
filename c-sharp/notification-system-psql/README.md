@@ -91,7 +91,7 @@ The system uses a custom exception hierarchy (NotificationException) to manage b
 ---
 
 
-## Data Verification
+## Data Verification:
 
 ### Users Table
 | id | username | email | phone_number |
