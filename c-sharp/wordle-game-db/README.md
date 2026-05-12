@@ -9,7 +9,7 @@ A robust, relational version of the classic Wordle game built using **C#**, **AD
 - **Relational Data Persistence**: All words, users, and scores are stored in a PostgreSQL database.
 - **Secure Authentication**: 
   - Login/Register system with password hashing (SHA-256).
-  - Unique 5-character UserID generation.
+  - Unique 5-character UserID generation : combined hashing of name and email.
 - **Dynamic Word Selection**: Fetches words from a normalized database table based on three difficulty levels.
 - **Core Game Logic**:
   - **Feedback System**: Standard Wordle rules with Green (Correct), Yellow (Wrong Position), and Red (Incorrect) feedback.
