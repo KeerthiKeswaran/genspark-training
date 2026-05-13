@@ -1,5 +1,5 @@
 # Notification System EF Version
-## version 5.0.1
+## version 5.0.2
 ## Project Overview
 The Notification System is a console-based application designed to facilitate multi-channel communication between users. The system supports Email and SMS delivery and is engineered using a 3-Tier Architecture to ensure strict separation of concerns, scalability, and robust data integrity.
 
