@@ -19,7 +19,7 @@ Follow these instructions to configure and run the application locally.
 This project uses a **Database-First** approach. Before running the application, you must provision the PostgreSQL database:
 1. Open your preferred PostgreSQL client (e.g., pgAdmin or `psql` CLI).
 2. Create a new database named `librarydb` (or your preferred name).
-3. Execute the provided SQL script (`documents/script.sql`) against your new database to generate all required tables, relationships, and PostgreSQL stored procedures.
+3. Execute the provided SQL script (`documents/psql_script.sql`) against your new database to generate all required tables, relationships, and PostgreSQL stored procedures.
 
 ### 2. Entity Framework Core Scaffolding
 Because this is a Database-First architecture, you must scaffold the database schema into C# models using the EF Core CLI tools. 
