@@ -13,7 +13,7 @@ Follow these instructions to configure and run the application locally.
 ### Prerequisites
 1. **.NET SDK**: Ensure the .NET 10.0 SDK (or compatible version) is installed on your machine.
 2. **PostgreSQL**: Install PostgreSQL and ensure the database server is actively running.
-3. **Database Script**: You will need the provided `docs/script.sql` (or `documents/psql_script.sql`) file to build the initial database schema.
+3. **Database Script**: You will need the provided `documents/psql_script.sql` file to build the initial database schema.
 
 ### 1. Database Initialization
 This project uses a **Database-First** approach. Before running the application, you must provision the PostgreSQL database:
