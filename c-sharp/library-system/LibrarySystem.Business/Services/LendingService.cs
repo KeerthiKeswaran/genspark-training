@@ -29,6 +29,10 @@ public class LendingService : ILendingService
         if (activeBorrowings.Any(b => b.Duedate < DateOnly.FromDateTime(borrowDate)))
             throw new LendingException("Borrowing blocked. Member has overdue books.");
 
+        // 2b. Check Duplicate Active Borrowing
+        if (activeBorrowings.Any(b => b.Bookid == bookId))
+            throw new LendingException("You already borrowed this book and have not returned it.");
+
         // 3. Check Borrowing Limit
         var limit = _repository.GetMembershipLimitByType(member.Membertype ?? "Basic");
         if (limit != null && activeBorrowings.Count() >= limit.Maxbooksallowed)
