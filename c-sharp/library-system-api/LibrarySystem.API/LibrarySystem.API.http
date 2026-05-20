@@ -1,0 +1,44 @@
+@LibrarySystem.API_HostAddress = http://localhost:5125
+
+### Add Book
+POST {{LibrarySystem.API_HostAddress}}/api/books
+Content-Type: application/json
+
+{
+  "title": "Clean Code",
+  "author": "Robert C. Martin",
+  "isbn": "9780132350884",
+  "publishedYear": 2008,
+  "availableCopies": 5
+}
+
+### Get All Books
+GET {{LibrarySystem.API_HostAddress}}/api/books
+Accept: application/json
+
+### Get Book By Id
+GET {{LibrarySystem.API_HostAddress}}/api/books/1
+Accept: application/json
+
+### Search Books By Title
+GET {{LibrarySystem.API_HostAddress}}/api/books/search?title=clean
+Accept: application/json
+
+### Add Member
+POST {{LibrarySystem.API_HostAddress}}/api/members
+Content-Type: application/json
+
+{
+  "fullName": "Rahul Sharma",
+  "email": "rahul@gmail.com",
+  "phoneNumber": "9876543210",
+  "membershipDate": "2026-05-20T00:00:00Z"
+}
+
+### Get All Members
+GET {{LibrarySystem.API_HostAddress}}/api/members
+Accept: application/json
+
+### Get Member By Id
+GET {{LibrarySystem.API_HostAddress}}/api/members/1
+Accept: application/json

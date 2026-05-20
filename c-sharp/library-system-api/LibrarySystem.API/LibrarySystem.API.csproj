@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.7" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="6.6.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\LibrarySystem.Business\LibrarySystem.Business.csproj" />
+    <ProjectReference Include="..\LibrarySystem.Contracts\LibrarySystem.Contracts.csproj" />
+    <ProjectReference Include="..\LibrarySystem.Models\LibrarySystem.Models.csproj" />
+    <ProjectReference Include="..\LibrarySystem.Data\LibrarySystem.Data.csproj" />
+  </ItemGroup>
+
+</Project>

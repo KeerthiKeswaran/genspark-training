@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="LibrarySystem.API/LibrarySystem.API.csproj" />
+  <Project Path="LibrarySystem.Business/LibrarySystem.Business.csproj" />
+  <Project Path="LibrarySystem.Contracts/LibrarySystem.Contracts.csproj" />
+  <Project Path="LibrarySystem.Data/LibrarySystem.Data.csproj" />
+  <Project Path="LibrarySystem.Models/LibrarySystem.Models.csproj" />
+</Solution>
