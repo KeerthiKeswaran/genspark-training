@@ -95,3 +95,11 @@ library-system-api/
 ### Get Member By Id (Not Found)
 **GET** `/api/members/{id}`
 ![Get Member By Id - Not Found](assets/10-getmemberbyid-notfound.png)
+
+### Database Tables
+
+#### Books Table
+![Books Table](assets/11-booktable.png)
+
+#### Members Table
+![Members Table](assets/12-memberstable.png)
