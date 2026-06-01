@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KeerthiKeswaran | Portfolio</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <nav class="nav-bar">
+    <div class="nav-container">
+      <a href="#hero" class="nav-logo">KK</a>
+      <div class="nav-links">
+        <a href="#about">About</a>
+        <a href="#skills">Skills</a>
+        <a href="#experience">Experience</a>
+        <a href="#projects">Projects</a>
+        <a href="#achievements">Credentials</a>
+        <a href="#contact">Contact</a>
+        <button id="theme-toggle" class="theme-toggle-btn"><i class="bi bi-moon-stars" id="theme-toggle-icon"></i></button>
+      </div>
+    </div>
+  </nav>
+
+  <header id="hero" class="hero-section">
+    <div class="video-background-container">
+      <video autoplay muted loop playsinline class="video-bg">
+        <source src="assets/videos/dark-theme.mp4" type="video/mp4">
+      </video>
+      <div class="video-overlay"></div>
+    </div>
+    
+    <div class="hero-content">
+      <h1 class="hero-name">KeerthiKeswaran</h1>
+      <p class="hero-subtitle">Software Engineer Intern | AI Developer</p>
+      <div class="hero-actions">
+        <a href="#about" class="btn-primary">Explore Portfolio</a>
+        <a href="#contact" class="btn-secondary">Get In Touch</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    
+    <section id="about" class="portfolio-section">
+      <div class="section-container">
+        <div class="about-grid">
+          <div class="about-image-wrapper">
+            <img src="assets/images/headshot.jpeg" alt="KeerthiKeswaran" class="about-image" onerror="this.src='https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80'">
+          </div>
+          <div class="about-info">
+            <h2 class="section-title">About Me</h2>
+            <p class="about-desc">
+              I am a Computer Science & Business Systems student at Vellore Institute of Technology, graduating in 2026. As a Software Engineer Intern at Presidio and a former AI Developer Intern at RevoltronX, I build intelligent systems, large language model integrations, and highly-scalable cloud architectures.
+            </p>
+            <div class="contact-quick-list">
+              <div class="contact-item">
+                <i class="bi bi-envelope"></i>
+                <a href="mailto:keshwarankeerthi@gmail.com">keshwarankeerthi@gmail.com</a>
+              </div>
+              <div class="contact-item">
+                <i class="bi bi-telephone"></i>
+                <span>+91 8939045777</span>
+              </div>
+              <div class="contact-item">
+                <i class="bi bi-geo-alt"></i>
+                <span>Chennai, India</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="skills" class="portfolio-section bg-darker">
+      <div class="section-container">
+        <h2 class="section-title text-center">Skills & Expertise</h2>
+        <div class="skills-grid">
+          <div class="skills-card">
+            <h4 class="skills-card-title">Core Languages</h4>
+            <p class="skills-card-list">Java, Python, C/C++, GoLang, TypeScript</p>
+          </div>
+          <div class="skills-card">
+            <h4 class="skills-card-title">Frameworks & APIs</h4>
+            <p class="skills-card-list">Flutter, React, Express, FastAPI, Django, REST APIs, GraphQL, Selenium, JMeter</p>
+          </div>
+          <div class="skills-card">
+            <h4 class="skills-card-title">Infrastructure & DevOps</h4>
+            <p class="skills-card-list">Docker, Kubernetes, Jenkins, AWS, Azure, Git, Grafana, Loki</p>
+          </div>
+          <div class="skills-card">
+            <h4 class="skills-card-title">Data & Intelligence</h4>
+            <p class="skills-card-list">MySQL, MongoDB, Neo4j, ChromaDB, Scikit-Learn, PyTorch, TensorFlow, Transformers, LangChain, Transfer Learning, PEFT, RAG</p>
+          </div>
+          <div class="skills-card">
+            <h4 class="skills-card-title">Academic Foundation</h4>
+            <p class="skills-card-list">DSA, OS, DBMS, OOPS, TCP/IP, SDLC, Agile Methodologies</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="experience" class="portfolio-section">
+      <div class="section-container">
+        <h2 class="section-title text-center">Professional Experience</h2>
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="timeline-header">
+              <span class="timeline-date">Mar 2026 - Present · 4 mos</span>
+              <h3 class="timeline-role">Intern</h3>
+              <h4 class="timeline-company">Presidio · Full-time</h4>
+              <p class="timeline-location">Chennai, Tamil Nadu, India · Remote</p>
+            </div>
+            <ul class="timeline-bullets">
+              <li>Gaining hands-on exposure to system design, engineering workflows, and production practices, with a focus on building maintainable solutions that perform consistently in real environments.</li>
+            </ul>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-header">
+              <span class="timeline-date">Jan 2024 - Jan 2025</span>
+              <h3 class="timeline-role">AI Developer Intern</h3>
+              <h4 class="timeline-company">RevoltronX</h4>
+            </div>
+            <ul class="timeline-bullets">
+              <li>Architected LLM model with chat history, cutting latency under 300ms and enhancing semantic correctness using cosine similarity retrieval.</li>
+              <li>Developed Auto-Tagging module with fine-tuned T5-base model, boosting tag relevance by 69% and optimizing inference speed through efficient decoding and model optimization techniques.</li>
+              <li>Implemented RAG with memory retention, improving response accuracy and enabling personalized responses through transfer learning.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="projects" class="portfolio-section bg-darker">
+      <div class="section-container">
+        <h2 class="section-title text-center">Featured Projects</h2>
+        <div class="projects-grid">
+          <div class="project-card">
+            <span class="project-date">Apr 2025</span>
+            <h3 class="project-title">AI-Powered Observability and Log Analysis System</h3>
+            <p class="project-desc">Engineered hybrid framework with Prometheus, Grafana, Loki, and LLM engine, improving anomaly detection and streamlining log analysis. Enhanced master-slave server monitoring, reducing resolution time by 30% through early issue detection.</p>
+          </div>
+          <div class="project-card">
+            <span class="project-date">Mar 2025</span>
+            <h3 class="project-title">ARIA-AI: Adaptive Response & Insight Assistant</h3>
+            <p class="project-desc">Developed Flutter app with fine-tuned LLMs delivering health insights to concurrent users via adaptive learning algorithms. Added offline mode with local caching, reducing response times by 40% while ensuring HIPAA compliance.</p>
+          </div>
+          <div class="project-card">
+            <span class="project-date">Jan 2025</span>
+            <h3 class="project-title">Behavior Anomaly Detection SDK</h3>
+            <p class="project-desc">Built SDK with Isolation Forest for behavior profiling, achieving 97% model accuracy in threat detection. Implemented transfer learning for continuous learning, enhancing security and improving processing speed.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="achievements" class="portfolio-section bg-darker">
+      <div class="section-container">
+        <h2 class="section-title text-center">Certifications & Achievements</h2>
+        <div class="certifications-grid">
+          <div class="cert-card">
+            <div class="cert-icon-wrapper"><i class="bi bi-patch-check"></i></div>
+            <h3 class="cert-title">Azure Data Fundamentals (DP-900)</h3>
+            <p class="cert-desc">Certified in core data concepts on Microsoft Azure.</p>
+          </div>
+          <div class="cert-card">
+            <div class="cert-icon-wrapper"><i class="bi bi-patch-check"></i></div>
+            <h3 class="cert-title">Machine Learning Specialization</h3>
+            <p class="cert-desc">Project-driven mastery of core ML topics by Stanford.</p>
+          </div>
+          <div class="cert-card">
+            <div class="cert-icon-wrapper"><i class="bi bi-patch-check"></i></div>
+            <h3 class="cert-title">Geekathon 1.0 Finalist</h3>
+            <p class="cert-desc">Led team building sentiment analysis tool in 24-hour hackathon.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="responsibility" class="portfolio-section">
+      <div class="section-container">
+        <h2 class="section-title text-center">Positions of Responsibility</h2>
+        <div class="responsibility-grid">
+          <div class="responsibility-card">
+            <h3 class="resp-title">Research Team Member</h3>
+            <span class="resp-org">Machine Learning Club</span>
+            <p class="resp-desc">Actively participating in collaborative projects and cutting-edge discussions focused on advancing AI technologies.</p>
+          </div>
+          <div class="responsibility-card">
+            <h3 class="resp-title">Team Lead</h3>
+            <span class="resp-org">NASA Space Apps & SIH'24</span>
+            <p class="resp-desc">Guiding teams in global and national hackathon initiatives focused on innovation and societal challenges.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer id="contact" class="footer-section">
+    <div class="footer-container">
+      <h2 class="footer-heading">Let's Connect</h2>
+      <div class="social-links">
+        <a href="mailto:keshwarankeerthi@gmail.com" class="social-icon-btn"><i class="bi bi-envelope"></i></a>
+        <a href="https://github.com/KeerthiKeswaran" target="_blank" class="social-icon-btn"><i class="bi bi-github"></i></a>
+        <a href="https://linkedin.com/in/keerthikeswaran-k-s" target="_blank" class="social-icon-btn"><i class="bi bi-linkedin"></i></a>
+      </div>
+      <p class="footer-copy">&copy; 2026 KeerthiKeswaran. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
