@@ -33,27 +33,12 @@ The objective of this assignment is to build a secure, interactive e-commerce po
    ```
 3. Run the development server:
    ```bash
-   npm start
-   # Or: ng serve
+   ng serve
    ```
 4. Access the portal at `http://localhost:4200/`. Use demo credentials:
    - **Username:** `emilys`
    - **Password:** `emilyspass`
 
-### Running the Screenshots Automation Script
-1. Navigate to the playwright directory:
-   ```bash
-   cd angular/playwright
-   ```
-2. Install packages:
-   ```bash
-   npm install
-   ```
-3. Run:
-   ```bash
-   ng serve
-   ```
----
 
 ## Project Screenshots
 
