@@ -49,16 +49,10 @@ The objective of this assignment is to build a secure, interactive e-commerce po
    ```bash
    npm install
    ```
-3. Download browser binaries (Chromium):
+3. Run:
    ```bash
-   npx playwright install chromium
+   ng serve
    ```
-4. Execute the script (make sure the Angular development server is running in another tab):
-   ```bash
-   node take_screenshots.js
-   ```
-   *Screenshots will be output directly into the local `angular/playwright/screenshots/` folder.*
-
 ---
 
 ## Project Screenshots
