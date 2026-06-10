@@ -1,0 +1,13 @@
+<nav class="home-navbar">
+  <div class="nav-links">
+    <!-- Meta-category links that fetch aggregated sets of products -->
+    <a [routerLink]="['/products']" [queryParams]="{ category: 'electronics' }" routerLinkActive="active" class="nav-link">Electronics</a>
+    <a [routerLink]="['/products']" [queryParams]="{ category: 'beauty' }" routerLinkActive="active" class="nav-link">Beauty</a>
+    <a [routerLink]="['/products']" [queryParams]="{ category: 'fashion' }" routerLinkActive="active" class="nav-link">Fashion</a>
+    <a [routerLink]="['/products']" [queryParams]="{ category: 'groceries' }" routerLinkActive="active" class="nav-link">Groceries</a>
+    <a [routerLink]="['/products']" [queryParams]="{ category: 'furniture' }" routerLinkActive="active" class="nav-link">Furniture</a>
+    <a [routerLink]="['/products']" [queryParams]="{ category: 'pharmacy' }" routerLinkActive="active" class="nav-link">Pharmacy</a>
+    <a [routerLink]="['/products']" [queryParams]="{ category: 'sports' }" routerLinkActive="active" class="nav-link">Sports</a>
+    <a [routerLink]="['/products']" [queryParams]="{ category: 'automotive' }" routerLinkActive="active" class="nav-link">Automotive</a>
+  </div>
+</nav>

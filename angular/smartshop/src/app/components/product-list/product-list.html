@@ -1,0 +1,83 @@
+<div class="products-view">
+  <!-- Section Title -->
+  <div class="section-header">
+    <h2 class="section-title">{{ getDisplayName(currentCategory()) }}</h2>
+    @if (!currentCategory()) {
+      <p class="section-subtitle">Grab the best offers on our top-rated products before they are gone!</p>
+    } @else {
+      <p class="section-subtitle">Browse the top choices in our {{ getDisplayName(currentCategory()) }} category.</p>
+    }
+  </div>
+
+  @if (errorMessage()) {
+    <div class="error-container">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="alert-icon">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+      <span>{{ errorMessage() }}</span>
+    </div>
+  }
+
+  <!-- Loading Skeletons -->
+  @if (isLoading()) {
+    <div class="products-grid">
+      @for (placeholder of [1,2,3,4,5,6,7,8]; track placeholder) {
+        <div class="skeleton-card">
+          <div class="skeleton-image skeleton-shimmer"></div>
+          <div class="skeleton-content">
+            <div class="skeleton-title skeleton-shimmer"></div>
+            <div class="skeleton-row">
+              <div class="skeleton-price skeleton-shimmer"></div>
+              <div class="skeleton-rating skeleton-shimmer"></div>
+            </div>
+            <div class="skeleton-button skeleton-shimmer"></div>
+          </div>
+        </div>
+      }
+    </div>
+  } @else if (!errorMessage() && products().length === 0) {
+    <div class="empty-state">
+      <p>No products found in this category.</p>
+    </div>
+  } @else if (!isLoading() && !errorMessage()) {
+    <!-- Products Grid -->
+    <div class="products-grid animate-fade-in">
+      @for (product of products(); track product.id) {
+        <div class="product-card">
+          <div class="card-image-wrapper">
+            <img [src]="product.thumbnail" [alt]="product.title" class="product-image" loading="lazy" />
+            <div class="price-tag">{{ product.price | inrCurrency }}</div>
+          </div>
+          
+          <div class="product-info">
+            <h3 class="product-title" [title]="product.title">{{ product.title }}</h3>
+            
+            <div class="product-meta">
+              <!-- Rating -->
+              <div class="rating-badge">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" class="star-icon">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                </svg>
+                <span>{{ product.rating }}</span>
+              </div>
+              
+              @if (product.brand) {
+                <span class="product-brand">{{ product.brand }}</span>
+              }
+            </div>
+            
+            <button [routerLink]="['/products', product.id]" class="btn-details">
+              <span>View Details</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-arrow">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>
