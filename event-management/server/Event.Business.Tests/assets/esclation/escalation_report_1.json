@@ -1,0 +1,5 @@
+{
+  "Subject": "Escalated Policy Violation: Event Flagged",
+  "Message": "This ticket was automatically escalated because Event #10 (\u0027Fake Gala\u0027) was flagged and upheld. Action: Policy violation.",
+  "Response": "Organizer Action: Restrict."
+}
