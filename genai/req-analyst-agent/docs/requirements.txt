@@ -1,0 +1,78 @@
+# Project Requirements: "ShopEase" Mobile Application
+
+## 1. Project Overview & Business Goal
+
+We run a regional chain of boutique grocery stores. Currently, our customers can only buy from us in person, and we manage our loyalty points using physical paper cards.
+
+Our primary goal is to launch a user-friendly mobile application (iOS and Android) that allows our customers to shop online for home delivery, track their loyalty rewards digitally, and receive personalized offers. We need this app to increase our monthly sales by **20%** within the first six months of launch and help us retain our existing customer base.
+
+---
+
+## 2. Target Audience
+
+Our customers vary wildly in tech-savviness.
+
+* **Group A (Busy Parents):** They know exactly what they want, need to order quickly, and rely on saved shopping lists or past orders to save time.
+* **Group B (Elderly Shoppers):** They might struggle with small fonts or overly complex navigation. The app *must* be clean, accessible, and intuitive.
+
+---
+
+## 3. High-Level Requirements & Features
+
+### A. Customer-Facing Features
+
+* **Easy Onboarding:** Users should be able to sign up using just their mobile number (via OTP) or Google/Apple accounts. We do not want long, tedious registration forms.
+* **Smart Product Search & Browsing:** * A clean catalog categorized by aisles (e.g., Fruits & Vegetables, Dairy, Bakery).
+* A search bar that suggests items as they type and handles minor typos gracefully.
+
+
+* **Seamless Cart & Checkout:**
+* A persistent shopping cart.
+* Multiple payment options: Credit/Debit Cards, UPI, and Cash on Delivery (COD).
+* The ability to choose a delivery time slot (e.g., 9 AM – 12 PM, 3 PM – 6 PM).
+
+
+* **Digital Loyalty Wallet:** * Customers must earn 1 point for every $10 spent.
+* A visible dashboard showing total points and a barcode that cashiers can scan in-store if the customer shops in person.
+
+
+* **Order Tracking:** Real-time updates showing when the order is "Packed," "Out for Delivery," and "Delivered."
+
+### B. Admin & Store Manager Features (Backend Control)
+
+* **Inventory Management:** A simple dashboard where our store managers can update stock levels, change prices, and mark items as "Out of stock."
+* **Order Fulfillment Panel:** A screen for our packing staff to see incoming orders, check off items as they pack them, and assign them to delivery drivers.
+
+---
+
+## 4. Design & User Experience (UX) Expectations
+
+* **Look & Feel:** The app must look modern, vibrant, and clean. We want to use our brand colors (Forest Green and Soft Gold).
+* **Simplicity First:** No cluttered screens. The "Add to Cart" button should always be prominent.
+* **Accessibility:** Large fonts, high-contrast text options, and clear icons so that older demographics can use the app without frustration.
+
+---
+
+## 5. Technical Constraints
+
+* **Speed:** The app must load the homepage and product catalog in under **2 seconds**, even on average 4G connections.
+* **Security:** Customer payment data and personal information must be completely secure and compliant with local data privacy laws. We do not want to store credit card numbers on our own servers.
+* **Reliability:** The app should handle up to **5,000 concurrent users** without crashing, especially during weekend peak hours.
+
+---
+
+## 6. Success Criteria & Deliverables
+
+We will consider this project a success if the development team delivers:
+
+1. Fully functional iOS and Android apps published on the App Store and Google Play Store.
+2. A web-based Admin panel for our store managers.
+3. 2 weeks of post-launch technical support to fix any immediate bugs or crashes.
+4. Clean, documented source code handed over to our internal IT team.
+
+---
+
+## 7. Timeline & Budget Constraints
+
+* **Target Launch Date:** We absolutely must launch before the holiday shopping season begins in **early November**.
+* **Phased Approach:** We would prefer to see a working prototype or Minimum Viable Product (MVP) within **8 weeks** to give feedback before the final build.
