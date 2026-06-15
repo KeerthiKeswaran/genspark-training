@@ -17,6 +17,7 @@ namespace Event.Business.Services
 
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IUserRepository _userRepository;
+        private readonly IEventRepository _eventRepository;
 
         #endregion
 
@@ -24,10 +25,12 @@ namespace Event.Business.Services
 
         public UserService(
             IHttpContextAccessor httpContextAccessor, 
-            IUserRepository userRepository)
+            IUserRepository userRepository,
+            IEventRepository eventRepository)
         {
             _httpContextAccessor = httpContextAccessor;
             _userRepository = userRepository;
+            _eventRepository = eventRepository;
         }
 
         #endregion
@@ -64,7 +67,7 @@ namespace Event.Business.Services
 
         #region SelectInterestedRegionsAsync
 
-        public async Task<bool> SelectInterestedRegionsAsync(int userId, IEnumerable<string> regionIds)
+        public async Task<bool> SelectInterestedRegionsAsync(int userId, string regionId)
         {
             // 1. Retrieve the target user and validate existence
             var userExists = await _userRepository.ExistsAsync(userId);
@@ -72,6 +75,7 @@ namespace Event.Business.Services
                 throw new NotFoundException($"User with ID {userId} not found.");
 
             // 2. Update interested regions using the repository
+            var regionIds = string.IsNullOrEmpty(regionId) ? new List<string>() : new List<string> { regionId };
             await _userRepository.UpdateInterestedRegionsAsync(userId, regionIds);
             return true;
         }
@@ -80,7 +84,7 @@ namespace Event.Business.Services
 
         #region UpdateUserProfileAsync
 
-        public async Task<bool> UpdateUserProfileAsync(int userId, string name, string mobileNumber, IEnumerable<string> interestedRegions)
+        public async Task<bool> UpdateUserProfileAsync(int userId, string name, string mobileNumber)
         {
             // 1. Retrieve the target user profile
             var user = await _userRepository.GetByIdAsync(userId);
@@ -92,8 +96,6 @@ namespace Event.Business.Services
             user.Mobile_Number = mobileNumber;
             await _userRepository.UpdateAsync(user);
 
-            // 3. Update associated user interest regions
-            await SelectInterestedRegionsAsync(userId, interestedRegions);
             return true;
         }
 
@@ -110,14 +112,15 @@ namespace Event.Business.Services
             if (user == null)
                 throw new NotFoundException($"User with ID {userId} not found.");
 
-            var interestedRegions = new List<string>();
+            var regionId = string.Empty;
             if (user.InterestedRegions != null)
             {
                 foreach (var ir in user.InterestedRegions)
                 {
                     if (ir.Region_Id != null)
                     {
-                        interestedRegions.Add(ir.Region_Id);
+                        regionId = ir.Region_Id;
+                        break;
                     }
                 }
             }
@@ -129,7 +132,82 @@ namespace Event.Business.Services
                 Email = user.Email,
                 Mobile_Number = user.Mobile_Number,
                 Status = user.Status,
-                InterestedRegions = interestedRegions
+                RegionId = regionId
+            };
+        }
+
+        #endregion
+
+        #region GetMyEventsAsync
+
+        public async Task<IEnumerable<MyEventOverviewResponse>> GetMyEventsAsync(int organizerId)
+        {
+            var userExists = await _userRepository.ExistsAsync(organizerId);
+            if (!userExists)
+                throw new NotFoundException($"User with ID {organizerId} not found.");
+
+            var events = await _eventRepository.GetEventsByOrganizerAsync(organizerId);
+            var response = new List<MyEventOverviewResponse>();
+            foreach (var ev in events)
+            {
+                response.Add(new MyEventOverviewResponse
+                {
+                    Event_Id = ev.Event_Id,
+                    Title = ev.Title,
+                    Event_Type = ev.Event_Type,
+                    Date_Time = ev.Date_Time,
+                    Duration_Hours = ev.Duration_Hours,
+                    Status = ev.Status,
+                    Venue_Name = ev.Venue?.Name
+                });
+            }
+            return response;
+        }
+
+        #endregion
+
+        #region GetMyEventDetailsAsync
+
+        public async Task<MyEventDetailsResponse?> GetMyEventDetailsAsync(int organizerId, int eventId)
+        {
+            var ev = await _eventRepository.GetEventDetailsAsync(eventId);
+            if (ev == null)
+                return null;
+
+            if (ev.Organizer_Id != organizerId)
+                throw new UnauthorizedAccessException("You are not authorized to view this event's details.");
+
+            var ticketTiers = new List<TicketTierDetailsDto>();
+            if (ev.TicketTiers != null)
+            {
+                foreach (var tier in ev.TicketTiers)
+                {
+                    ticketTiers.Add(new TicketTierDetailsDto
+                    {
+                        Tier_Name = tier.Tier_Name,
+                        Price = tier.Price,
+                        Tickets_Sold = tier.Tickets_Sold
+                    });
+                }
+            }
+
+            return new MyEventDetailsResponse
+            {
+                Event_Id = ev.Event_Id,
+                Organizer_Id = ev.Organizer_Id,
+                Event_Type = ev.Event_Type,
+                Title = ev.Title,
+                Description_Url = ev.Description_Url,
+                Image_Url = ev.Image_Url,
+                Date_Time = ev.Date_Time,
+                Duration_Hours = ev.Duration_Hours,
+                Status = ev.Status,
+                Requires_Staff = ev.Requires_Staff,
+                Venue_Id = ev.Venue_Id,
+                Venue_Name = ev.Venue?.Name,
+                Virtual_Url = ev.Virtual_Url,
+                Virtual_Password_Hash = ev.Virtual_Password_Hash,
+                TicketTiers = ticketTiers
             };
         }
 

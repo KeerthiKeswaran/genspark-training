@@ -16,6 +16,7 @@ namespace Event.Models.DTOs
         public string CheckIn_Status { get; set; } = string.Empty;
         public DateTime Created_At { get; set; }
         public string? Virtual_Url { get; set; }
+        public string? Virtual_Password_Hash { get; set; }
         public List<BookingDetailDto> Details { get; set; } = new List<BookingDetailDto>();
     }
 

@@ -11,6 +11,7 @@ namespace Event.Contracts.IRepositories
         Task<Transaction?> GetPendingBookingTransactionAsync(int bookingId);
         Task<Transaction?> GetSuccessBookingTransactionAsync(int bookingId);
         Task<Transaction?> GetPendingOrganizerUpfrontTransactionAsync(int eventId);
+        Task<Transaction?> GetSuccessOrganizerUpfrontTransactionAsync(int eventId);
         Task<decimal> GetGrossRevenueAsync();
         Task<System.Collections.Generic.IEnumerable<Transaction>> GetRecentTransactionsAsync(int count);
         Task<PagedResult<Transaction>> GetTransactionRangeAsync(int from, int to);

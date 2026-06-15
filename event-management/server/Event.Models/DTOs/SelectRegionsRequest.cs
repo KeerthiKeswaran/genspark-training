@@ -4,6 +4,6 @@ namespace Event.Models.DTOs
 {
     public class SelectRegionsRequest
     {
-        public List<string> RegionIds { get; set; } = new List<string>();
+        public string RegionId { get; set; } = string.Empty;
     }
 }

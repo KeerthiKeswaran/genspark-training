@@ -37,10 +37,6 @@ namespace Event.Models.DTOs
 
         public int? VenueId { get; set; }
 
-        public string? VirtualUrl { get; set; }
-
-        public string? VirtualPassword { get; set; }
-
         public bool HasAcceptedPolicy { get; set; }
 
         [Required]

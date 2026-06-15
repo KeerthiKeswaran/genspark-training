@@ -21,6 +21,11 @@ The project is structured following clean architecture guidelines:
 *   **Email Engine**: Brevo SMTP Integration
 *   **Testing Suite**: NUnit, Coverlet, Moq
 
+### Highlights of Recent Updates:
+*   **Single Interested Region**: Refactored the user interested region preference from a list/collection to a single `RegionId` string, simplifying onboarding.
+*   **Public Regions Discovery**: Added a public `/api/regions` endpoint, allowing the frontend client to query the list of active operating regions without needing user authentication (e.g., for location-based landing pages).
+*   **Organizer Created Events Retrieval**: Exposes two new routes under `UserController`: `GET /api/user/my-events` (which returns a non-sensitive overview of events created by the logged-in organizer) and `GET /api/user/my-events/{eventId}` (which returns the full event details, including Jitsi meeting URLs and passcode hashes).
+
 ---
 
 ## Database Schema Details
@@ -43,7 +48,7 @@ The database is built on **PostgreSQL** using Entity Framework Core. Specific se
 8. **Venue Seat Capacities (`"VenueSeatCapacities"`)**: Seat limits per physical tier. Key fields: `(Venue_Id, Tier_Name)` (Composite PK / FK to `"Venues"`), `Total_Seats`.
 9. **Events (`"Events"`)**: Scheduled events. Key fields: `Event_Id` (PK), `Organizer_Id` (FK to `"Users"`), `Venue_Id` (nullable FK to `"Venues"`), `Status` (Live, Pending, Cancelled, Completed, Failed).
 10. **Event Ticket Tiers (`"EventTicketTiers"`)**: Prices and capacity per tier. Key fields: `(Event_Id, Tier_Name)` (Composite PK / FK to `"Events"`), `Price`, `Tickets_Sold`.
-11. **Bookings (`"Bookings"`)**: Reservations. Key fields: `Booking_Id` (PK), `Attendee_Id` (FK to `"Users"`), `Event_Id` (FK to `"Events"`), `Booking_Status`, `Qr_Secret_Hash`, `CheckIn_Status`.
+11. **Bookings (`"Bookings"`)**: Reservations. Key fields: `Booking_Id` (PK), `Attendee_Id` (FK to `"Users"`), `Event_Id` (FK to `"Events"`), `Booking_Status`, `Qr_Secret_Hash`, `CheckIn_Status`, `Virtual_Url`.
 12. **Booking Details (`"BookingDetails"`)**: Quantities reserved per booking tier. Key fields: `(Booking_Id, Tier_Name)` (Composite PK / FK to `"Bookings"`), `Quantity`.
 13. **Platform Settings (`"PlatformSettings"`)**: Global platform fees and limits. Key fields: `Settings_Id` (PK), `Staff_Flat_Rate`, `Ticket_Commission_Percentage`, `Updated_By_Admin_Id` (FK to `"Admins"`).
 14. **Terms And Conditions (`"TermsAndConditions"`)**: Policy agreements. Key fields: `Terms_Id` (PK), `Version`, `Type` (General, EventCreation), `Is_Active`.

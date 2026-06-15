@@ -26,6 +26,8 @@ namespace Event.Models
         public string CheckIn_Status { get; set; } = "Pending";
         
         public DateTime Created_At { get; set; }
+        
+        public string? Virtual_Url { get; set; }
 
         // Navigation properties
         public virtual ICollection<BookingDetail> Details { get; set; } = new List<BookingDetail>();

@@ -25,7 +25,7 @@ namespace Event.API.Controllers
             try
             {
                 int userId = _userService.GetCurrentUserId();
-                var success = await _userService.SelectInterestedRegionsAsync(userId, request.RegionIds);
+                var success = await _userService.SelectInterestedRegionsAsync(userId, request.RegionId);
                 if (!success)
                     return BadRequest(new { Message = "Failed to update interested regions." });
 
@@ -61,7 +61,7 @@ namespace Event.API.Controllers
             try
             {
                 int userId = _userService.GetCurrentUserId();
-                var success = await _userService.UpdateUserProfileAsync(userId, request.Name, request.MobileNumber, request.InterestedRegions);
+                var success = await _userService.UpdateUserProfileAsync(userId, request.Name, request.MobileNumber);
                 if (!success)
                     return BadRequest(new { Message = "Failed to update user profile." });
 
@@ -70,6 +70,47 @@ namespace Event.API.Controllers
             catch (UnauthorizedAccessException ex)
             {
                 return Unauthorized(new { Message = ex.Message });
+            }
+        }
+
+        [HttpGet("my-events")]
+        public async Task<IActionResult> GetMyEvents()
+        {
+            try
+            {
+                int userId = _userService.GetCurrentUserId();
+                var events = await _userService.GetMyEventsAsync(userId);
+                return Ok(events);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpGet("my-events/{eventId}")]
+        public async Task<IActionResult> ViewMyEvent(int eventId)
+        {
+            try
+            {
+                int userId = _userService.GetCurrentUserId();
+                var ev = await _userService.GetMyEventDetailsAsync(userId, eventId);
+                if (ev == null)
+                    return NotFound(new { Message = "Event not found." });
+
+                return Ok(ev);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
             }
         }
     }

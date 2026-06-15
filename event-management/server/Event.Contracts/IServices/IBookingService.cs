@@ -9,7 +9,7 @@ namespace Event.Contracts.IServices
     {
         Task<BookingResponse?> BookTicketsAsync(int attendeeId, int eventId, Dictionary<string, int> tierQuantities);
         Task<BookingResponse?> ConfirmBookingPaymentAsync(int bookingId, string stripeChargeId, string paymentMethod);
-        Task<IEnumerable<BookingResponse>> GetMyBookingsAsync(int attendeeId);
+        Task<IEnumerable<BookingResponse>> GetMyBookingsAsync(int attendeeId, string? status = null);
         Task<bool> CancelBookingAsync(int bookingId, string refundType = "Dynamic");
         Task ReleaseExpiredEventBookingAsync();
         Task<bool> RevertPendingBookingAsync(int bookingId);

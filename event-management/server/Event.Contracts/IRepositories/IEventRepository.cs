@@ -17,6 +17,7 @@ namespace Event.Contracts.IRepositories
         Task AddFeedbackAsync(EventFeedback feedback);
         Task<System.Collections.Generic.IEnumerable<Event.Models.Event>> GetEventsByRegionsAsync(System.Collections.Generic.IEnumerable<string> regionIds);
         Task<System.Collections.Generic.IEnumerable<Event.Models.Event>> GetLiveEventsWithDetailsAsync();
+        Task<System.Collections.Generic.IEnumerable<Event.Models.Event>> GetEventsByOrganizerAsync(int organizerId);
         Task<PagedResult<Event.Models.Event>> GetEventsPagedAsync(string? keyword, string? eventType, string? status, DateTime? startDate, DateTime? endDate, string? sortBy, int page, int size);
     }
 }

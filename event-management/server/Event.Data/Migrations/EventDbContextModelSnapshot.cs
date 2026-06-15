@@ -134,6 +134,9 @@ namespace Event.Data.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
+                    b.Property<string>("Virtual_Url")
+                        .HasColumnType("text");
+
                     b.HasKey("Booking_Id");
 
                     b.HasIndex("Attendee_Id");

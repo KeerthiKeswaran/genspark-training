@@ -135,6 +135,7 @@ namespace Event.Business.Services
                     Booking_Status = "Payment Pending",
                     CheckIn_Status = "Pending",
                     Created_At = DateTime.UtcNow,
+                    Virtual_Url = ev.Virtual_Url,
                     Details = bookingDetails
                 };
 
@@ -159,6 +160,7 @@ namespace Event.Business.Services
 
                 // 11. Commit the transaction and return the booking details
                 await _bookingRepository.CommitTransactionAsync();
+                booking.Event = ev;
                 return MapToBookingResponse(booking);
             }
             catch (BaseBusinessException)
@@ -207,6 +209,16 @@ namespace Event.Business.Services
                     ledgerTx.Remarks = chargeResult.ErrorMessage;
                     await _transactionRepository.UpdateAsync(ledgerTx);
                     await _bookingRepository.CommitTransactionAsync();
+
+                    try
+                    {
+                        await RevertPendingBookingAsync(bookingId);
+                    }
+                    catch (Exception)
+                    {
+                        // Ignore inner exception to propagate the original charge failed validation exception
+                    }
+
                     throw new ValidationException($"Stripe charge failed: {chargeResult.ErrorMessage}");
                 }
 
@@ -275,6 +287,25 @@ namespace Event.Business.Services
                     try
                     {
                         var ticketDetailsStr = string.Join(", ", booking.Details.Select(d => $"{d.Quantity}x {d.Tier_Name}"));
+                        if (booking.Event?.Event_Type.Equals("Virtual", StringComparison.OrdinalIgnoreCase) == true ||
+                            booking.Event?.Event_Type.Equals("Hybrid", StringComparison.OrdinalIgnoreCase) == true)
+                        {
+                            string rawPasscode = "N/A";
+                            var upfrontTx = await _transactionRepository.GetSuccessOrganizerUpfrontTransactionAsync(booking.Event_Id);
+                            if (upfrontTx != null && !string.IsNullOrEmpty(upfrontTx.Remarks))
+                            {
+                                var marker = "[Virtual Access Passcode]:";
+                                var idx = upfrontTx.Remarks.IndexOf(marker);
+                                if (idx != -1)
+                                {
+                                    rawPasscode = upfrontTx.Remarks.Substring(idx + marker.Length).Trim();
+                                }
+                            }
+                            
+                            var virtualUrl = booking.Virtual_Url ?? booking.Event?.Virtual_Url;
+                            ticketDetailsStr += $"<br/><span class=\"info-label\">Virtual Link:</span> <a href=\"{virtualUrl}\" style=\"color: #ffcccc; text-decoration: underline;\">{virtualUrl}</a><br/><span class=\"info-label\">Passcode:</span> {rawPasscode}";
+                        }
+
                         var emailDto = new EmailTemplateDto
                         {
                             TemplateName = "EventBookingSuccessTemplate.html",
@@ -323,9 +354,15 @@ namespace Event.Business.Services
 
         #region GetMyBookingsAsync
 
-        public async Task<IEnumerable<BookingResponse>> GetMyBookingsAsync(int attendeeId)
+        public async Task<IEnumerable<BookingResponse>> GetMyBookingsAsync(int attendeeId, string? status = null)
         {
             var bookings = await _bookingRepository.GetBookingsByUserIdAsync(attendeeId);
+            
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                bookings = bookings.Where(b => b.Booking_Status.Equals(status, StringComparison.OrdinalIgnoreCase));
+            }
+
             return bookings.Select(MapToBookingResponse).Where(x => x != null).Cast<BookingResponse>().ToList();
         }
 
@@ -506,7 +543,8 @@ namespace Event.Business.Services
                 Qr_Code_Path = booking.Qr_Code_Path,
                 CheckIn_Status = booking.CheckIn_Status,
                 Created_At = booking.Created_At,
-                Virtual_Url = booking.Event?.Virtual_Url,
+                Virtual_Url = booking.Virtual_Url ?? booking.Event?.Virtual_Url,
+                Virtual_Password_Hash = booking.Event?.Virtual_Password_Hash,
                 Details = booking.Details?.Select(d => new BookingDetailDto
                 {
                     Tier_Name = d.Tier_Name,

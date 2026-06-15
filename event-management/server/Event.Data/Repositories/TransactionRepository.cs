@@ -51,6 +51,12 @@ namespace Event.Data.Repositories
                 .FirstOrDefaultAsync(t => t.Related_Id == eventId && t.Transaction_Type == "OrganizerUpfrontPayment" && t.Status == "Pending");
         }
 
+        public async Task<Transaction?> GetSuccessOrganizerUpfrontTransactionAsync(int eventId)
+        {
+            return await _dbSet
+                .FirstOrDefaultAsync(t => t.Related_Id == eventId && t.Transaction_Type == "OrganizerUpfrontPayment" && t.Status == "Success");
+        }
+
         public async Task<decimal> GetGrossRevenueAsync()
         {
             return await _dbSet

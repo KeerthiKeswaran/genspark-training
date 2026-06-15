@@ -75,7 +75,7 @@ namespace Event.Business.Services
 
         #region BrowseEventsAsync
 
-        public async Task<PagedResult<Event.Models.Event>> BrowseEventsAsync(string? keyword, string? category, DateTime? minDateTime, string? regionId, int page, int size)
+        public async Task<PagedResult<BrowsedEventResponse>> BrowseEventsAsync(string? keyword, string? category, DateTime? minDateTime, string? regionId, int page, int size)
         {
             // 1. Calculate the cutoff search time (must be at least 30 minutes in the future)
             var cutoffTime = DateTime.UtcNow.AddMinutes(30);
@@ -84,7 +84,64 @@ namespace Event.Business.Services
                 : cutoffTime;
 
             // 2. Query event repository for paged results matching filters
-            return await _eventRepository.SearchEventsAsync(keyword, category, searchMinTime, regionId, page, size);
+            var rawResult = await _eventRepository.SearchEventsAsync(keyword, category, searchMinTime, regionId, page, size);
+
+            // 3. Map to BrowsedEventResponse DTO
+            var mappedItems = new List<BrowsedEventResponse>();
+            if (rawResult.Items != null)
+            {
+                foreach (var ev in rawResult.Items)
+                {
+                    var ticketTiers = new List<TicketTierDetailsDto>();
+                    if (ev.TicketTiers != null)
+                    {
+                        foreach (var tier in ev.TicketTiers)
+                        {
+                            ticketTiers.Add(new TicketTierDetailsDto
+                            {
+                                Tier_Name = tier.Tier_Name,
+                                Price = tier.Price,
+                                Tickets_Sold = tier.Tickets_Sold
+                            });
+                        }
+                    }
+
+                    var reports = new List<BrowsedEventReportDto>();
+                    if (ev.Reports != null)
+                    {
+                        foreach (var report in ev.Reports)
+                        {
+                            reports.Add(new BrowsedEventReportDto
+                            {
+                                Report_Id = report.Report_Id,
+                                Reporter_Id = report.Reporter_Id,
+                                Reason = report.Reason,
+                                Created_At = report.Created_At
+                            });
+                        }
+                    }
+
+                    mappedItems.Add(new BrowsedEventResponse
+                    {
+                        Event_Id = ev.Event_Id,
+                        Organizer_Name = ev.Organizer?.Name ?? string.Empty,
+                        Venue_Name = ev.Venue?.Name,
+                        Address = ev.Venue?.Address,
+                        Venue_Region_Name = ev.Venue?.Region?.Region_Name,
+                        Event_Type = ev.Event_Type,
+                        Title = ev.Title,
+                        Description_Url = ev.Description_Url,
+                        Image_Url = ev.Image_Url,
+                        Date_Time = ev.Date_Time,
+                        Status = ev.Status,
+                        Duration_Hours = ev.Duration_Hours,
+                        TicketTiers = ticketTiers,
+                        Reports = reports
+                    });
+                }
+            }
+
+            return new PagedResult<BrowsedEventResponse>(mappedItems, rawResult.TotalCount, rawResult.Page, rawResult.PageSize);
         }
 
         #endregion
@@ -383,10 +440,8 @@ namespace Event.Business.Services
                     Duration_Hours = request.DurationHours,
                     Status = "Activation Pending",
                     Requires_Staff = request.RequiresStaff,
-                    Virtual_Url = request.VirtualUrl,
-                    Virtual_Password_Hash = !string.IsNullOrEmpty(request.VirtualPassword) 
-                        ? BCrypt.Net.BCrypt.HashPassword(request.VirtualPassword) 
-                        : null
+                    Virtual_Url = null,
+                    Virtual_Password_Hash = null
                 };
 
                 // Add ticket tiers
@@ -514,6 +569,16 @@ namespace Event.Business.Services
                     transaction.Remarks = chargeResult.ErrorMessage;
                     await _transactionRepository.UpdateAsync(transaction);
                     await _bookingRepository.CommitTransactionAsync();
+
+                    try
+                    {
+                        await RevertPendingEventCreationAsync(eventId);
+                    }
+                    catch (Exception)
+                    {
+                        // Ignore inner exception to propagate the original charge failed validation exception
+                    }
+
                     throw new ValidationException($"Stripe charge failed: {chargeResult.ErrorMessage}");
                 }
 
@@ -837,9 +902,7 @@ namespace Event.Business.Services
 
 
 
-        #region GetEventsByInterestedRegionsAsync
-
-        public async Task<System.Collections.Generic.IEnumerable<Event.Models.Event>> GetEventsByInterestedRegionsAsync(int userId)
+        public async Task<System.Collections.Generic.IEnumerable<BrowsedEventResponse>> GetEventsByInterestedRegionsAsync(int userId)
         {
             var user = await _userRepository.GetUserProfileAsync(userId);
             if (user == null)
@@ -850,12 +913,62 @@ namespace Event.Business.Services
             var regionIds = user.InterestedRegions.Select(r => r.Region_Id).ToList();
             if (!regionIds.Any())
             {
-                return new List<Event.Models.Event>();
+                return new List<BrowsedEventResponse>();
             }
 
-            return await _eventRepository.GetEventsByRegionsAsync(regionIds);
-        }
+            var rawEvents = await _eventRepository.GetEventsByRegionsAsync(regionIds);
+            var response = new List<BrowsedEventResponse>();
+            foreach (var ev in rawEvents)
+            {
+                var ticketTiers = new List<TicketTierDetailsDto>();
+                if (ev.TicketTiers != null)
+                {
+                    foreach (var tier in ev.TicketTiers)
+                    {
+                        ticketTiers.Add(new TicketTierDetailsDto
+                        {
+                            Tier_Name = tier.Tier_Name,
+                            Price = tier.Price,
+                            Tickets_Sold = tier.Tickets_Sold
+                        });
+                    }
+                }
 
-        #endregion
+                var reports = new List<BrowsedEventReportDto>();
+                if (ev.Reports != null)
+                {
+                    foreach (var report in ev.Reports)
+                    {
+                        reports.Add(new BrowsedEventReportDto
+                        {
+                            Report_Id = report.Report_Id,
+                            Reporter_Id = report.Reporter_Id,
+                            Reason = report.Reason,
+                            Created_At = report.Created_At
+                        });
+                    }
+                }
+
+                response.Add(new BrowsedEventResponse
+                {
+                    Event_Id = ev.Event_Id,
+                    Organizer_Name = ev.Organizer?.Name ?? string.Empty,
+                    Venue_Name = ev.Venue?.Name,
+                    Address = ev.Venue?.Address,
+                    Venue_Region_Name = ev.Venue?.Region?.Region_Name,
+                    Event_Type = ev.Event_Type,
+                    Title = ev.Title,
+                    Description_Url = ev.Description_Url,
+                    Image_Url = ev.Image_Url,
+                    Date_Time = ev.Date_Time,
+                    Status = ev.Status,
+                    Duration_Hours = ev.Duration_Hours,
+                    TicketTiers = ticketTiers,
+                    Reports = reports
+                });
+            }
+
+            return response;
+        }
     }
 }

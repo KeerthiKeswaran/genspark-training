@@ -50,12 +50,12 @@ namespace Event.API.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetMyBookings()
+        public async Task<IActionResult> GetMyBookings([FromQuery] string? status)
         {
             try
             {
                 int attendeeId = _userService.GetCurrentUserId();
-                var bookings = await _bookingService.GetMyBookingsAsync(attendeeId);
+                var bookings = await _bookingService.GetMyBookingsAsync(attendeeId, status);
                 return Ok(bookings);
             }
             catch (UnauthorizedAccessException ex)

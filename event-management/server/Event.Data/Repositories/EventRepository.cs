@@ -47,6 +47,11 @@ namespace Event.Data.Repositories
 
             int totalCount = await query.CountAsync();
             var items = await query
+                .Include(e => e.Organizer)
+                .Include(e => e.Venue)
+                    .ThenInclude(v => v.Region)
+                .Include(e => e.TicketTiers)
+                .Include(e => e.Reports)
                 .OrderByDescending(e => e.Event_Id)
                 .Skip((page - 1) * size)
                 .Take(size)
@@ -122,7 +127,11 @@ namespace Event.Data.Repositories
         public async Task<System.Collections.Generic.IEnumerable<Event.Models.Event>> GetEventsByRegionsAsync(System.Collections.Generic.IEnumerable<string> regionIds)
         {
             return await _dbSet
+                .Include(e => e.Organizer)
                 .Include(e => e.Venue)
+                    .ThenInclude(v => v.Region)
+                .Include(e => e.TicketTiers)
+                .Include(e => e.Reports)
                 .Where(e => e.Status == "Live" && e.Venue != null && regionIds.Contains(e.Venue.Region_Id))
                 .ToListAsync();
         }
@@ -219,6 +228,14 @@ namespace Event.Data.Repositories
                 .ToListAsync();
 
             return new PagedResult<Event.Models.Event>(items, totalCount, page, size);
+        }
+
+        public async Task<System.Collections.Generic.IEnumerable<Event.Models.Event>> GetEventsByOrganizerAsync(int organizerId)
+        {
+            return await _dbSet
+                .Include(e => e.Venue)
+                .Where(e => e.Organizer_Id == organizerId)
+                .ToListAsync();
         }
     }
 }

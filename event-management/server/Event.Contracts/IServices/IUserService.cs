@@ -8,8 +8,10 @@ namespace Event.Contracts.IServices
     public interface IUserService
     {
         int GetCurrentUserId();
-        Task<bool> SelectInterestedRegionsAsync(int userId, IEnumerable<string> regionIds);
-        Task<bool> UpdateUserProfileAsync(int userId, string name, string mobileNumber, IEnumerable<string> interestedRegions);
+        Task<bool> SelectInterestedRegionsAsync(int userId, string regionId);
+        Task<bool> UpdateUserProfileAsync(int userId, string name, string mobileNumber);
         Task<UserProfileResponse?> GetUserProfileAsync(int userId);
+        Task<IEnumerable<MyEventOverviewResponse>> GetMyEventsAsync(int organizerId);
+        Task<MyEventDetailsResponse?> GetMyEventDetailsAsync(int organizerId, int eventId);
     }
 }

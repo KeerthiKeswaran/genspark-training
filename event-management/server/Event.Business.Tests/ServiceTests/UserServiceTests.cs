@@ -18,6 +18,7 @@ namespace Event.Business.Tests.ServiceTests
     {
         private Mock<IHttpContextAccessor> _httpContextAccessorMock = null!;
         private Mock<IUserRepository> _userRepositoryMock = null!;
+        private Mock<IEventRepository> _eventRepositoryMock = null!;
         private UserService _userService = null!;
 
         private const string Service = "UserService";
@@ -30,7 +31,8 @@ namespace Event.Business.Tests.ServiceTests
         {
             _httpContextAccessorMock = new Mock<IHttpContextAccessor>();
             _userRepositoryMock = new Mock<IUserRepository>();
-            _userService = new UserService(_httpContextAccessorMock.Object, _userRepositoryMock.Object);
+            _eventRepositoryMock = new Mock<IEventRepository>();
+            _userService = new UserService(_httpContextAccessorMock.Object, _userRepositoryMock.Object, _eventRepositoryMock.Object);
         }
         #endregion
 
@@ -106,13 +108,13 @@ namespace Event.Business.Tests.ServiceTests
 
             try
             {
-                var result = await _userService.SelectInterestedRegionsAsync(1, new[] { "US-EAST" });
+                var result = await _userService.SelectInterestedRegionsAsync(1, "US-EAST");
                 Assert.That(result, Is.True);
-                LogTestDetail(Service, "SelectInterestedRegionsAsync", "Select interested regions for user successfully", new { UserId = 1, Regions = new[] { "US-EAST" } }, result, true);
+                LogTestDetail(Service, "SelectInterestedRegionsAsync", "Select interested regions for user successfully", new { UserId = 1, Region = "US-EAST" }, result, true);
             }
             catch (Exception ex)
             {
-                LogTestDetail(Service, "SelectInterestedRegionsAsync", "Select interested regions for user successfully", new { UserId = 1, Regions = new[] { "US-EAST" } }, null, false, ex.Message);
+                LogTestDetail(Service, "SelectInterestedRegionsAsync", "Select interested regions for user successfully", new { UserId = 1, Region = "US-EAST" }, null, false, ex.Message);
                 throw;
             }
         }
@@ -125,7 +127,7 @@ namespace Event.Business.Tests.ServiceTests
             try
             {
                 Assert.ThrowsAsync<NotFoundException>(async () =>
-                    await _userService.SelectInterestedRegionsAsync(999, new[] { "US-EAST" })
+                    await _userService.SelectInterestedRegionsAsync(999, "US-EAST")
                 );
                 LogTestDetail(Service, "SelectInterestedRegionsAsync", "Non-existent user throws not found exception", new { UserId = 999 }, "NotFoundException", true);
             }
@@ -144,18 +146,17 @@ namespace Event.Business.Tests.ServiceTests
             var user = new User { User_Id = 1, Name = TestName, Email = TestEmail, Mobile_Number = "1234" };
             _userRepositoryMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(user);
             _userRepositoryMock.Setup(r => r.UpdateAsync(user)).Returns(Task.CompletedTask);
-            _userRepositoryMock.Setup(r => r.ExistsAsync(1)).ReturnsAsync(true);
 
             try
             {
-                var result = await _userService.UpdateUserProfileAsync(1, "Updated Name", "9876", new[] { "US-EAST" });
+                var result = await _userService.UpdateUserProfileAsync(1, "Updated Name", "9876");
                 Assert.That(result, Is.True);
                 Assert.That(user.Name, Is.EqualTo("Updated Name"));
-                LogTestDetail(Service, "UpdateUserProfileAsync", "Update user profile and regions", new { UserId = 1, Name = "Updated Name" }, result, true);
+                LogTestDetail(Service, "UpdateUserProfileAsync", "Update user profile", new { UserId = 1, Name = "Updated Name" }, result, true);
             }
             catch (Exception ex)
             {
-                LogTestDetail(Service, "UpdateUserProfileAsync", "Update user profile and regions", new { UserId = 1, Name = "Updated Name" }, null, false, ex.Message);
+                LogTestDetail(Service, "UpdateUserProfileAsync", "Update user profile", new { UserId = 1, Name = "Updated Name" }, null, false, ex.Message);
                 throw;
             }
         }
@@ -165,7 +166,16 @@ namespace Event.Business.Tests.ServiceTests
         [Test]
         public async Task Test_GetUserProfileAsync_Success()
         {
-            var user = new User { User_Id = 1, Name = TestName, Email = TestEmail };
+            var user = new User 
+            { 
+                User_Id = 1, 
+                Name = TestName, 
+                Email = TestEmail,
+                InterestedRegions = new List<UserInterestedRegion>
+                {
+                    new UserInterestedRegion { Region_Id = "US-EAST" }
+                }
+            };
             _userRepositoryMock.Setup(r => r.GetUserProfileAsync(1)).ReturnsAsync(user);
 
             try
@@ -173,11 +183,68 @@ namespace Event.Business.Tests.ServiceTests
                 var result = await _userService.GetUserProfileAsync(1);
                 Assert.That(result, Is.Not.Null);
                 Assert.That(result.Name, Is.EqualTo(TestName));
+                Assert.That(result.RegionId, Is.EqualTo("US-EAST"));
                 LogTestDetail(Service, "GetUserProfileAsync", "Retrieve user profile details", 1, result, true);
             }
             catch (Exception ex)
             {
                 LogTestDetail(Service, "GetUserProfileAsync", "Retrieve user profile details", 1, null, false, ex.Message);
+                throw;
+            }
+        }
+        #endregion
+
+        #region GetMyEventsAsync Tests
+        [Test]
+        public async Task Test_GetMyEventsAsync_Success()
+        {
+            _userRepositoryMock.Setup(r => r.ExistsAsync(1)).ReturnsAsync(true);
+            var mockEvents = new List<Event.Models.Event>
+            {
+                new Event.Models.Event { Event_Id = 101, Title = "Test Event 1", Event_Type = "Physical", Date_Time = DateTime.UtcNow }
+            };
+            _eventRepositoryMock.Setup(r => r.GetEventsByOrganizerAsync(1)).ReturnsAsync(mockEvents);
+
+            try
+            {
+                var result = await _userService.GetMyEventsAsync(1);
+                Assert.That(result, Is.Not.Null);
+                Assert.That(result.Count(), Is.EqualTo(1));
+                LogTestDetail(Service, "GetMyEventsAsync", "Retrieve my events list overview", 1, result, true);
+            }
+            catch (Exception ex)
+            {
+                LogTestDetail(Service, "GetMyEventsAsync", "Retrieve my events list overview", 1, null, false, ex.Message);
+                throw;
+            }
+        }
+        #endregion
+
+        #region GetMyEventDetailsAsync Tests
+        [Test]
+        public async Task Test_GetMyEventDetailsAsync_Success()
+        {
+            var mockEvent = new Event.Models.Event 
+            { 
+                Event_Id = 101, 
+                Organizer_Id = 1, 
+                Title = "Test Event 1", 
+                Event_Type = "Virtual", 
+                Virtual_Url = "http://jitsi",
+                Virtual_Password_Hash = "hashed"
+            };
+            _eventRepositoryMock.Setup(r => r.GetEventDetailsAsync(101)).ReturnsAsync(mockEvent);
+
+            try
+            {
+                var result = await _userService.GetMyEventDetailsAsync(1, 101);
+                Assert.That(result, Is.Not.Null);
+                Assert.That(result.Virtual_Url, Is.EqualTo("http://jitsi"));
+                LogTestDetail(Service, "GetMyEventDetailsAsync", "Retrieve my event full details", 101, result, true);
+            }
+            catch (Exception ex)
+            {
+                LogTestDetail(Service, "GetMyEventDetailsAsync", "Retrieve my event full details", 101, null, false, ex.Message);
                 throw;
             }
         }

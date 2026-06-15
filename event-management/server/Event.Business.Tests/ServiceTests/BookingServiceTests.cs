@@ -646,5 +646,146 @@ namespace Event.Business.Tests.ServiceTests
             _bookingRepositoryMock.Verify(r => r.RollbackTransactionAsync(), Times.Once);
         }
         #endregion
+
+        #region Virtual Passcode Tests
+        [Test]
+        public async Task Test_ConfirmBookingPaymentAsync_HybridEvent_SharesPasscodeAndUrl()
+        {
+            int bookingId = 10600;
+            var attendee = new User
+            {
+                User_Id = 10002,
+                Name = "Test Attendee",
+                Email = "attendee@example.com"
+            };
+
+            var mockBooking = new Booking
+            {
+                Booking_Id = bookingId,
+                Booking_Status = "Payment Pending",
+                Attendee_Id = attendee.User_Id,
+                Attendee = attendee,
+                Event_Id = 200,
+                Event = new Event.Models.Event 
+                { 
+                    Event_Id = 200,
+                    Title = "Hybrid Masterclass", 
+                    Event_Type = "Hybrid",
+                    Virtual_Url = "https://meet.jit.si/hybrid-masterclass",
+                    Virtual_Password_Hash = "hashed_passcode"
+                },
+                Details = new List<BookingDetail>
+                {
+                    new BookingDetail { Tier_Name = "Virtual", Quantity = 2 }
+                }
+            };
+
+            var mockTx = new Transaction
+            {
+                Transaction_Id = 1000000000000999L,
+                Amount = 300.00m,
+                Currency = "INR",
+                Status = "Pending"
+            };
+
+            var mockSettings = new PlatformSettings
+            {
+                Ticket_Commission_Percentage = 5.0m,
+                Ticket_Fixed_Fee = 0.0m
+            };
+
+            var mockUpfrontTx = new Transaction
+            {
+                Transaction_Id = 1000000000000888L,
+                Status = "Success",
+                Transaction_Type = "OrganizerUpfrontPayment",
+                Related_Id = 200,
+                Remarks = "Upfront payment \n[Virtual Access Passcode]: secretpasscode123"
+            };
+
+            _bookingRepositoryMock.Setup(r => r.GetBookingDetailsAsync(bookingId)).ReturnsAsync(mockBooking);
+            _transactionRepositoryMock.Setup(r => r.GetPendingBookingTransactionAsync(bookingId)).ReturnsAsync(mockTx);
+            _settingsRepositoryMock.Setup(r => r.GetSettingsAsync()).ReturnsAsync(mockSettings);
+            _transactionRepositoryMock.Setup(r => r.GetSuccessOrganizerUpfrontTransactionAsync(200)).ReturnsAsync(mockUpfrontTx);
+
+            _bookingPaymentRepositoryMock.Setup(r => r.AddAsync(It.IsAny<BookingPayment>())).Returns(Task.CompletedTask);
+            _bookingRepositoryMock.Setup(r => r.UpdateAsync(It.IsAny<Booking>())).Returns(Task.CompletedTask);
+            _transactionRepositoryMock.Setup(r => r.UpdateAsync(It.IsAny<Transaction>())).Returns(Task.CompletedTask);
+
+            var result = await _bookingService.ConfirmBookingPaymentAsync(bookingId, "tok_visa", "StripeCard");
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result.Virtual_Password_Hash, Is.EqualTo("hashed_passcode"));
+            Assert.That(result.Virtual_Url, Is.EqualTo("https://meet.jit.si/hybrid-masterclass"));
+            LogTestDetail(ServiceName, "ConfirmBookingPaymentAsync", "Confirm booking for Hybrid event maps passcode and url", bookingId, result, true);
+        }
+
+        [Test]
+        public async Task Test_GetMyBookingsAsync_ReturnsVirtualPasswordHash()
+        {
+            var mockBookings = new List<Booking>
+            {
+                new Booking
+                {
+                    Booking_Id = 10700,
+                    Attendee_Id = 10002,
+                    Event_Id = 201,
+                    Event = new Event.Models.Event
+                    {
+                        Event_Id = 201,
+                        Title = "Virtual Webinar",
+                        Event_Type = "Virtual",
+                        Virtual_Password_Hash = "webinar_hash"
+                    },
+                    Virtual_Url = "https://meet.jit.si/webinar"
+                }
+            };
+
+            _bookingRepositoryMock.Setup(r => r.GetBookingsByUserIdAsync(10002)).ReturnsAsync(mockBookings);
+
+            var result = await _bookingService.GetMyBookingsAsync(10002);
+            Assert.That(result, Is.Not.Null);
+            var booking = result.FirstOrDefault();
+            Assert.That(booking, Is.Not.Null);
+            Assert.That(booking.Virtual_Password_Hash, Is.EqualTo("webinar_hash"));
+            Assert.That(booking.Virtual_Url, Is.EqualTo("https://meet.jit.si/webinar"));
+            LogTestDetail(ServiceName, "GetMyBookingsAsync", "Get bookings returns passcode hash and url", 10002, result, true);
+        }
+
+        [Test]
+        public async Task Test_GetMyBookingsAsync_FiltersByStatus()
+        {
+            var mockBookings = new List<Booking>
+            {
+                new Booking
+                {
+                    Booking_Id = 10700,
+                    Attendee_Id = 10002,
+                    Booking_Status = "Confirmed",
+                    Event = new Event.Models.Event { Title = "Event 1" }
+                },
+                new Booking
+                {
+                    Booking_Id = 10701,
+                    Attendee_Id = 10002,
+                    Booking_Status = "Cancelled",
+                    Event = new Event.Models.Event { Title = "Event 2" }
+                }
+            };
+
+            _bookingRepositoryMock.Setup(r => r.GetBookingsByUserIdAsync(10002)).ReturnsAsync(mockBookings);
+
+            var confirmedResult = await _bookingService.GetMyBookingsAsync(10002, "Confirmed");
+            Assert.That(confirmedResult, Is.Not.Null);
+            Assert.That(confirmedResult.Count(), Is.EqualTo(1));
+            Assert.That(confirmedResult.First().Booking_Id, Is.EqualTo(10700));
+
+            var cancelledResult = await _bookingService.GetMyBookingsAsync(10002, "cancelled");
+            Assert.That(cancelledResult, Is.Not.Null);
+            Assert.That(cancelledResult.Count(), Is.EqualTo(1));
+            Assert.That(cancelledResult.First().Booking_Id, Is.EqualTo(10701));
+
+            LogTestDetail(ServiceName, "GetMyBookingsAsync", "Get bookings filters by status successfully", 10002, confirmedResult, true);
+        }
+        #endregion
     }
 }

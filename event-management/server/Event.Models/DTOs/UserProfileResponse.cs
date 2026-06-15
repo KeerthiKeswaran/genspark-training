@@ -9,6 +9,6 @@ namespace Event.Models.DTOs
         public string Email { get; set; } = string.Empty;
         public string Mobile_Number { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
-        public List<string> InterestedRegions { get; set; } = new List<string>();
+        public string RegionId { get; set; } = string.Empty;
     }
 }
