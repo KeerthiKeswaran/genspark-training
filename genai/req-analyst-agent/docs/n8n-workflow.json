@@ -1,0 +1,574 @@
+{
+  "name": "Req-Analyst-Flow",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        32,
+        16
+      ],
+      "id": "79d19205-7a8c-4bd0-92c8-73dd7c44c1a1",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "qKl07467e950M83H",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a senior software business analyst working in a professional product engineering company.\n\nYou are part of an automated system. Your output will be directly parsed by downstream services.\n\nYour task is to analyze client requirements and return a STRICT JSON response.\n\n-------------------------------------\nOUTPUT SCHEMA (MANDATORY)\n-------------------------------------\n\nYou MUST return ONLY a valid JSON object with the following structure:\n\n{\n  \"functional_requirements\": [string],\n  \"non_functional_requirements\": [string],\n  \"risks\": [string],\n  \"assumptions\": [string],\n  \"questions_to_client\": [string]\n}\n\n-------------------------------------\nSTRICT RULES (NON-NEGOTIABLE)\n-------------------------------------\n\n1. DO NOT return anything outside the JSON object.\n2. DO NOT include explanations, headings, markdown, or comments.\n3. DO NOT wrap JSON in backticks or code blocks.\n4. DO NOT include text before or after JSON.\n5. ALL fields must be present (never omit any field).\n6. Each field must be an array of strings.\n7. Each string must be concise, specific, and meaningful.\n8. No empty arrays — always provide at least one item per field.\n9. Ensure the JSON is syntactically valid:\n   - Proper quotes\n   - No trailing commas\n   - No invalid characters\n\n-------------------------------------\nCONTENT QUALITY RULES\n-------------------------------------\n\nFunctional Requirements:\n- Define clear system behaviors and features\n- Avoid vague statements like \"system should work properly\"\n\nNon-Functional Requirements:\n- Include performance, scalability, reliability, and security\n- Use measurable or realistic expectations where possible\n\nRisks:\n- Include technical, operational, and business risks\n- Avoid generic risks\n\nAssumptions:\n- Infer missing details logically\n- Be realistic and practical\n\nQuestions to Client:\n- Ask only high-value clarification questions\n- Questions should impact design or implementation\n\n-------------------------------------\nFAIL-SAFE BEHAVIOR\n-------------------------------------\n\nIf the input is unclear, incomplete, or ambiguous:\n- Still return a fully valid JSON response\n- Use assumptions to fill gaps\n- Generate meaningful questions to clarify\n\n-------------------------------------\nBEHAVIORAL MODE\n-------------------------------------\n\nYou are NOT a chatbot.\nYou are a deterministic analysis engine.\n\nYour output must be consistent, structured, and machine-readable at all times.\n\nUser Input:\nAnalyze the following client requirement:\n{{$json[\"data\"]}}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1616,
+        -96
+      ],
+      "id": "3fbfa9db-695d-4962-a137-ce301ff61716",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        1616,
+        64
+      ],
+      "id": "2add47ee-65d1-4405-b47f-5107425ebf75",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "mT11Fm84WNejSo6o",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "documentText",
+        "options": {
+          "fileName": "analysis.txt"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        2384,
+        0
+      ],
+      "id": "08bbe51a-4d98-4571-a63d-b329b725a1c0",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2592,
+        0
+      ],
+      "id": "2f37fb12-13be-4980-bd46-f9ce9f67c39a",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2832,
+        -224
+      ],
+      "id": "8c63a872-e5d6-43d7-b82f-5306d521e077",
+      "name": "No Operation, do nothing1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        848,
+        112
+      ],
+      "id": "c1cad769-c3f3-47c9-9d0d-ad47f9e21582",
+      "name": "No Operation, do nothing2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a51c04c2-6f20-42bd-9ead-c289ebcbc5e7",
+              "name": "=senderEmail",
+              "value": "={{JSON.parse($json[\"from\"]).value[0].address }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        16
+      ],
+      "id": "a7dad44e-e1cc-4c7a-89be-2e60afe65da7",
+      "name": "Retrive Email"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1oUjeP-aqOmX6GzBJDP9kDHq7K0xtH-TLacPVAmBpqxY",
+          "mode": "list",
+          "cachedResultName": "Client Sheet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1oUjeP-aqOmX6GzBJDP9kDHq7K0xtH-TLacPVAmBpqxY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1oUjeP-aqOmX6GzBJDP9kDHq7K0xtH-TLacPVAmBpqxY/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Client_Emails",
+              "lookupValue": "={{ $('Gmail Trigger').item.json.From.match(/<([^>]+)>/)?.[1] || $('Gmail Trigger').item.json.From }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        432,
+        16
+      ],
+      "id": "35c6a656-9ab3-4aee-928f-6081601d1bbc",
+      "name": "Get Sheet Rows",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "eIFuyWia6ehE761F",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "08797279-add9-42e3-825f-07fe8c68957e",
+              "leftValue": "={{ $('Gmail Trigger').item.json.From.match(/<([^>]+)>/)?.[1] }}",
+              "rightValue": "={{$json.Client_Emails}}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        640,
+        16
+      ],
+      "id": "5cc6b5cc-30f6-4bc4-91bc-57118cd72527",
+      "name": "If (Email exists in Records)"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": "={{ $('Gmail Trigger').item.json.id }}",
+        "simple": false,
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        912,
+        -96
+      ],
+      "id": "027d36de-8356-4356-ab87-f03d254be385",
+      "name": "Get Email Message",
+      "webhookId": "51929861-88fb-4d72-a3c8-e3014811aebd",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "qKl07467e950M83H",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const binaries = items[0].binary;\n\nfor (const key in binaries) {\n  if (binaries[key].fileName === \"requirements.txt\") {\n    return [\n      {\n        binary: {\n          data: binaries[key]\n        }\n      }\n    ];\n  }\n}\n\nthrow new Error(\"requirements.txt not found\");"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        -96
+      ],
+      "id": "cf4239f2-d924-4835-afdb-676682448e7e",
+      "name": "Extract Attachments"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1392,
+        -96
+      ],
+      "id": "31a8c581-e47f-4faa-9f74-7b6e47d3d6b6",
+      "name": "Extract Contents"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cd488a0c-cf54-4c7a-b77c-f0fb0dc0eed1",
+              "name": "analysis",
+              "value": "={{   (() => {     let data = $json[\"output\"];      if (typeof data === \"string\") {       data = JSON.parse(data);     }      if (typeof data === \"string\") {       data = JSON.parse(data);     }      return data;   })() }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1968,
+        -96
+      ],
+      "id": "243dd817-2595-4e28-ba52-0d70030538fa",
+      "name": "Format Output as JSON"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4a8e0390-58b2-4adc-8c06-2a5ac67ec118",
+              "name": "questionsText",
+              "value": "={{ \"• \" + $json.analysis.questions_to_client.join(\"\\n• \") }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2208,
+        -224
+      ],
+      "id": "db52b907-d407-4bd0-a470-40bd7c5fa61a",
+      "name": "Extract Questions"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "16531f63-4628-4c2b-8184-8ef7b251f472",
+              "name": "=emailBody",
+              "value": "={{ `Hello,<br><br>Thank you for sharing your requirements. We have reviewed them and performed an initial analysis.<br><br>To proceed further, we would like to clarify the following:<br><br><ul><li>` + $json.questionsText.split(\"\\n\").map(q => q.replace(/[•\\s-]+/, '').trim()).filter(Boolean).join(\"</li><li>\") + `</li></ul><br><br>These inputs will help us refine the scope and provide an accurate solution.<br><br>Looking forward to your response.<br><br>Regards,<br>Your Team` }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2416,
+        -224
+      ],
+      "id": "c890f34f-29c2-41dd-b327-cafd33a947d6",
+      "name": "Draft Email"
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $node[\"Get Email Message\"].json[\"id\"] }}",
+        "message": "={{$json[\"emailBody\"]}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2624,
+        -224
+      ],
+      "id": "a53512f2-bcbf-429c-81e5-a99a14840535",
+      "name": "Reply to the Email",
+      "webhookId": "9f338ec3-af3e-4c38-a182-8fe57eb1b2fb",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "qKl07467e950M83H",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "965d8d5f-9c68-409f-ac0d-2c6907aa36e8",
+              "name": "documentText",
+              "value": "={{ \"PROJECT REQUIREMENT ANALYSIS\\n\\n\" +  \"Functional Requirements:\\n \" + $json.analysis.functional_requirements.join(\"\\n \") + \"\\n\\n\" +  \"Non-Functional Requirements:\\n \" + $json.analysis.non_functional_requirements.join(\"\\n \") + \"\\n\\n\" +  \"Risks:\\n \" + $json.analysis.risks.join(\"\\n \") + \"\\n\\n\" +  \"Assumptions:\\n \" + $json.analysis.assumptions.join(\"\\n \") + \"\\n\\n\" +  \"Questions to Client:\\n \" + $json.analysis.questions_to_client.join(\"\\n \") }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2192,
+        0
+      ],
+      "id": "12470b1f-3e06-4600-a879-f4421e2df686",
+      "name": "Extract Analysis Output"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Retrive Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Format Output as JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrive Email": {
+      "main": [
+        [
+          {
+            "node": "Get Sheet Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sheet Rows": {
+      "main": [
+        [
+          {
+            "node": "If (Email exists in Records)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (Email exists in Records)": {
+      "main": [
+        [
+          {
+            "node": "Get Email Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Email Message": {
+      "main": [
+        [
+          {
+            "node": "Extract Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Attachments": {
+      "main": [
+        [
+          {
+            "node": "Extract Contents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Contents": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Output as JSON": {
+      "main": [
+        [
+          {
+            "node": "Extract Analysis Output",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Extract Questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Questions": {
+      "main": [
+        [
+          {
+            "node": "Draft Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft Email": {
+      "main": [
+        [
+          {
+            "node": "Reply to the Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply to the Email": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Analysis Output": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "0093809d-ff65-4901-bdc4-1ba038db6b47",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b44e512394e9a92d3d051d00f77e7b794aeb0634a1ed67aa48f4b07efa613d77"
+  },
+  "nodeGroups": [],
+  "id": "SuhgKSTNXV1yKwt8",
+  "tags": []
+}
