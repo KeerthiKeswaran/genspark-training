@@ -25,6 +25,9 @@ The project is structured following clean architecture guidelines:
 *   **Single Interested Region**: Refactored the user interested region preference from a list/collection to a single `RegionId` string, simplifying onboarding.
 *   **Public Regions Discovery**: Added a public `/api/regions` endpoint, allowing the frontend client to query the list of active operating regions without needing user authentication (e.g., for location-based landing pages).
 *   **Organizer Created Events Retrieval**: Exposes two new routes under `UserController`: `GET /api/user/my-events` (which returns a non-sensitive overview of events created by the logged-in organizer) and `GET /api/user/my-events/{eventId}` (which returns the full event details, including Jitsi meeting URLs and passcode hashes).
+*   **Bookings Filtering by Status**: Added a `status` query parameter to the `GET /api/booking` endpoint, allowing users to filter their bookings list by status (`Confirmed` or `Cancelled`).
+*   **Hybrid/Virtual Event Details & Booking Response**: Updated booking confirmation and retrieval flows to share virtual meeting URLs (`Virtual_Url`) and meeting passcode hashes (`Virtual_Password_Hash`) with the attendee once their booking is confirmed.
+*   **Automated Email Credentials**: When a hybrid/virtual event is booked, the booking engine now automatically emails the attendee with the meeting link and the raw (unhashed) passcode.
 
 ---
 
@@ -146,7 +149,7 @@ Our comprehensive test suite validates all critical paths, mocking DB adapters a
 
 *   **Business Layer Tests (`Event.Business.Tests.dll`)**:
     ```text
-    Passed!  - Failed:     0, Passed:   166, Skipped:     0, Total:   166, Duration: 27 s - Event.Business.Tests.dll (net10.0)
+    Passed!  - Failed:     0, Passed:   206, Skipped:     0, Total:   206, Duration: 27 s - Event.Business.Tests.dll (net10.0)
     ```
 *   **Data Layer Tests (`Event.Data.Tests.dll`)**:
     ```text
@@ -167,19 +170,19 @@ The coverage metrics generated using `coverlet` and `dotnet test` are summarized
 
 | Module | Line Coverage | Branch Coverage | Method Coverage |
 | :--- | :--- | :--- | :--- |
-| **Event.Models** | 79.1% | 16.66% | 80.43% |
+| **Event.Models** | **82.58%** | **16.66%** | **83.74%** |
 | **Event.Data** | 0% | 0% | 0% |
-| **Event.Business** | **90.09%** | **73.75%** | **96.63%** |
+| **Event.Business** | **92.54%** | **81.15%** | **96.00%** |
 | **Event.Contracts** | 100% | 100% | 100% |
-| **Total** | **10.15%** | **66.84%** | **62.64%** |
-| **Average** | **67.29%** | **47.6%** | **69.26%** |
+| **Total** | **9.77%** | **74.66%** | **65.49%** |
+| **Average** | **68.78%** | **49.45%** | **69.94%** |
 
 > [!NOTE]
 > `Event.Data` registers 0% coverage because the database repositories rely on concrete PostgreSQL instances, which are excluded from standard Business logic unit tests to preserve test execution speeds.
 
 ---
 
-### Why `Event.Business` is at ~90% (Not 100%)
+### Why `Event.Business` is at ~92.5% (Not 100%)
 
 While all critical code paths are thoroughly validated, achieving 100% coverage is restricted by defensive infrastructure constraints:
 
