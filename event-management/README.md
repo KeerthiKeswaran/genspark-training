@@ -29,61 +29,8 @@ The database is built on **PostgreSQL** using Entity Framework Core. Specific se
 
 #### Entity Relationship Diagram (ERD)
 
-```mermaid
----
-config:
-  layout: elk
----
-erDiagram
-    %% Lookup / Configuration Setup
-    Admins ||--o{ PlatformSettings : "updates"
-    TermsAndConditions ||--o{ Users : "consented by"
-
-    %% Regional Management
-    Management ||--o{ Staffs : "has"
-    Management ||--o{ Venues : "has"
-    Venues ||--o{ VenueSeatCapacities : "defines"
-    Management ||--o{ UserInterestedRegions : "contains"
-    Users ||--o{ UserInterestedRegions : "selects"
-
-    %% Staff Allocations
-    Staffs ||--o{ EventStaffAllocations : "assigned to"
-    Events ||--o{ EventStaffAllocations : "allocates"
-
-    %% Users, Events, Bookings (Core Triangle)
-    Users ||--o{ Events : "organizes"
-    Venues ||--o{ Events : "hosts"
-    Events ||--o{ EventTicketTiers : "defines"
-
-    Users ||--o{ Bookings : "makes"
-    Events ||--o{ Bookings : "receives"
-    Bookings ||--o{ BookingDetails : "contains"
-
-    %% Feedback, Reports, and Support
-    Events ||--o{ EventFeedbacks : "gets"
-    Users ||--o{ EventFeedbacks : "submits"
-    Events ||--o{ EventReports : "receives"
-    Users ||--o{ EventReports : "files"
-
-    %% Support & Admin Actions
-    Users ||--o{ SupportTickets : "submits"
-    SupportTickets }o--o| Bookings : "references"
-    SupportTickets }o--o| Events : "references"
-    Admins ||--o{ AdminActions : "moderates"
-    SupportTickets ||--o| AdminActions : "linked to"
-
-    %% Financial Transactions & Audit Ledger
-    Bookings ||--o{ BookingPayments : "has"
-    Events ||--o{ OrganizerUpfrontPayments : "requires"
-    Events ||--o{ OrganizerPayouts : "payout"
-    
-    Transactions ||--o{ BookingPayments : "ledger"
-    Transactions ||--o{ OrganizerUpfrontPayments : "ledger"
-    Transactions ||--o| OrganizerPayouts : "ledger"
-
-    %% Independent
-    Notifications
-```
+## Database Schema
+![Entity Relationship Diagram](docs/designs/erdiagram.png)
 
 ### Table Definitions & Key Constraints
 1. **Users (`"Users"`)**: Attendee and Organizer accounts. Key fields: `User_Id` (PK), `Email` (Unique), `Password_Hash`, `Consented_Terms_Id` (FK to `"TermsAndConditions"`), `Status` (Active, Restricted, Deactivated).
