@@ -20,5 +20,7 @@ namespace Event.Models
         public string Status { get; set; } = string.Empty;
 
         public string? EsclationStatus { get; set; } // "Available", "Unavailable"
+        
+        public int? RelatedId { get; set; }
     }
 }

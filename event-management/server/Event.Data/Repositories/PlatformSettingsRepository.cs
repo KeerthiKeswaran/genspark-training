@@ -14,7 +14,7 @@ namespace Event.Data.Repositories
 
         public async Task<PlatformSettings?> GetSettingsAsync()
         {
-            return await _dbSet.FirstOrDefaultAsync(ps => ps.Settings_Id == 1);
+            return await _dbSet.FirstOrDefaultAsync();
         }
     }
 }

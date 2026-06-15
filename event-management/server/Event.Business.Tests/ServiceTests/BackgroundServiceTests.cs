@@ -43,10 +43,14 @@ namespace Event.Business.Tests.ServiceTests
             eventRepositoryMock.Setup(r => r.GetExpiredEventsAsync(It.IsAny<DateTime>())).ReturnsAsync(new List<Event.Models.Event>());
 
             var configuration = CreateTestConfiguration();
-            var emailService = CreateConcreteEmailService(configuration);
-            var paymentService = CreateConcretePaymentService(configuration);
-            var virtualMeetingService = CreateConcreteVirtualMeetingService();
-            var qrCodeService = CreateConcreteQrCodeService();
+            // var emailService = CreateConcreteEmailService(configuration);
+            // var paymentService = CreateConcretePaymentService(configuration);
+            // var virtualMeetingService = CreateConcreteVirtualMeetingService();
+            // var qrCodeService = CreateConcreteQrCodeService();
+            var emailService = CreateMockEmailService();
+            var paymentService = CreateMockPaymentService();
+            var virtualMeetingService = CreateMockVirtualMeetingService();
+            var qrCodeService = CreateMockQrCodeService();
             var serviceProviderMock = new Mock<IServiceProvider>();
 
             var refundService = new RefundService(

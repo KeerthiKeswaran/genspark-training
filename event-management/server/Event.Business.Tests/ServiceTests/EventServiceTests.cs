@@ -65,9 +65,12 @@ namespace Event.Business.Tests.ServiceTests
                 .AddJsonFile(appSettingsPath, optional: false, reloadOnChange: false)
                 .Build();
 
-            _emailService = CreateConcreteEmailService(_configuration);
-            _paymentService = CreateConcretePaymentService(_configuration);
-            _virtualMeetingService = CreateConcreteVirtualMeetingService();
+            // _emailService = CreateConcreteEmailService(_configuration);
+            // _paymentService = CreateConcretePaymentService(_configuration);
+            // _virtualMeetingService = CreateConcreteVirtualMeetingService();
+            _emailService = CreateMockEmailService();
+            _paymentService = CreateMockPaymentService();
+            _virtualMeetingService = CreateMockVirtualMeetingService();
 
             _notificationRepositoryMock.Setup(r => r.AddAsync(It.IsAny<Notification>()))
                 .Returns(Task.CompletedTask);
@@ -226,7 +229,7 @@ namespace Event.Business.Tests.ServiceTests
         [Test]
         public async Task Test_GetEventDetailsAsync_Success()
         {
-            var mockEvent = new Event.Models.Event { Event_Id = 10010, Title = "Tech Gala", Organizer_Id = 10001 };
+            var mockEvent = new Event.Models.Event { Event_Id = 10010, Title = "Tech Gala", Organizer_Id = 10001, Organizer = new User { User_Id = 10001, Name = "Mock User", Email = "mock@example.com" } };
             _eventRepositoryMock.Setup(r => r.GetEventDetailsAsync(10010)).ReturnsAsync(mockEvent);
 
             try

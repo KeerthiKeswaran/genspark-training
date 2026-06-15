@@ -54,7 +54,9 @@ namespace Event.Data.Repositories
         public async Task<decimal> GetGrossRevenueAsync()
         {
             return await _dbSet
-                .Where(t => t.Status == "Success")
+                .Where(t => t.Status == "Success" && 
+                            (t.Transaction_Type == "BookingPayment" || 
+                             t.Transaction_Type == "OrganizerUpfrontPayment"))
                 .SumAsync(t => t.Amount);
         }
 

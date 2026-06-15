@@ -27,40 +27,88 @@ The project is structured following clean architecture guidelines:
 
 The database is built on **PostgreSQL** using Entity Framework Core. Specific sequences start IDs at **10000** for all primary keys (excluding transactions, which utilize a 16-digit sequence starting at `1000000000000000`) to guarantee uniform 5-digit entity tracking.
 
-### Entity Relationship Diagram (ERD)
+#### Entity Relationship Diagram (ERD)
 
 ```mermaid
+---
+config:
+  layout: elk
+---
 erDiagram
-    Users ||--o{ Bookings : "makes"
-    Users ||--o{ Events : "organizes"
-    Users ||--o{ SupportTickets : "submits"
-    Users }|--|| TermsAndConditions : "consents to"
+    %% Lookup / Configuration Setup
     Admins ||--o{ PlatformSettings : "updates"
+    TermsAndConditions ||--o{ Users : "consented by"
+
+    %% Regional Management
     Management ||--o{ Staffs : "has"
     Management ||--o{ Venues : "has"
     Venues ||--o{ VenueSeatCapacities : "defines"
-    Events }|--|| Venues : "held at"
+    Management ||--o{ UserInterestedRegions : "contains"
+    Users ||--o{ UserInterestedRegions : "selects"
+
+    %% Staff Allocations
+    Staffs ||--o{ EventStaffAllocations : "assigned to"
+    Events ||--o{ EventStaffAllocations : "allocates"
+
+    %% Users, Events, Bookings (Core Triangle)
+    Users ||--o{ Events : "organizes"
+    Venues ||--o{ Events : "hosts"
     Events ||--o{ EventTicketTiers : "defines"
-    Events ||--o{ EventStaffAllocations : "assigns"
+
+    Users ||--o{ Bookings : "makes"
     Events ||--o{ Bookings : "receives"
     Bookings ||--o{ BookingDetails : "contains"
-    Bookings ||--o{ BookingPayments : "has"
-    BookingPayments }|--|| Transactions : "records"
-    Events ||--o{ EventReports : "receives"
+
+    %% Feedback, Reports, and Support
     Events ||--o{ EventFeedbacks : "gets"
+    Users ||--o{ EventFeedbacks : "submits"
+    Events ||--o{ EventReports : "receives"
+    Users ||--o{ EventReports : "files"
+
+    %% Support & Admin Actions
+    Users ||--o{ SupportTickets : "submits"
+    SupportTickets }o--o| Bookings : "references"
+    SupportTickets }o--o| Events : "references"
+    Admins ||--o{ AdminActions : "moderates"
+    SupportTickets ||--o| AdminActions : "linked to"
+
+    %% Financial Transactions & Audit Ledger
+    Bookings ||--o{ BookingPayments : "has"
+    Events ||--o{ OrganizerUpfrontPayments : "requires"
+    Events ||--o{ OrganizerPayouts : "payout"
+    
+    Transactions ||--o{ BookingPayments : "ledger"
+    Transactions ||--o{ OrganizerUpfrontPayments : "ledger"
+    Transactions ||--o| OrganizerPayouts : "ledger"
+
+    %% Independent
+    Notifications
 ```
 
 ### Table Definitions & Key Constraints
-1.  **Users (`"Users"`)**: Attendee and Organizer accounts. Key fields: `User_Id` (PK), `Email` (Unique), `Password_Hash`, `Consented_Terms_Id` (FK to `"TermsAndConditions"`).
-2.  **Admins (`"Admins"`)**: Platform staff accounts. Key fields: `Admin_Id` (PK - starts with `ADM` or `FIN`), `Email`, `Password_Hash`.
-3.  **Regions (`"Management"`)**: Regional operational centers. Key fields: `Region_Id` (PK), `No_Of_Staffs`.
-4.  **Venues (`"Venues"`)**: Physical event spaces. Key fields: `Venue_Id` (PK), `Region_Id` (FK to `"Management"`), `Hourly_Price`.
-5.  **Venue Seat Capacities (`"VenueSeatCapacities"`)**: Composite key: `(Venue_Id, Tier_Name)`. Tracks seat limits.
-6.  **Events (`"Events"`)**: Key fields: `Event_Id` (PK), `Organizer_Id` (FK to `"Users"`), `Venue_Id` (FK to `"Venues"`), `Status` (Live, Pending, Cancelled).
-7.  **Event Ticket Tiers (`"EventTicketTiers"`)**: Composite key: `(Event_Id, Tier_Name)`. Tracks prices and capacities per tier.
-8.  **Bookings (`"Bookings"`)**: Key fields: `Booking_Id` (PK), `Attendee_Id` (FK), `Event_Id` (FK), `Booking_Status` (Live, Pending, Cancelled), `Qr_Secret_Hash` (SHA256 hash verified for ticket check-ins).
-9.  **Platform Settings (`"PlatformSettings"`)**: Dynamic parameters. Key fields: `Staff_Flat_Rate`, `Ticket_Commission_Percentage`, `Max_Tickets_Per_Booking`, `Updated_By_Admin_Id` (FK to `"Admins"`).
-10. **Support Tickets (`"SupportTickets"`)**: Key fields: `Ticket_Id` (PK), `User_Id` (FK to `"Users"`), `Subject`, `Message`, `Status` (Open, Resolved).
+1. **Users (`"Users"`)**: Attendee and Organizer accounts. Key fields: `User_Id` (PK), `Email` (Unique), `Password_Hash`, `Consented_Terms_Id` (FK to `"TermsAndConditions"`), `Status` (Active, Restricted, Deactivated).
+2. **Admins (`"Admins"`)**: Platform staff accounts. Key fields: `Admin_Id` (PK - starts with `ADM` or `FIN`), `Email`, `Password_Hash`.
+3. **Regions (`"Management"`)**: Regional operational centers. Key fields: `Region_Id` (PK), `Region_Name`, `No_Of_Staffs`.
+4. **User Interested Regions (`"UserInterestedRegions"`)**: Preferred regions of users. Key fields: `(User_Id, Region_Id)` (Composite PK / FKs to `"Users"` and `"Management"`).
+5. **Staffs (`"Staffs"`)**: Regional support staff. Key fields: `Employee_ID` (PK), `Name`, `Email`, `Region_Id` (FK to `"Management"`), `IsAllocated`.
+6. **Event Staff Allocations (`"EventStaffAllocations"`)**: Support staff assigned to events. Key fields: `(Event_Id, Employee_ID)` (Composite PK / FKs to `"Events"` and `"Staffs"`).
+7. **Venues (`"Venues"`)**: Physical event hosting spaces. Key fields: `Venue_Id` (PK), `Region_Id` (FK to `"Management"`), `Hourly_Price`.
+8. **Venue Seat Capacities (`"VenueSeatCapacities"`)**: Seat limits per physical tier. Key fields: `(Venue_Id, Tier_Name)` (Composite PK / FK to `"Venues"`), `Total_Seats`.
+9. **Events (`"Events"`)**: Scheduled events. Key fields: `Event_Id` (PK), `Organizer_Id` (FK to `"Users"`), `Venue_Id` (nullable FK to `"Venues"`), `Status` (Live, Pending, Cancelled, Completed, Failed).
+10. **Event Ticket Tiers (`"EventTicketTiers"`)**: Prices and capacity per tier. Key fields: `(Event_Id, Tier_Name)` (Composite PK / FK to `"Events"`), `Price`, `Tickets_Sold`.
+11. **Bookings (`"Bookings"`)**: Reservations. Key fields: `Booking_Id` (PK), `Attendee_Id` (FK to `"Users"`), `Event_Id` (FK to `"Events"`), `Booking_Status`, `Qr_Secret_Hash`, `CheckIn_Status`.
+12. **Booking Details (`"BookingDetails"`)**: Quantities reserved per booking tier. Key fields: `(Booking_Id, Tier_Name)` (Composite PK / FK to `"Bookings"`), `Quantity`.
+13. **Platform Settings (`"PlatformSettings"`)**: Global platform fees and limits. Key fields: `Settings_Id` (PK), `Staff_Flat_Rate`, `Ticket_Commission_Percentage`, `Updated_By_Admin_Id` (FK to `"Admins"`).
+14. **Terms And Conditions (`"TermsAndConditions"`)**: Policy agreements. Key fields: `Terms_Id` (PK), `Version`, `Type` (General, EventCreation), `Is_Active`.
+15. **Notifications (`"Notifications"`)**: Queued transactional outbound emails. Key fields: `Notification_Id` (PK), `Recipient_Email`, `Subject`, `Status` (Pending, Sent, Failed).
+16. **Support Tickets (`"SupportTickets"`)**: Customer inquiries. Key fields: `Ticket_Id` (PK), `User_Id` (FK to `"Users"`), `ConcernUrl`, `RequestType`, `Status`, `EsclationStatus`, `RelatedId` (nullable FK to Event or Booking).
+17. **Admin Actions (`"AdminActions"`)**: Record of support ticket escalations. Key fields: `ActionId` (PK), `AdminId` (FK to `"Admins"`), `TicketId` (nullable FK to `"SupportTickets"`), `ActionStatus`.
+18. **Event Reports (`"EventReports"`)**: Event flags and policy violations. Key fields: `Report_Id` (PK), `Event_Id` (FK to `"Events"`), `Reporter_Id` (FK to `"Users"`), `ResponseAction`.
+19. **Event Feedback (`"EventFeedbacks"`)**: Attendee reviews and ratings. Key fields: `Feedback_Id` (PK), `Event_Id` (FK to `"Events"`), `Attendee_Id` (FK to `"Users"`), `Rating`, `Review`.
+20. **Transactions (`"Transactions"`)**: Double-entry financial audit ledger. Key fields: `Transaction_Id` (PK), `Sender_Id`, `Receiver_Id`, `Transaction_Type`, `Amount`, `Related_Id` (Event or Booking ID), `Status`.
+21. **Booking Payments (`"BookingPayments"`)**: Payment records for booking transactions. Key fields: `Booking_Payment_Id` (PK), `Booking_Id` (FK to `"Bookings"`), `Transaction_Id` (FK to `"Transactions"`), `Platform_Fee_Cut`, `Payment_Status`.
+22. **Organizer Upfront Payments (`"OrganizerUpfrontPayments"`)**: Payment records for event activation. Key fields: `Upfront_Payment_Id` (PK), `Event_Id` (FK to `"Events"`), `Transaction_Id` (FK to `"Transactions"`), `Payment_Status`.
+23. **Organizer Payouts (`"OrganizerPayouts"`)**: Payout records for ticket sales. Key fields: `Payout_Id` (PK), `Event_Id` (FK to `"Events"`), `Transaction_Id` (nullable FK to `"Transactions"`), `Payout_Amount`, `Payout_Status`.
 
 ---
 
@@ -146,7 +194,7 @@ Our comprehensive test suite validates all critical paths, mocking DB adapters a
 
 *   **Business Layer Tests (`Event.Business.Tests.dll`)**:
     ```text
-    Passed!  - Failed:     0, Passed:   165, Skipped:     0, Total:   165, Duration: 27 s - Event.Business.Tests.dll (net10.0)
+    Passed!  - Failed:     0, Passed:   166, Skipped:     0, Total:   166, Duration: 27 s - Event.Business.Tests.dll (net10.0)
     ```
 *   **Data Layer Tests (`Event.Data.Tests.dll`)**:
     ```text

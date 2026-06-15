@@ -47,8 +47,10 @@ namespace Event.Business.Tests.ServiceTests
             var bookingPaymentRepositoryMock = new Mock<IBookingPaymentRepository>();
 
             var configuration = CreateTestConfiguration();
-            _emailService = CreateConcreteEmailService(configuration);
-            var paymentService = CreateConcretePaymentService(configuration);
+            // _emailService = CreateConcreteEmailService(configuration);
+            // var paymentService = CreateConcretePaymentService(configuration);
+            _emailService = CreateMockEmailService();
+            var paymentService = CreateMockPaymentService();
 
             _refundService = new RefundService(
                 bookingRepositoryMock.Object,

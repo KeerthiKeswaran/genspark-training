@@ -60,7 +60,8 @@ namespace Event.Business.Tests.ServiceTests
                 .AddInMemoryCollection(inMemorySettings)
                 .Build();
 
-            _emailService = CreateConcreteEmailService(_configuration);
+            // _emailService = CreateConcreteEmailService(_configuration);
+            _emailService = CreateMockEmailService();
             _cacheService = CreateConcreteCacheService();
 
             _otpService = new OtpService(_emailService, _userRepositoryMock.Object, _adminRepositoryMock.Object, _cacheService);

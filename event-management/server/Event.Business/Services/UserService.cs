@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Event.Models;
+using Event.Models.DTOs;
 using Event.Contracts.IRepositories;
 using Event.Contracts.IServices;
 using Event.Business.Exceptions;
@@ -100,7 +101,7 @@ namespace Event.Business.Services
 
         #region GetUserProfileAsync
 
-        public async Task<User?> GetUserProfileAsync(int userId)
+        public async Task<UserProfileResponse?> GetUserProfileAsync(int userId)
         {
             // 1. Query user record with eager interest regions loading from repository
             var user = await _userRepository.GetUserProfileAsync(userId);
@@ -109,7 +110,27 @@ namespace Event.Business.Services
             if (user == null)
                 throw new NotFoundException($"User with ID {userId} not found.");
 
-            return user;
+            var interestedRegions = new List<string>();
+            if (user.InterestedRegions != null)
+            {
+                foreach (var ir in user.InterestedRegions)
+                {
+                    if (ir.Region_Id != null)
+                    {
+                        interestedRegions.Add(ir.Region_Id);
+                    }
+                }
+            }
+
+            return new UserProfileResponse
+            {
+                User_Id = user.User_Id,
+                Name = user.Name,
+                Email = user.Email,
+                Mobile_Number = user.Mobile_Number,
+                Status = user.Status,
+                InterestedRegions = interestedRegions
+            };
         }
 
         #endregion

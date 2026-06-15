@@ -38,12 +38,13 @@ namespace Event.Business.Helpers
 
         public string GenerateAdminToken(string adminId, string email)
         {
+            string role = adminId.StartsWith("FIN", StringComparison.OrdinalIgnoreCase) ? "finance" : "admin";
             var claims = new List<Claim>
             {
                 new Claim(JwtRegisteredClaimNames.Sub,   adminId),
                 new Claim(JwtRegisteredClaimNames.Email, email),
                 new Claim(JwtRegisteredClaimNames.Jti,   Guid.NewGuid().ToString()),
-                new Claim(ClaimTypes.Role, "Admin")
+                new Claim(ClaimTypes.Role, role)
             };
             return BuildToken(claims);
         }

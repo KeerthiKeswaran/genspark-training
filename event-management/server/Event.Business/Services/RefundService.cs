@@ -139,7 +139,7 @@ namespace Event.Business.Services
                     Transaction_Type = "BookingRefund",
                     Related_Id = bookingId,
                     Amount = refundAmountVal,
-                    Currency = "USD",
+                    Currency = "INR",
                     Status = (string.Equals(refundType, "NoRefund", StringComparison.OrdinalIgnoreCase) || isRefunded) ? "Success" : "Failed",
                     Created_At = DateTime.UtcNow,
                     Remarks = remarksVal
@@ -155,7 +155,7 @@ namespace Event.Business.Services
                         Placeholders = new Dictionary<string, string>
                         {
                             { "referenceName", booking.Event?.Title ?? "" },
-                            { "refundAmount", refundAmountVal.ToString("C") },
+                            { "refundAmount", $"INR {refundAmountVal:N2}" },
                             { "refundMessage", string.IsNullOrWhiteSpace(refundMessage) ? "" : refundMessage },
                             { "year", DateTime.UtcNow.Year.ToString() }
                         }
@@ -244,7 +244,7 @@ namespace Event.Business.Services
                             Transaction_Type = "BookingRefund", // Reusing BookingRefund type or log as Refund
                             Related_Id = eventId,
                             Amount = organizerRefundAmount,
-                            Currency = "USD",
+                            Currency = "INR",
                             Status = "Success",
                             Created_At = DateTime.UtcNow,
                             Remarks = organizerRemarks,
@@ -272,7 +272,7 @@ namespace Event.Business.Services
                                 Placeholders = new Dictionary<string, string>
                                 {
                                     { "referenceName", ev.Title },
-                                    { "refundAmount", organizerRefundAmount.ToString("C") },
+                                    { "refundAmount", $"INR {organizerRefundAmount:N2}" },
                                     { "refundMessage", string.IsNullOrWhiteSpace(refundMessage) ? "A refund was processed for your upfront activation fee." : refundMessage },
                                     { "year", DateTime.UtcNow.Year.ToString() }
                                 }
@@ -298,7 +298,7 @@ namespace Event.Business.Services
                         Transaction_Type = "BookingRefund",
                         Related_Id = eventId,
                         Amount = 0m,
-                        Currency = "USD",
+                        Currency = "INR",
                         Status = "Success",
                         Created_At = DateTime.UtcNow,
                         Remarks = organizerRemarks

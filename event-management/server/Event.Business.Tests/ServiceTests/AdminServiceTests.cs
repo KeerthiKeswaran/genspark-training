@@ -57,9 +57,12 @@ namespace Event.Business.Tests.ServiceTests
                 .Returns(Task.CompletedTask);
 
             var configuration = CreateTestConfiguration();
-            _emailService = CreateConcreteEmailService(configuration);
-            var paymentService = CreateConcretePaymentService(configuration);
-            var virtualMeetingService = CreateConcreteVirtualMeetingService();
+            // _emailService = CreateConcreteEmailService(configuration);
+            // var paymentService = CreateConcretePaymentService(configuration);
+            // var virtualMeetingService = CreateConcreteVirtualMeetingService();
+            _emailService = CreateMockEmailService();
+            var paymentService = CreateMockPaymentService();
+            var virtualMeetingService = CreateMockVirtualMeetingService();
             var bookingRepositoryMock = new Mock<IBookingRepository>();
             var upfrontPaymentRepositoryMock = new Mock<IOrganizerUpfrontPaymentRepository>();
 

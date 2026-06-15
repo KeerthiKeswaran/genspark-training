@@ -531,8 +531,16 @@ namespace Event.Data.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Employee_ID"));
                     NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Employee_ID"), 10000L, null, null, null, null, null);
 
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<bool>("IsAllocated")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<string>("Region_Id")
                         .IsRequired()
@@ -560,6 +568,9 @@ namespace Event.Data.Migrations
 
                     b.Property<string>("EsclationStatus")
                         .HasColumnType("text");
+
+                    b.Property<int?>("RelatedId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("RequestType")
                         .IsRequired()

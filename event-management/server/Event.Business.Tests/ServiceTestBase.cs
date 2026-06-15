@@ -9,6 +9,7 @@ using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Serilog;
+using Moq;
 using Event.Business.Services;
 using Event.Contracts.IServices;
 
@@ -154,6 +155,73 @@ namespace Event.Business.Tests
         protected IQrCodeService CreateConcreteQrCodeService()
         {
             return new QrCodeService();
+        }
+
+        protected IEmailService CreateMockEmailService()
+        {
+            var mock = new Mock<IEmailService>();
+            mock.Setup(x => x.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+                .Returns(Task.CompletedTask);
+            mock.Setup(x => x.BuildEmailHtmlAsync(It.IsAny<Event.Models.DTOs.EmailTemplateDto>()))
+                .ReturnsAsync("<html>Mock Html</html>");
+            return mock.Object;
+        }
+
+        protected IPaymentService CreateMockPaymentService()
+        {
+            var mock = new Mock<IPaymentService>();
+            mock.Setup(x => x.CreateChargeAsync(It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+                .ReturnsAsync((decimal amount, string currency, string token, string desc) => 
+                    token.Contains("fail") 
+                    ? (false, "", $"Card declined: {token}") 
+                    : (true, "ch_mock_123", ""));
+            mock.Setup(x => x.CreateRefundAsync(It.IsAny<string>(), It.IsAny<decimal>()))
+                .ReturnsAsync((string txRef, decimal amount) => 
+                    txRef.Contains("fail") 
+                    ? (false, "", $"Stripe refund failed: {txRef}") 
+                    : (true, "re_mock_123", ""));
+            mock.Setup(x => x.CreatePayoutAsync(It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<string>()))
+                .ReturnsAsync((string dest, decimal amount, string currency) => 
+                    dest.Contains("fail") 
+                    ? (false, "", $"Payout failed: {dest}") 
+                    : (true, "tr_mock_123", ""));
+            return mock.Object;
+        }
+
+        protected IVirtualMeetingService CreateMockVirtualMeetingService()
+        {
+            var mock = new Mock<IVirtualMeetingService>();
+            mock.Setup(x => x.GenerateMeetingRoomAsync(It.IsAny<string>()))
+                .ReturnsAsync(("https://virtual-meeting.example.com/mock-room", "passcode123"));
+            return mock.Object;
+        }
+
+        protected IQrCodeService CreateMockQrCodeService()
+        {
+            var mock = new Mock<IQrCodeService>();
+            mock.Setup(x => x.GenerateQrCodeAsync(It.IsAny<string>()))
+                .ReturnsAsync(new byte[] { 1, 2, 3, 4 });
+            return mock.Object;
+        }
+
+        protected ICacheService CreateMockCacheService()
+        {
+            var store = new Dictionary<string, object>();
+            var mock = new Mock<ICacheService>();
+            mock.Setup(x => x.SetAsync<object>(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<TimeSpan?>()))
+                .Callback<string, object, TimeSpan?>((key, val, exp) => store[key] = val)
+                .Returns(Task.CompletedTask);
+            mock.Setup(x => x.SetAsync<string>(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<TimeSpan?>()))
+                .Callback<string, string, TimeSpan?>((key, val, exp) => store[key] = val)
+                .Returns(Task.CompletedTask);
+            mock.Setup(x => x.GetAsync<object>(It.IsAny<string>()))
+                .Returns<string>(key => Task.FromResult(store.TryGetValue(key, out var val) ? val : null));
+            mock.Setup(x => x.GetAsync<string>(It.IsAny<string>()))
+                .Returns<string>(key => Task.FromResult(store.TryGetValue(key, out var val) ? (string)val : null));
+            mock.Setup(x => x.RemoveAsync(It.IsAny<string>()))
+                .Callback<string>(key => store.Remove(key))
+                .Returns(Task.CompletedTask);
+            return mock.Object;
         }
 
         protected void LogSubTest(string serviceName, string testCaseName, bool success, string? details = null)

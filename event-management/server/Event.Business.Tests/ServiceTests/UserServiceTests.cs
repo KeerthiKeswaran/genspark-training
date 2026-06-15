@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Moq;
 using NUnit.Framework;
 using Event.Models;
+using Event.Models.DTOs;
 using Event.Contracts.IRepositories;
 using Event.Business.Services;
 using Event.Business.Exceptions;

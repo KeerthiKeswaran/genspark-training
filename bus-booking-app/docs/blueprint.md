@@ -73,6 +73,9 @@ Dedicated to logistics management. Operators manage their "Fleet" (physical buse
 ### **Admin Module**
 The "Command Center" of the platform. Responsible for approving new operators, authorizing new buses, managing global fee settings (commissions/flat fees), and monitoring platform-wide financial metrics.
 
+### **Support Module**
+Enables users to submit support queries and tickets. Support tickets can be optionally associated with a specific contextual record (such as a booking or an event/schedule) via a nullable `RelatedId` field. This facilitates ticket categorization and allows admins to view the related details immediately when responding.
+
 ---
 
 ## 💾 6. Data Flow & State Management

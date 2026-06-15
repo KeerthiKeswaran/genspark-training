@@ -27,7 +27,7 @@ namespace Event.Business.Services
 
         #region SubmitSupportTicketAsync
 
-        public async Task<bool> SubmitSupportTicketAsync(int userId, string subject, string message, string requestType)
+        public async Task<bool> SubmitSupportTicketAsync(int userId, string subject, string message, string requestType, int? relatedId = null)
         {
             // 1. Validate that target user exists
             var userExists = await _userRepository.ExistsAsync(userId);
@@ -88,7 +88,8 @@ namespace Event.Business.Services
                 ConcernUrl = $"/assets/support_tickets/{fileName}",
                 RequestType = requestType,
                 Status = "Open",
-                EsclationStatus = escalationStatus
+                EsclationStatus = escalationStatus,
+                RelatedId = relatedId
             };
             await _supportTicketRepository.AddAsync(ticket);
             return true;

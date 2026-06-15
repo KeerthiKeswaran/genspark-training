@@ -46,7 +46,8 @@ namespace Event.Business.Tests.ServiceTests
                 .AddJsonFile(appSettingsPath, optional: false, reloadOnChange: false)
                 .Build();
 
-            _emailService = CreateConcreteEmailService(_configuration);
+            // _emailService = CreateConcreteEmailService(_configuration);
+            _emailService = CreateMockEmailService();
             _cacheService = CreateConcreteCacheService();
 
             _otpService = new OtpService(

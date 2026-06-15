@@ -10,6 +10,8 @@ namespace Event.Models
 
         [Required]
         public string AdminId { get; set; } = string.Empty;
+
+        [System.Text.Json.Serialization.JsonIgnore]
         public virtual Admin Admin { get; set; } = null!;
 
         [Required]
@@ -25,6 +27,8 @@ namespace Event.Models
         public int ReferenceId { get; set; } // Event or Booking ID
 
         public int? TicketId { get; set; }
+
+        [System.Text.Json.Serialization.JsonIgnore]
         public virtual SupportTicket? SupportTicket { get; set; }
 
         [Required]

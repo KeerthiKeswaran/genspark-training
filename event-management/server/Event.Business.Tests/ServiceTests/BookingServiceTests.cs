@@ -56,9 +56,12 @@ namespace Event.Business.Tests.ServiceTests
                 .AddJsonFile(appSettingsPath, optional: false, reloadOnChange: false)
                 .Build();
 
-            _emailService = CreateConcreteEmailService(_configuration);
-            _paymentService = CreateConcretePaymentService(_configuration);
-            _qrCodeService = new QrCodeService();
+            // _emailService = CreateConcreteEmailService(_configuration);
+            // _paymentService = CreateConcretePaymentService(_configuration);
+            // _qrCodeService = new QrCodeService();
+            _emailService = CreateMockEmailService();
+            _paymentService = CreateMockPaymentService();
+            _qrCodeService = CreateMockQrCodeService();
 
             _notificationRepositoryMock.Setup(r => r.AddAsync(It.IsAny<Notification>()))
                 .Returns(Task.CompletedTask);

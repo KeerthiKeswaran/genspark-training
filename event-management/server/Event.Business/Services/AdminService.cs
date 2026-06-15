@@ -472,9 +472,15 @@ namespace Event.Business.Services
 
         #region GetAllRegionsAsync
 
-        public async Task<IEnumerable<Region>> GetAllRegionsAsync()
+        public async Task<IEnumerable<RegionResponse>> GetAllRegionsAsync()
         {
-            return await _regionRepository.GetAllAsync();
+            var regions = await _regionRepository.GetAllAsync();
+            return regions.Select(r => new RegionResponse
+            {
+                Region_Id = r.Region_Id,
+                No_Of_Staffs = r.No_Of_Staffs,
+                Region_Name = r.Region_Name
+            }).ToList();
         }
 
         #endregion
@@ -579,6 +585,8 @@ namespace Event.Business.Services
             return staffs.Select(s => new StaffResponse
             {
                 Employee_ID = s.Employee_ID,
+                Name = s.Name,
+                Email = s.Email,
                 Region_Id = s.Region_Id,
                 IsAllocated = s.IsAllocated
             });

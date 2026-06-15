@@ -118,7 +118,7 @@ namespace Event.Business.Services
             if (string.Equals(action.TargetType, "ATD", StringComparison.OrdinalIgnoreCase) || 
                 string.Equals(action.TargetType, "ADT", StringComparison.OrdinalIgnoreCase))
             {
-                var result = await _refundService.RefundAttendeeAsync(action.ReferenceId, mappedRefundType);
+                var result = await _refundService.RefundAttendeeAsync(action.ReferenceId, mappedRefundType, refundMessage: refundMessage);
                 finalRemarks = $"Approved refund of type {mappedRefundType}. Amount: {result.RefundAmount}. {result.Remarks}";
             }
             else if (string.Equals(action.TargetType, "ORG", StringComparison.OrdinalIgnoreCase))

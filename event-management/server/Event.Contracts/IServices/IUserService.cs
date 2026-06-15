@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Event.Models;
+using Event.Models.DTOs;
 
 namespace Event.Contracts.IServices
 {
@@ -9,6 +10,6 @@ namespace Event.Contracts.IServices
         int GetCurrentUserId();
         Task<bool> SelectInterestedRegionsAsync(int userId, IEnumerable<string> regionIds);
         Task<bool> UpdateUserProfileAsync(int userId, string name, string mobileNumber, IEnumerable<string> interestedRegions);
-        Task<User?> GetUserProfileAsync(int userId);
+        Task<UserProfileResponse?> GetUserProfileAsync(int userId);
     }
 }

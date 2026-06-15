@@ -1,25 +1,22 @@
--- Database: event_management_db
+-- Database Creation Script & Reference Data Seeding
 
+-- 1. DATABASE SYSTEM INITIALIZATION
+-- CREATE DATABASE event_management_db;
 
-
-
------ Seeding Script ------
-
--- 1. SEED REGIONS (Mapped to table named "Management")
-INSERT INTO "Management" ("Region_Id", "No_Of_Staffs") VALUES
-('REG01', 10),
-('REG02', 15),
-('US-EAST', 8)
+-- 2. SEED REGIONS (Mapped to table named "Management")
+INSERT INTO "Management" ("Region_Id", "Region_Name", "No_Of_Staffs") VALUES
+('CHE12', 'Chennai', 10),
+('CBE23', 'Coimbatore', 15),
+('BNG22', 'Bengaluru', 8)
 ON CONFLICT ("Region_Id") DO NOTHING;
 
--- 2. SEED TERMS & CONDITIONS (Needed for Register endpoint & Policies)
--- Standard User registration requires consenting to the active terms (ID 10000 by default)
+-- 3. SEED TERMS & CONDITIONS (Needed for Register endpoint & Policies)
 INSERT INTO "TermsAndConditions" ("Terms_Id", "Version", "File_Path", "Type", "Is_Active", "Created_At") VALUES
 (10000, 'v1.0', '/docs/policies/terms_v1.md', 'General', TRUE, NOW()),
 (10001, 'v1.0', '/docs/policies/refund_v1.md', 'Refund', TRUE, NOW())
 ON CONFLICT ("Terms_Id") DO NOTHING;
 
--- 3. SEED ADMINISTRATORS (Roles: Admin and Finance)
+-- 4. SEED ADMINISTRATORS (Roles: Admin and Finance)
 -- Password for ADM01 is 'AdminPassword123!'
 -- Password for FIN01 is 'FinancePassword123!'
 INSERT INTO "Admins" ("Admin_Id", "Name", "Email", "Password_Hash", "Password_Reset_Token") VALUES
@@ -27,15 +24,21 @@ INSERT INTO "Admins" ("Admin_Id", "Name", "Email", "Password_Hash", "Password_Re
 ('FIN01', 'Finance Executive', 'finance@example.com', 'EBNGxyXSoaYbAAWAjCKcFG4PoXc7YgGT8nZ/QEnU3A8Jnj9lO3gkeLmfVHrx3QWG', NULL)
 ON CONFLICT ("Admin_Id") DO NOTHING;
 
--- 4. SEED PLATFORM SETTINGS (Needed for bookings and payment logic)
+-- 5. SEED STANDARD USER
+-- Password for KeerthiKeswaran is 'SecurePassword123!'
+INSERT INTO "Users" ("User_Id", "Name", "Email", "Mobile_Number", "Password_Hash", "Consented_Terms_Id", "Has_Marketing_Consent") VALUES
+(10000, 'KeerthiKeswaran', 'keshwarankeerthi@gmail.com', '9876543210', '61eJPjKCSth/N5T72cAbXmAqrhLOyHLRuTnmKG1jGO3eu/Fwp2nldfpJ9UOW4S3p', 10000, TRUE)
+ON CONFLICT ("User_Id") DO NOTHING;
+
+-- 6. SEED PLATFORM SETTINGS (Needed for bookings and payment logic)
 INSERT INTO "PlatformSettings" ("Settings_Id", "Staff_Flat_Rate", "Virtual_Event_Activation_Fee", "Physical_Event_Activation_Fee", "Ticket_Commission_Percentage", "Ticket_Fixed_Fee", "Max_Tickets_Per_Booking", "Updated_At", "Updated_By_Admin_Id") VALUES
 (10000, 50.00, 25.00, 100.00, 2.50, 1.50, 10, NOW(), 'ADM01')
 ON CONFLICT ("Settings_Id") DO NOTHING;
 
--- 5. SEED VENUES & SEAT CAPACITIES (Needed for physical event creation)
-INSERT INTO "Venues" ("Venue_Id", "Name", "Region_Id", "Hourly_Price", "Is_Available") VALUES
-(10001, 'Metropolitan Auditorium', 'REG01', 150.00, TRUE),
-(10002, 'Silicon Center Hall A', 'REG02', 300.00, TRUE)
+-- 7. SEED VENUES & SEAT CAPACITIES (Seeded with Tamil Nadu locations & addresses)
+INSERT INTO "Venues" ("Venue_Id", "Name", "Region_Id", "Hourly_Price", "Is_Available", "Address") VALUES
+(10001, 'Codissia Trade Fair Complex', 'CBE23', 500.00, TRUE, 'Avinashi Road, Civil Aerodrome Post, Coimbatore, Tamil Nadu 641014'),
+(10002, 'Chennai Trade Centre', 'CHE12', 800.00, TRUE, 'Mount-Poonamallee Road, Nandambakkam, Chennai, Tamil Nadu 600089')
 ON CONFLICT ("Venue_Id") DO NOTHING;
 
 INSERT INTO "VenueSeatCapacities" ("Venue_Id", "Tier_Name", "Total_Seats") VALUES
@@ -45,11 +48,11 @@ INSERT INTO "VenueSeatCapacities" ("Venue_Id", "Tier_Name", "Total_Seats") VALUE
 (10002, 'VIP Access', 20)
 ON CONFLICT ("Venue_Id", "Tier_Name") DO NOTHING;
 
--- 6. SEED REGIONAL STAFF (Needed for physical staff allocation checks)
+-- 8. SEED REGIONAL STAFF (Indian Names allocated to Tamil Nadu operational regions)
 INSERT INTO "Staffs" ("Employee_ID", "Name", "Email", "Region_Id", "Is_Available") VALUES
-(10001, 'Alice Smith', 'alice@example.com', 'REG01', TRUE),
-(10002, 'Bob Johnson', 'bob@example.com', 'REG01', TRUE),
-(10003, 'Charlie Brown', 'charlie@example.com', 'REG02', TRUE)
+(10001, 'Rajesh Kumar', 'rajesh@example.com', 'CHE12', TRUE),
+(10002, 'Priya Sharma', 'priya@example.com', 'CHE12', TRUE),
+(10003, 'Anish Dev', 'anish@example.com', 'CBE23', TRUE)
 ON CONFLICT ("Employee_ID") DO NOTHING;
 
 

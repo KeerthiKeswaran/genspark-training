@@ -91,7 +91,7 @@ namespace Event.Business.Services
 
         #region GetEventDetailsAsync
 
-        public async Task<Event.Models.Event?> GetEventDetailsAsync(int eventId)
+        public async Task<EventDetailsResponse?> GetEventDetailsAsync(int eventId)
         {
             // 1. Fetch details with eager loading of tiers and venue/seat capacities
             var ev = await _eventRepository.GetEventDetailsAsync(eventId);
@@ -100,7 +100,54 @@ namespace Event.Business.Services
             if (ev == null)
                 throw new NotFoundException($"Event with ID {eventId} not found.");
 
-            return ev;
+            // 3. Map to DTO
+            var ticketTiers = new List<TicketTierDetailsDto>();
+            if (ev.TicketTiers != null)
+            {
+                foreach (var tier in ev.TicketTiers)
+                {
+                    ticketTiers.Add(new TicketTierDetailsDto
+                    {
+                        Tier_Name = tier.Tier_Name,
+                        Price = tier.Price,
+                        Tickets_Sold = tier.Tickets_Sold
+                    });
+                }
+            }
+
+            var organizerDto = new OrganizerDetailsDto
+            {
+                User_Id = ev.Organizer.User_Id,
+                Name = ev.Organizer.Name,
+                Email = ev.Organizer.Email
+            };
+
+            VenueDetailsDto? venueDto = null;
+            if (ev.Venue != null)
+            {
+                venueDto = new VenueDetailsDto
+                {
+                    Region_Id = ev.Venue.Region_Id,
+                    Name = ev.Venue.Name,
+                    Address = ev.Venue.Address
+                };
+            }
+
+            return new EventDetailsResponse
+            {
+                Event_Id = ev.Event_Id,
+                Organizer_Id = ev.Organizer_Id,
+                Organizer = organizerDto,
+                Venue = venueDto,
+                Event_Type = ev.Event_Type,
+                Title = ev.Title,
+                Description_Url = ev.Description_Url,
+                Image_Url = ev.Image_Url,
+                Date_Time = ev.Date_Time,
+                Duration_Hours = ev.Duration_Hours,
+                Status = ev.Status,
+                TicketTiers = ticketTiers
+            };
         }
 
         #endregion
@@ -228,7 +275,7 @@ namespace Event.Business.Services
 
         #region CreateEventAsync
 
-        public async Task<Event.Models.Event> CreateEventAsync(int organizerId, Event.Models.DTOs.CreateEventRequest request)
+        public async Task<EventDetailsResponse> CreateEventAsync(int organizerId, Event.Models.DTOs.CreateEventRequest request)
         {
             // 0. Validation: Policy acceptance
             if (!request.HasAcceptedPolicy)
@@ -363,7 +410,7 @@ namespace Event.Business.Services
                     Transaction_Type = "OrganizerUpfrontPayment",
                     Related_Id = newEvent.Event_Id,
                     Amount = upfrontFee,
-                    Currency = "USD",
+                    Currency = "INR",
                     Status = "Pending",
                     Created_At = DateTime.UtcNow,
                     Remarks = $"Upfront payment for publishing Event '{request.Title}'"
@@ -372,7 +419,55 @@ namespace Event.Business.Services
                 await _transactionRepository.AddAsync(transaction);
 
                 await _bookingRepository.CommitTransactionAsync();
-                return newEvent;
+
+                // Map to DTO
+                var ticketTiers = new List<TicketTierDetailsDto>();
+                if (newEvent.TicketTiers != null)
+                {
+                    foreach (var tier in newEvent.TicketTiers)
+                    {
+                        ticketTiers.Add(new TicketTierDetailsDto
+                        {
+                            Tier_Name = tier.Tier_Name,
+                            Price = tier.Price,
+                            Tickets_Sold = tier.Tickets_Sold
+                        });
+                    }
+                }
+
+                var organizerDto = new OrganizerDetailsDto
+                {
+                    User_Id = organizer.User_Id,
+                    Name = organizer.Name,
+                    Email = organizer.Email
+                };
+
+                VenueDetailsDto? venueDto = null;
+                if (venue != null)
+                {
+                    venueDto = new VenueDetailsDto
+                    {
+                        Region_Id = venue.Region_Id,
+                        Name = venue.Name,
+                        Address = venue.Address
+                    };
+                }
+
+                return new EventDetailsResponse
+                {
+                    Event_Id = newEvent.Event_Id,
+                    Organizer_Id = newEvent.Organizer_Id,
+                    Organizer = organizerDto,
+                    Venue = venueDto,
+                    Event_Type = newEvent.Event_Type,
+                    Title = newEvent.Title,
+                    Description_Url = newEvent.Description_Url,
+                    Image_Url = newEvent.Image_Url,
+                    Date_Time = newEvent.Date_Time,
+                    Duration_Hours = newEvent.Duration_Hours,
+                    Status = newEvent.Status,
+                    TicketTiers = ticketTiers
+                };
             }
             catch (Exception)
             {
@@ -385,7 +480,7 @@ namespace Event.Business.Services
 
         #region ConfirmEventUpfrontPaymentAsync
 
-        public async Task<Event.Models.Event> ConfirmEventUpfrontPaymentAsync(int eventId, string stripeChargeId, string paymentMethod)
+        public async Task<EventDetailsResponse> ConfirmEventUpfrontPaymentAsync(int eventId, string stripeChargeId, string paymentMethod)
         {
             // Step 1: Start a new database transaction to guarantee database consistency and atomicity.
             await _bookingRepository.BeginTransactionAsync();
@@ -512,7 +607,7 @@ namespace Event.Business.Services
                                 { "dateTime", ev.Date_Time.ToString("f") },
                                 { "eventType", ev.Event_Type },
                                 { "locationDetails", locationDetails },
-                                { "upfrontFee", transaction.Amount.ToString("C") },
+                                { "upfrontFee", $"INR {transaction.Amount:N2}" },
                                 { "year", DateTime.UtcNow.Year.ToString() }
                             }
                         };
@@ -534,7 +629,54 @@ namespace Event.Business.Services
                 // Step 13: Commit the database transaction to apply all modifications atomically.
                 await _bookingRepository.CommitTransactionAsync();
 
-                return ev;
+                // Map to DTO
+                var ticketTiers = new List<TicketTierDetailsDto>();
+                if (ev.TicketTiers != null)
+                {
+                    foreach (var tier in ev.TicketTiers)
+                    {
+                        ticketTiers.Add(new TicketTierDetailsDto
+                        {
+                            Tier_Name = tier.Tier_Name,
+                            Price = tier.Price,
+                            Tickets_Sold = tier.Tickets_Sold
+                        });
+                    }
+                }
+
+                var organizerDto = new OrganizerDetailsDto
+                {
+                    User_Id = ev.Organizer.User_Id,
+                    Name = ev.Organizer.Name,
+                    Email = ev.Organizer.Email
+                };
+
+                VenueDetailsDto? venueDto = null;
+                if (ev.Venue != null)
+                {
+                    venueDto = new VenueDetailsDto
+                    {
+                        Region_Id = ev.Venue.Region_Id,
+                        Name = ev.Venue.Name,
+                        Address = ev.Venue.Address
+                    };
+                }
+
+                return new EventDetailsResponse
+                {
+                    Event_Id = ev.Event_Id,
+                    Organizer_Id = ev.Organizer_Id,
+                    Organizer = organizerDto,
+                    Venue = venueDto,
+                    Event_Type = ev.Event_Type,
+                    Title = ev.Title,
+                    Description_Url = ev.Description_Url,
+                    Image_Url = ev.Image_Url,
+                    Date_Time = ev.Date_Time,
+                    Duration_Hours = ev.Duration_Hours,
+                    Status = ev.Status,
+                    TicketTiers = ticketTiers
+                };
             }
             catch (Exception)
             {

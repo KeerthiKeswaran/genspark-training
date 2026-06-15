@@ -63,7 +63,7 @@ namespace Event.Business.Services
 
         #region BookTicketsAsync
 
-        public async Task<Booking?> BookTicketsAsync(int attendeeId, int eventId, Dictionary<string, int> tierQuantities)
+        public async Task<BookingResponse?> BookTicketsAsync(int attendeeId, int eventId, Dictionary<string, int> tierQuantities)
         {
             // 1. Validate inputs (ensure tiers are specified and quantities are positive)
             if (tierQuantities == null || !tierQuantities.Any() || tierQuantities.Values.Any(q => q <= 0))
@@ -150,7 +150,7 @@ namespace Event.Business.Services
                     Transaction_Type = "BookingPayment",
                     Related_Id = booking.Booking_Id,
                     Amount = totalAmount,
-                    Currency = "USD",
+                    Currency = "INR",
                     Status = "Pending",
                     Created_At = DateTime.UtcNow
                 };
@@ -159,7 +159,7 @@ namespace Event.Business.Services
 
                 // 11. Commit the transaction and return the booking details
                 await _bookingRepository.CommitTransactionAsync();
-                return booking;
+                return MapToBookingResponse(booking);
             }
             catch (BaseBusinessException)
             {
@@ -177,7 +177,7 @@ namespace Event.Business.Services
 
         #region ConfirmBookingPaymentAsync
 
-        public async Task<Booking?> ConfirmBookingPaymentAsync(int bookingId, string stripeChargeId, string paymentMethod)
+        public async Task<BookingResponse?> ConfirmBookingPaymentAsync(int bookingId, string stripeChargeId, string paymentMethod)
         {
             // 1. Begin database transaction
             await _bookingRepository.BeginTransactionAsync();
@@ -282,7 +282,7 @@ namespace Event.Business.Services
                             {
                                 { "bookingId", booking.Booking_Id.ToString() },
                                 { "eventName", booking.Event?.Title ?? "" },
-                                { "totalAmount", ledgerTx.Amount.ToString("C") },
+                                { "totalAmount", $"INR {ledgerTx.Amount:N2}" },
                                 { "ticketDetails", ticketDetailsStr },
                                 { "year", DateTime.UtcNow.Year.ToString() },
                                 { "qrCode", $"https://quickchart.io/qr?text={secretHash}&size=200" }
@@ -305,7 +305,7 @@ namespace Event.Business.Services
 
                 // 10. Commit database transaction and return the confirmed booking
                 await _bookingRepository.CommitTransactionAsync();
-                return booking;
+                return MapToBookingResponse(booking);
             }
             catch (BaseBusinessException)
             {
@@ -323,9 +323,10 @@ namespace Event.Business.Services
 
         #region GetMyBookingsAsync
 
-        public async Task<IEnumerable<Booking>> GetMyBookingsAsync(int attendeeId)
+        public async Task<IEnumerable<BookingResponse>> GetMyBookingsAsync(int attendeeId)
         {
-            return await _bookingRepository.GetBookingsByUserIdAsync(attendeeId);
+            var bookings = await _bookingRepository.GetBookingsByUserIdAsync(attendeeId);
+            return bookings.Select(MapToBookingResponse).Where(x => x != null).Cast<BookingResponse>().ToList();
         }
 
         #endregion
@@ -487,6 +488,34 @@ namespace Event.Business.Services
 
         #endregion
 
+        #region Helper Methods
+
+        private BookingResponse? MapToBookingResponse(Booking? booking)
+        {
+            if (booking == null) return null;
+
+            return new BookingResponse
+            {
+                Booking_Id = booking.Booking_Id,
+                Attendee_Id = booking.Attendee_Id,
+                Event_Id = booking.Event_Id,
+                Event_Title = booking.Event?.Title ?? string.Empty,
+                Event_Type = booking.Event?.Event_Type ?? string.Empty,
+                Event_Date_Time = booking.Event?.Date_Time ?? DateTime.MinValue,
+                Booking_Status = booking.Booking_Status,
+                Qr_Code_Path = booking.Qr_Code_Path,
+                CheckIn_Status = booking.CheckIn_Status,
+                Created_At = booking.Created_At,
+                Virtual_Url = booking.Event?.Virtual_Url,
+                Details = booking.Details?.Select(d => new BookingDetailDto
+                {
+                    Tier_Name = d.Tier_Name,
+                    Quantity = d.Quantity
+                }).ToList() ?? new List<BookingDetailDto>()
+            };
+        }
+
+        #endregion
 
     }
 }

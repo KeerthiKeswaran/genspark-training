@@ -27,7 +27,7 @@ namespace Event.API.Controllers
             try
             {
                 int userId = _userService.GetCurrentUserId();
-                var success = await _supportService.SubmitSupportTicketAsync(userId, request.Subject, request.Message, request.RequestType);
+                var success = await _supportService.SubmitSupportTicketAsync(userId, request.Subject, request.Message, request.RequestType, request.RelatedId);
                 if (!success)
                     return BadRequest(new { Message = "Failed to submit support ticket." });
 

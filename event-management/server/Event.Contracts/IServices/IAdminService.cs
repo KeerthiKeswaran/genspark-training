@@ -17,7 +17,7 @@ namespace Event.Contracts.IServices
         Task<bool> DismissEventReportAsync(int reportId);
         Task<bool> UpholdEventReportAsync(int reportId, string adminId, string actionReason, string organizerAction);
 
-        Task<IEnumerable<Region>> GetAllRegionsAsync();
+        Task<IEnumerable<RegionResponse>> GetAllRegionsAsync();
         Task<IEnumerable<VenueResponse>> GetAllVenuesAsync();
         Task<VenueResponse> CreateVenueAsync(CreateVenueRequest request);
 

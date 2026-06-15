@@ -31,7 +31,8 @@ namespace Event.Data.Repositories
 
             if (!string.IsNullOrWhiteSpace(category))
             {
-                query = query.Where(e => e.Event_Type == category);
+                var lowerCategory = category.ToLower();
+                query = query.Where(e => e.Event_Type.ToLower() == lowerCategory);
             }
 
             if (minDateTime.HasValue)
@@ -46,6 +47,7 @@ namespace Event.Data.Repositories
 
             int totalCount = await query.CountAsync();
             var items = await query
+                .OrderByDescending(e => e.Event_Id)
                 .Skip((page - 1) * size)
                 .Take(size)
                 .ToListAsync();

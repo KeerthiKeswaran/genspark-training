@@ -25,7 +25,8 @@ namespace Event.Data.Repositories
         public async Task<BookingPayment?> GetSuccessPaymentByBookingIdAsync(int bookingId)
         {
             return await _dbSet
-                .FirstOrDefaultAsync(bp => bp.Booking_Id == bookingId && bp.Payment_Status == "Success");
+                .FirstOrDefaultAsync(bp => bp.Booking_Id == bookingId && 
+                                           (bp.Payment_Status == "Success" || bp.Payment_Status == "Refunded"));
         }
 
         public async Task<decimal> GetTotalCommissionAsync()
