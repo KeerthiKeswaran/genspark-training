@@ -14,6 +14,16 @@ var builder = WebApplication.CreateBuilder(args);
 
 
 // Add services to the container.
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowClient", policy =>
+    {
+        policy.WithOrigins("http://localhost:4200")
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -94,6 +104,8 @@ builder.Services.AddScoped<IPolicyService, PolicyService>();
 builder.Services.AddHostedService<Event.Business.Services.BackgroundService>();
 
 var app = builder.Build();
+
+app.UseCors("AllowClient");
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 

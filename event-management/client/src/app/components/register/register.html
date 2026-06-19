@@ -1,0 +1,142 @@
+<div class="split-root">
+  
+  <!-- Left Side: Appealing branding & illustration -->
+  <div class="split-left">
+    <div class="left-overlay"></div>
+    <div class="left-content">
+      <div class="left-header">
+        <img src="/logo.png" alt="Event Management Logo" class="brand-logo">
+      </div>
+      <div class="left-body">
+        <h1 class="appealing-title">Join a Global Community of Event Goers.</h1>
+        <p class="appealing-text">
+          Create an account to book seats, manage your schedule, and check in cleanly with digital tickets.
+        </p>
+      </div>
+      <div class="left-footer">
+        <p class="copyright">&copy; 2026 EventManagement Inc. All rights reserved.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Side: Registration Form -->
+  <div class="split-right">
+    <div class="form-container">
+      
+      <!-- Back to login -->
+      <a routerLink="/login" class="back-link">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        <span>Back to Login</span>
+      </a>
+
+      <div class="header-section">
+        <h2>Create Account</h2>
+        <p class="subtitle">Enter your details to create an attendee or organizer profile.</p>
+      </div>
+
+      <form (ngSubmit)="onSubmit($event)" class="register-form">
+        @if (errorMessage()) {
+          <div class="alert alert-error">
+            {{ errorMessage() }}
+          </div>
+        }
+
+        @if (successMessage()) {
+          <div class="alert alert-success">
+            {{ successMessage() }}
+          </div>
+        }
+
+        <div class="form-group">
+          <label for="name">Full Name</label>
+          <input 
+            type="text" 
+            id="name" 
+            [(ngModel)]="name" 
+            name="name" 
+            placeholder="Enter your full name" 
+            required 
+            class="form-control"
+            [disabled]="isSubmitting()"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <div class="input-action-wrapper">
+            <input 
+              type="email" 
+              id="email" 
+              [(ngModel)]="email" 
+              name="email" 
+              placeholder="Enter your email" 
+              required 
+              class="form-control"
+              [disabled]="isSubmitting()"
+            />
+            <button type="button" class="btn btn-outline send-otp-btn" (click)="sendOtp()" [disabled]="isSubmitting()">
+              {{ isOtpSent() ? 'Resend' : 'Send OTP' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="otp">Email Verification (OTP)</label>
+          <input 
+            type="text" 
+            id="otp" 
+            [(ngModel)]="otp" 
+            name="otp" 
+            placeholder="Enter 6-digit code" 
+            required 
+            class="form-control"
+            [disabled]="isSubmitting()"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="mobileNumber">Mobile Number</label>
+          <input 
+            type="text" 
+            id="mobileNumber" 
+            [(ngModel)]="mobileNumber" 
+            name="mobileNumber" 
+            placeholder="9876543210" 
+            required 
+            class="form-control"
+            [disabled]="isSubmitting()"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input 
+            type="password" 
+            id="password" 
+            [(ngModel)]="password" 
+            name="password" 
+            placeholder="Create secure password" 
+            required 
+            class="form-control"
+            [disabled]="isSubmitting()"
+          />
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg" [disabled]="isSubmitting() || !isOtpSent()">
+          {{ isSubmitting() ? 'Registering...' : 'Register' }}
+        </button>
+
+        <div class="form-footer-action">
+          <p>Already have an account? <a routerLink="/login" class="accent-link">Sign in instead</a></p>
+        </div>
+
+
+      </form>
+
+    </div>
+  </div>
+
+</div>

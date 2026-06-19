@@ -1,0 +1,37 @@
+<!-- Global Footer -->
+<footer class="footer">
+  <div class="footer-container">
+    <div class="footer-column brand-col">
+      <img src="/logo.png" alt="Logo" class="footer-logo">
+      <p class="footer-desc">The modern platform for tickets, reservations, and seamless gathering operations.</p>
+    </div>
+    <div class="footer-column">
+      <h4>Explore</h4>
+      <ul>
+        <li><a (click)="onSearchSubmit()">Browse Events</a></li>
+        <li><a (click)="onPopularRegionSelect('REG01')">Chennai</a></li>
+        <li><a (click)="onPopularRegionSelect('REG02')">Coimbatore</a></li>
+        <li><a (click)="onPopularRegionSelect('REG03')">Madurai</a></li>
+      </ul>
+    </div>
+    <div class="footer-column">
+      <h4>Organizers</h4>
+      <ul>
+        <li><a (click)="triggerCreateEventAction()">Create an Event</a></li>
+        <li><a (click)="triggerManageMyEventsAction()">Host Resources</a></li>
+        <li><a (click)="triggerGetHelpAction()">Staffing Guides</a></li>
+      </ul>
+    </div>
+    <div class="footer-column">
+      <h4>Company</h4>
+      <ul>
+        <li><a (click)="triggerGetHelpAction()">Privacy Policy</a></li>
+        <li><a (click)="triggerGetHelpAction()">Terms of Service</a></li>
+        <li><a (click)="triggerGetHelpAction()">Contact Help</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>&copy; 2026 EventManagement Inc. All rights reserved. Created for GenSpark Internship.</p>
+  </div>
+</footer>

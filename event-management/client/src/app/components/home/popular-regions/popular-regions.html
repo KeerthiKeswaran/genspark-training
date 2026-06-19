@@ -1,0 +1,22 @@
+<!-- Section 2: Popular Regions -->
+<section class="popular-regions-section" style="padding-top: 0;">
+  <div class="section-header centered">
+    <span class="sub-title">Destinations</span>
+    <h2 class="section-title">Explore Cities</h2>
+    <p class="section-description">Explore top happenings in these highly active event communities.</p>
+  </div>
+
+  <div class="regions-grid">
+    @for (reg of homeRegions(); track reg.region_Id) {
+      <div class="region-card" (click)="onPopularRegionSelect(reg.region_Id)">
+        <img [src]="getRegionImage(reg.region_Id)" [alt]="reg.name" class="region-bg">
+        <div class="region-card-overlay"></div>
+        <div class="region-info">
+          <h3>{{ reg.name }}</h3>
+          <span class="region-badge-btn">Explore →</span>
+        </div>
+      </div>
+    }
+  </div>
+</section>
+
