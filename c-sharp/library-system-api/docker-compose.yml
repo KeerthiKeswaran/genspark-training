@@ -1,0 +1,53 @@
+services:
+
+  db:
+    image: postgres:16
+
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+    networks:
+      - appnet
+
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${DB_USER}", "-d", "${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    ports:
+      - "3000:8080"
+
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_HTTPS_PORT: ""
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASS}"
+
+    networks:
+      - appnet
+
+
+volumes:
+  pgdata:
+
+networks:
+  appnet:

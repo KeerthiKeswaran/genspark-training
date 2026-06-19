@@ -13,18 +13,18 @@ primary
 lastDtbSucceeded
 
 [properties]
-AssemblyName=notification-system
+AssemblyName=wordle-game
 CommandLineArgsForDesignTimeEvaluation=-langversion:14.0 -define:TRACE
 CompilerGeneratedFilesOutputPath=
 MaxSupportedLangVersion=14.0
 ProjectAssetsFile=<PATH>obj/project.assets.json
-RootNamespace=notification_system
+RootNamespace=wordle_game
 RunAnalyzers=
 RunAnalyzersDuringLiveAnalysis=
 SolutionPath=*Undefined*
 TargetFrameworkIdentifier=.NETCoreApp
-TargetPath=<PATH>bin/Debug/net10.0/notification-system.dll
-TargetRefPath=<PATH>obj/Debug/net10.0/ref/notification-system.dll
+TargetPath=<PATH>bin/Debug/net10.0/wordle-game.dll
+TargetRefPath=<PATH>obj/Debug/net10.0/ref/wordle-game.dll
 TemporaryDependencyNodeTargetIdentifier=net10.0
 
 [commandLineArguments]
@@ -44,8 +44,8 @@ TemporaryDependencyNodeTargetIdentifier=net10.0
 /debug:portable
 /filealign:512
 /optimize-
-/out:obj/Debug/net10.0/notification-system.dll
-/refout:obj/Debug/net10.0/refint/notification-system.dll
+/out:obj/Debug/net10.0/wordle-game.dll
+/refout:obj/Debug/net10.0/refint/wordle-game.dll
 /target:exe
 /warnaserror-
 /utf8output
@@ -54,24 +54,31 @@ TemporaryDependencyNodeTargetIdentifier=net10.0
 /warnaserror+:NU1605,SYSLIB0011
 
 [sourceFiles]
-Interface/
- INotificationRepository.cs
- INotificationSender.cs
+Exceptions/
+ AuthExceptions.cs
+ InvalidDifficultyException.cs
+ InvalidGuessException.cs
+Interfaces/
+ IFeedbackService.cs
+ IGameRepository.cs
+ IGameService.cs
+ IValidationService.cs
 Models/
- EmailNotification.cs
- Notification.cs
- SmsNotification.cs
- User.cs
+ GameModel.cs
+ ScoreModel.cs
+ UserModel.cs
 obj/Debug/net10.0/
  .NETCoreApp,Version=v10.0.AssemblyAttributes.cs
- notification-system.AssemblyInfo.cs
- notification-system.GlobalUsings.g.cs
+ wordle-game.AssemblyInfo.cs
+ wordle-game.GlobalUsings.g.cs
 Program.cs
-Repositories/NotificationRepository.cs
+Repositories/GameRepository.cs
 Services/
- NotificationService.Crud.cs
- NotificationService.cs
- NotificationService.Messaging.cs
+ FeedbackService.cs
+ GameService.cs
+ GameService.Operations.cs
+ GameService.Utilities.cs
+ ValidationService.cs
 
 [metadataReferences]
 <DOTNET>/packs/Microsoft.NETCore.App.Ref/10.0.7/ref/net10.0/
@@ -243,10 +250,17 @@ Services/
  System.Xml.XPath.XDocument.dll
  WindowsBase.dll
 <NUGET>/
- bouncycastle.cryptography/2.6.2/lib/net6.0/BouncyCastle.Cryptography.dll
- mailkit/4.16.0/lib/net10.0/MailKit.dll
- mimekit/4.16.0/lib/net10.0/MimeKit.dll
- system.security.cryptography.pkcs/10.0.0/lib/net10.0/System.Security.Cryptography.Pkcs.dll
+ microsoft.extensions.configuration.abstractions/10.0.7/lib/net10.0/Microsoft.Extensions.Configuration.Abstractions.dll
+ microsoft.extensions.configuration.fileextensions/10.0.7/lib/net10.0/Microsoft.Extensions.Configuration.FileExtensions.dll
+ microsoft.extensions.configuration.json/10.0.7/lib/net10.0/Microsoft.Extensions.Configuration.Json.dll
+ microsoft.extensions.configuration/10.0.7/lib/net10.0/Microsoft.Extensions.Configuration.dll
+ microsoft.extensions.dependencyinjection.abstractions/10.0.0/lib/net10.0/Microsoft.Extensions.DependencyInjection.Abstractions.dll
+ microsoft.extensions.fileproviders.abstractions/10.0.7/lib/net10.0/Microsoft.Extensions.FileProviders.Abstractions.dll
+ microsoft.extensions.fileproviders.physical/10.0.7/lib/net10.0/Microsoft.Extensions.FileProviders.Physical.dll
+ microsoft.extensions.filesystemglobbing/10.0.7/lib/net10.0/Microsoft.Extensions.FileSystemGlobbing.dll
+ microsoft.extensions.logging.abstractions/10.0.0/lib/net10.0/Microsoft.Extensions.Logging.Abstractions.dll
+ microsoft.extensions.primitives/10.0.7/lib/net10.0/Microsoft.Extensions.Primitives.dll
+ npgsql/10.0.2/lib/net10.0/Npgsql.dll
 
 [analyzerReferences]
 <DOTNET>/packs/Microsoft.NETCore.App.Ref/10.0.7/analyzers/dotnet/cs/
@@ -259,7 +273,8 @@ Services/
 <DOTNET>/sdk/10.0.203/Sdks/Microsoft.NET.Sdk/analyzers/
  Microsoft.CodeAnalysis.CSharp.NetAnalyzers.dll
  Microsoft.CodeAnalysis.NetAnalyzers.dll
+<NUGET>/microsoft.extensions.logging.abstractions/10.0.0/analyzers/dotnet/roslyn4.4/cs/Microsoft.Extensions.Logging.Generators.dll
 
 [analyzerConfigFiles]
 <DOTNET>/sdk/10.0.203/Sdks/Microsoft.NET.Sdk/analyzers/build/config/analysislevel_10_default.globalconfig
-obj/Debug/net10.0/notification-system.GeneratedMSBuildEditorConfig.editorconfig
+obj/Debug/net10.0/wordle-game.GeneratedMSBuildEditorConfig.editorconfig

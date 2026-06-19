@@ -51,4 +51,10 @@ if (!app.Environment.IsDevelopment())
 app.UseCors("AllowAll");
 app.MapControllers();
 
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+    dbContext.Database.Migrate(); 
+}
+
 app.Run();

@@ -13,18 +13,18 @@ primary
 lastDtbSucceeded
 
 [properties]
-AssemblyName=notification-system
+AssemblyName=NotificationSystem.Business
 CommandLineArgsForDesignTimeEvaluation=-langversion:14.0 -define:TRACE
 CompilerGeneratedFilesOutputPath=
 MaxSupportedLangVersion=14.0
 ProjectAssetsFile=<PATH>obj/project.assets.json
-RootNamespace=notification_system
+RootNamespace=NotificationSystem.Business
 RunAnalyzers=
 RunAnalyzersDuringLiveAnalysis=
 SolutionPath=*Undefined*
 TargetFrameworkIdentifier=.NETCoreApp
-TargetPath=<PATH>bin/Debug/net10.0/notification-system.dll
-TargetRefPath=<PATH>obj/Debug/net10.0/ref/notification-system.dll
+TargetPath=<PATH>bin/Debug/net10.0/NotificationSystem.Business.dll
+TargetRefPath=<PATH>obj/Debug/net10.0/ref/NotificationSystem.Business.dll
 TemporaryDependencyNodeTargetIdentifier=net10.0
 
 [commandLineArguments]
@@ -44,9 +44,9 @@ TemporaryDependencyNodeTargetIdentifier=net10.0
 /debug:portable
 /filealign:512
 /optimize-
-/out:obj/Debug/net10.0/notification-system.dll
-/refout:obj/Debug/net10.0/refint/notification-system.dll
-/target:exe
+/out:obj/Debug/net10.0/NotificationSystem.Business.dll
+/refout:obj/Debug/net10.0/refint/NotificationSystem.Business.dll
+/target:library
 /warnaserror-
 /utf8output
 /deterministic+
@@ -54,26 +54,22 @@ TemporaryDependencyNodeTargetIdentifier=net10.0
 /warnaserror+:NU1605,SYSLIB0011
 
 [sourceFiles]
-Interface/
- INotificationRepository.cs
- INotificationSender.cs
-Models/
- EmailNotification.cs
- Notification.cs
- SmsNotification.cs
- User.cs
+NotificationService.cs
+NotificationService.Operation.cs
+NotificationService.Utility.cs
+NotificationValidation.cs
 obj/Debug/net10.0/
  .NETCoreApp,Version=v10.0.AssemblyAttributes.cs
- notification-system.AssemblyInfo.cs
- notification-system.GlobalUsings.g.cs
-Program.cs
-Repositories/NotificationRepository.cs
-Services/
- NotificationService.Crud.cs
- NotificationService.cs
- NotificationService.Messaging.cs
+ NotificationSystem.Business.AssemblyInfo.cs
+ NotificationSystem.Business.GlobalUsings.g.cs
 
 [metadataReferences]
+../
+ NotificationSystem.Contracts/obj/Debug/net10.0/ref/NotificationSystem.Contracts.dll
+ NotificationSystem.Data/obj/Debug/net10.0/ref/NotificationSystem.Data.dll
+ NotificationSystem.Models/obj/Debug/net10.0/ref/NotificationSystem.Models.dll
+ NotificationSystem.Senders/obj/Debug/net10.0/ref/NotificationSystem.Senders.dll
+ NotificationSystem.Shared/obj/Debug/net10.0/ref/NotificationSystem.Shared.dll
 <DOTNET>/packs/Microsoft.NETCore.App.Ref/10.0.7/ref/net10.0/
  Microsoft.CSharp.dll
  Microsoft.VisualBasic.Core.dll
@@ -242,11 +238,6 @@ Services/
  System.Xml.XPath.dll
  System.Xml.XPath.XDocument.dll
  WindowsBase.dll
-<NUGET>/
- bouncycastle.cryptography/2.6.2/lib/net6.0/BouncyCastle.Cryptography.dll
- mailkit/4.16.0/lib/net10.0/MailKit.dll
- mimekit/4.16.0/lib/net10.0/MimeKit.dll
- system.security.cryptography.pkcs/10.0.0/lib/net10.0/System.Security.Cryptography.Pkcs.dll
 
 [analyzerReferences]
 <DOTNET>/packs/Microsoft.NETCore.App.Ref/10.0.7/analyzers/dotnet/cs/
@@ -262,4 +253,4 @@ Services/
 
 [analyzerConfigFiles]
 <DOTNET>/sdk/10.0.203/Sdks/Microsoft.NET.Sdk/analyzers/build/config/analysislevel_10_default.globalconfig
-obj/Debug/net10.0/notification-system.GeneratedMSBuildEditorConfig.editorconfig
+obj/Debug/net10.0/NotificationSystem.Business.GeneratedMSBuildEditorConfig.editorconfig

@@ -13,18 +13,18 @@ primary
 lastDtbSucceeded
 
 [properties]
-AssemblyName=notification-system
+AssemblyName=NotificationSystem.Data
 CommandLineArgsForDesignTimeEvaluation=-langversion:14.0 -define:TRACE
 CompilerGeneratedFilesOutputPath=
 MaxSupportedLangVersion=14.0
 ProjectAssetsFile=<PATH>obj/project.assets.json
-RootNamespace=notification_system
+RootNamespace=NotificationSystem.Data
 RunAnalyzers=
 RunAnalyzersDuringLiveAnalysis=
 SolutionPath=*Undefined*
 TargetFrameworkIdentifier=.NETCoreApp
-TargetPath=<PATH>bin/Debug/net10.0/notification-system.dll
-TargetRefPath=<PATH>obj/Debug/net10.0/ref/notification-system.dll
+TargetPath=<PATH>bin/Debug/net10.0/NotificationSystem.Data.dll
+TargetRefPath=<PATH>obj/Debug/net10.0/ref/NotificationSystem.Data.dll
 TemporaryDependencyNodeTargetIdentifier=net10.0
 
 [commandLineArguments]
@@ -44,9 +44,9 @@ TemporaryDependencyNodeTargetIdentifier=net10.0
 /debug:portable
 /filealign:512
 /optimize-
-/out:obj/Debug/net10.0/notification-system.dll
-/refout:obj/Debug/net10.0/refint/notification-system.dll
-/target:exe
+/out:obj/Debug/net10.0/NotificationSystem.Data.dll
+/refout:obj/Debug/net10.0/refint/NotificationSystem.Data.dll
+/target:library
 /warnaserror-
 /utf8output
 /deterministic+
@@ -54,26 +54,30 @@ TemporaryDependencyNodeTargetIdentifier=net10.0
 /warnaserror+:NU1605,SYSLIB0011
 
 [sourceFiles]
-Interface/
- INotificationRepository.cs
- INotificationSender.cs
-Models/
- EmailNotification.cs
- Notification.cs
- SmsNotification.cs
- User.cs
+Contexts/
+ NotificationContext.cs
+ NotificationContextFactory.cs
+Migrations/
+ 20260513112909_InitialMigrations.cs
+ 20260513112909_InitialMigrations.Designer.cs
+ 20260513115535_UpdateSeed.cs
+ 20260513115535_UpdateSeed.Designer.cs
+ 20260513120410_RemovedSeed.cs
+ 20260513120410_RemovedSeed.Designer.cs
+ 20260513131247_UpdatedAttributes.cs
+ 20260513131247_UpdatedAttributes.Designer.cs
+ NotificationContextModelSnapshot.cs
 obj/Debug/net10.0/
  .NETCoreApp,Version=v10.0.AssemblyAttributes.cs
- notification-system.AssemblyInfo.cs
- notification-system.GlobalUsings.g.cs
-Program.cs
+ NotificationSystem.Data.AssemblyInfo.cs
+ NotificationSystem.Data.GlobalUsings.g.cs
 Repositories/NotificationRepository.cs
-Services/
- NotificationService.Crud.cs
- NotificationService.cs
- NotificationService.Messaging.cs
 
 [metadataReferences]
+../
+ NotificationSystem.Contracts/obj/Debug/net10.0/ref/NotificationSystem.Contracts.dll
+ NotificationSystem.Models/obj/Debug/net10.0/ref/NotificationSystem.Models.dll
+ NotificationSystem.Shared/obj/Debug/net10.0/ref/NotificationSystem.Shared.dll
 <DOTNET>/packs/Microsoft.NETCore.App.Ref/10.0.7/ref/net10.0/
  Microsoft.CSharp.dll
  Microsoft.VisualBasic.Core.dll
@@ -243,10 +247,26 @@ Services/
  System.Xml.XPath.XDocument.dll
  WindowsBase.dll
 <NUGET>/
- bouncycastle.cryptography/2.6.2/lib/net6.0/BouncyCastle.Cryptography.dll
- mailkit/4.16.0/lib/net10.0/MailKit.dll
- mimekit/4.16.0/lib/net10.0/MimeKit.dll
- system.security.cryptography.pkcs/10.0.0/lib/net10.0/System.Security.Cryptography.Pkcs.dll
+ microsoft.entityframeworkcore.abstractions/10.0.8/lib/net10.0/Microsoft.EntityFrameworkCore.Abstractions.dll
+ microsoft.entityframeworkcore.relational/10.0.8/lib/net10.0/Microsoft.EntityFrameworkCore.Relational.dll
+ microsoft.entityframeworkcore/10.0.8/lib/net10.0/Microsoft.EntityFrameworkCore.dll
+ microsoft.extensions.caching.abstractions/10.0.8/lib/net10.0/Microsoft.Extensions.Caching.Abstractions.dll
+ microsoft.extensions.caching.memory/10.0.8/lib/net10.0/Microsoft.Extensions.Caching.Memory.dll
+ microsoft.extensions.configuration.abstractions/10.0.8/lib/net10.0/Microsoft.Extensions.Configuration.Abstractions.dll
+ microsoft.extensions.configuration.fileextensions/10.0.8/lib/net10.0/Microsoft.Extensions.Configuration.FileExtensions.dll
+ microsoft.extensions.configuration.json/10.0.8/lib/net10.0/Microsoft.Extensions.Configuration.Json.dll
+ microsoft.extensions.configuration/10.0.8/lib/net10.0/Microsoft.Extensions.Configuration.dll
+ microsoft.extensions.dependencyinjection.abstractions/10.0.8/lib/net10.0/Microsoft.Extensions.DependencyInjection.Abstractions.dll
+ microsoft.extensions.dependencyinjection/10.0.8/lib/net10.0/Microsoft.Extensions.DependencyInjection.dll
+ microsoft.extensions.fileproviders.abstractions/10.0.8/lib/net10.0/Microsoft.Extensions.FileProviders.Abstractions.dll
+ microsoft.extensions.fileproviders.physical/10.0.8/lib/net10.0/Microsoft.Extensions.FileProviders.Physical.dll
+ microsoft.extensions.filesystemglobbing/10.0.8/lib/net10.0/Microsoft.Extensions.FileSystemGlobbing.dll
+ microsoft.extensions.logging.abstractions/10.0.8/lib/net10.0/Microsoft.Extensions.Logging.Abstractions.dll
+ microsoft.extensions.logging/10.0.8/lib/net10.0/Microsoft.Extensions.Logging.dll
+ microsoft.extensions.options/10.0.8/lib/net10.0/Microsoft.Extensions.Options.dll
+ microsoft.extensions.primitives/10.0.8/lib/net10.0/Microsoft.Extensions.Primitives.dll
+ npgsql.entityframeworkcore.postgresql/10.0.1/lib/net10.0/Npgsql.EntityFrameworkCore.PostgreSQL.dll
+ npgsql/10.0.2/lib/net10.0/Npgsql.dll
 
 [analyzerReferences]
 <DOTNET>/packs/Microsoft.NETCore.App.Ref/10.0.7/analyzers/dotnet/cs/
@@ -259,7 +279,14 @@ Services/
 <DOTNET>/sdk/10.0.203/Sdks/Microsoft.NET.Sdk/analyzers/
  Microsoft.CodeAnalysis.CSharp.NetAnalyzers.dll
  Microsoft.CodeAnalysis.NetAnalyzers.dll
+<NUGET>/microsoft.codeanalysis.analyzers/3.11.0/analyzers/dotnet/cs/
+ Microsoft.CodeAnalysis.Analyzers.dll
+ Microsoft.CodeAnalysis.CSharp.Analyzers.dll
+<NUGET>/
+ microsoft.entityframeworkcore.analyzers/10.0.8/analyzers/dotnet/cs/Microsoft.EntityFrameworkCore.Analyzers.dll
+ microsoft.extensions.logging.abstractions/10.0.8/analyzers/dotnet/roslyn4.4/cs/Microsoft.Extensions.Logging.Generators.dll
+ microsoft.extensions.options/10.0.8/analyzers/dotnet/roslyn4.4/cs/Microsoft.Extensions.Options.SourceGeneration.dll
 
 [analyzerConfigFiles]
 <DOTNET>/sdk/10.0.203/Sdks/Microsoft.NET.Sdk/analyzers/build/config/analysislevel_10_default.globalconfig
-obj/Debug/net10.0/notification-system.GeneratedMSBuildEditorConfig.editorconfig
+obj/Debug/net10.0/NotificationSystem.Data.GeneratedMSBuildEditorConfig.editorconfig
