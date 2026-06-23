@@ -34,6 +34,7 @@ export interface BrowsedEventResponse {
   region_Name?: string;
   status?: string;
   minPrice?: number;
+  organizer_Name?: string;
 }
 
 export interface PagedResult<T> {

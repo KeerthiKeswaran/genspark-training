@@ -18,8 +18,10 @@ import { RegionModel } from '../../../models/region.model';
 export class PopularRegionsComponent implements OnInit, OnDestroy {
   public isLoggedIn = signal(false);
   public homeRegions = signal<RegionModel[]>([]);
-  public regionImages = signal<Map<string, string>>(new Map());
+  public regionImages = signal<Map<string, string | null>>(new Map());
+  public imageErrors = signal<Map<string, boolean>>(new Map());
   private subscriptions: Subscription = new Subscription();
+  private currentLoadingRegionsString = '';
 
   constructor(
     private store: AppStoreService,
@@ -41,6 +43,13 @@ export class PopularRegionsComponent implements OnInit, OnDestroy {
           r.region_Id === 'REG03' || 
           r.region_Id === 'REG04'
         );
+        
+        const regionsKey = filtered.map(r => r.region_Id).join(',');
+        if (regionsKey && regionsKey === this.currentLoadingRegionsString) {
+          return;
+        }
+        this.currentLoadingRegionsString = regionsKey;
+
         this.homeRegions.set(filtered);
         this.loadImages(filtered);
       })
@@ -48,20 +57,46 @@ export class PopularRegionsComponent implements OnInit, OnDestroy {
   }
 
   private async loadImages(regions: RegionModel[]): Promise<void> {
-    const images = new Map<string, string>();
+    const currentImages = this.regionImages();
+    const images = new Map<string, string | null>(currentImages);
+    
+    // Load images sequentially with a delay to prevent rate-limiting and stagger rendering
     for (const region of regions) {
-      const url = await firstValueFrom(this.pixabayService.searchRegionImage(region.name));
-      images.set(region.region_Id, url);
+      // Only fetch if we don't already have it loaded in memory
+      if (images.has(region.region_Id)) {
+        continue;
+      }
+
+      try {
+        const url = await firstValueFrom(this.pixabayService.searchRegionImage(region.name));
+        images.set(region.region_Id, url);
+        // Update the signal incrementally so each image displays as soon as it resolves
+        this.regionImages.set(new Map(images));
+        
+        // Add a 450ms delay between image displays to stagger browser requests and avoid CDN rate-limiting
+        await new Promise(resolve => setTimeout(resolve, 450));
+      } catch (err) {
+        console.error(`Error loading image for region ${region.name}:`, err);
+      }
     }
-    this.regionImages.set(images);
   }
 
   ngOnDestroy(): void {
     this.subscriptions.unsubscribe();
   }
 
-  public getRegionImage(regionId: string): string {
-    return this.regionImages().get(regionId) || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=600&auto=format&fit=crop&q=80';
+  public getRegionImage(regionId: string): string | null {
+    return this.regionImages().get(regionId) || null;
+  }
+
+  public onImageError(regionId: string): void {
+    const errors = new Map(this.imageErrors());
+    errors.set(regionId, true);
+    this.imageErrors.set(errors);
+  }
+
+  public hasImageError(regionId: string): boolean {
+    return !!this.imageErrors().get(regionId);
   }
 
   public onPopularRegionSelect(regionId: string): void {

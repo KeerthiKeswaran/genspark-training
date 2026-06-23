@@ -84,6 +84,14 @@ export class HeroCarouselComponent implements OnInit, OnDestroy {
       this.router.navigate(['/login']);
       return;
     }
-    alert('Navigating to bookings overview...');
+    this.router.navigate(['/bookings']);
+  }
+
+  public navigateToBookingFlow(eventId: number): void {
+    if (!this.isLoggedIn()) {
+      this.router.navigate(['/login']);
+      return;
+    }
+    this.router.navigate(['/booking'], { queryParams: { eventId } });
   }
 }

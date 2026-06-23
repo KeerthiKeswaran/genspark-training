@@ -9,14 +9,24 @@
   <div class="regions-grid">
     @for (reg of homeRegions(); track reg.region_Id) {
       <div class="region-card" (click)="onPopularRegionSelect(reg.region_Id)">
-        <img [src]="getRegionImage(reg.region_Id)" [alt]="reg.name" class="region-bg">
-        <div class="region-card-overlay"></div>
-        <div class="region-info">
-          <h3>{{ reg.name }}</h3>
-          <span class="region-badge-btn">Explore →</span>
-        </div>
+        @if (getRegionImage(reg.region_Id) && !hasImageError(reg.region_Id)) {
+          <img [src]="getRegionImage(reg.region_Id)" [alt]="reg.name" class="region-bg" (error)="onImageError(reg.region_Id)">
+          <div class="region-card-overlay"></div>
+          <div class="region-info">
+            <h3>{{ reg.name }}</h3>
+            <span class="region-badge-btn">Explore →</span>
+          </div>
+        } @else {
+          <!-- Stylish Text Placeholder when image is missing or broken -->
+          <div class="region-placeholder">
+            <div class="region-watermark">{{ reg.name }}</div>
+            <div class="region-placeholder-content">
+              <div class="region-front-title">{{ reg.name }}</div>
+              <span class="region-badge-btn placeholder-badge">Explore →</span>
+            </div>
+          </div>
+        }
       </div>
     }
   </div>
 </section>
-

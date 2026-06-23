@@ -1,12 +1,15 @@
-import { Component, OnInit, OnDestroy, Output, EventEmitter, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, Output, EventEmitter, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { Subscription, Subject, of } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 import { AppStoreService } from '../../../store/app-store.service';
 import { AuthService } from '../../../services/auth.service';
 import { RegionService } from '../../../services/region.service';
 import { RegionModel } from '../../../models/region.model';
+import { BrowsedEventResponse } from '../../../models/event.model';
+import { mockAllEvents } from '../../../data/event.mock';
 
 @Component({
   selector: 'app-navbar',
@@ -21,6 +24,15 @@ export class NavbarComponent implements OnInit, OnDestroy {
   public searchKeyword = signal('');
   public selectedRegionId = signal('REG01');
   public isProfileDropdownOpen = signal(false);
+  public showRecommendations = signal(false);
+  public recommendations = signal<BrowsedEventResponse[]>([]);
+
+  private searchSubject = new Subject<string>();
+
+  @HostListener('document:click', ['$event'])
+  public onDocumentClick(event: MouseEvent): void {
+    this.closeDropdowns();
+  }
 
   public currentUser = signal<any>(null);
   public isLoggedIn = signal(false);
@@ -33,7 +45,7 @@ export class NavbarComponent implements OnInit, OnDestroy {
     private authService: AuthService,
     private regionService: RegionService,
     private router: Router
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     this.subscriptions.add(
@@ -48,6 +60,27 @@ export class NavbarComponent implements OnInit, OnDestroy {
     this.subscriptions.add(
       this.store.select(state => state.regions.currentRegionId).subscribe(regId => {
         this.selectedRegionId.set(regId || 'REG01');
+      })
+    );
+
+    // Search recommendation subscription with RxJS switchMap, distinct, debounceTime
+    this.subscriptions.add(
+      this.searchSubject.pipe(
+        debounceTime(200),
+        distinctUntilChanged(),
+        switchMap(keyword => {
+          const kw = keyword.toLowerCase().trim();
+          if (!kw) {
+            return of([]);
+          }
+          const matches = mockAllEvents.filter(e => 
+            e.title.toLowerCase().includes(kw) || 
+            (e.venue_Name && e.venue_Name.toLowerCase().includes(kw))
+          ).slice(0, 5);
+          return of(matches);
+        })
+      ).subscribe(matches => {
+        this.recommendations.set(matches);
       })
     );
   }
@@ -69,6 +102,18 @@ export class NavbarComponent implements OnInit, OnDestroy {
 
   public closeDropdowns(): void {
     this.isProfileDropdownOpen.set(false);
+    this.showRecommendations.set(false);
+  }
+
+  public onSearchInput(val: string): void {
+    this.searchKeyword.set(val);
+    this.searchSubject.next(val);
+  }
+
+  public selectRecommendation(rec: any): void {
+    this.searchKeyword.set(rec.title);
+    this.showRecommendations.set(false);
+    this.router.navigate(['/booking'], { queryParams: { eventId: rec.event_Id } });
   }
 
   public onLocationPickerClick(event: Event): void {
@@ -96,7 +141,8 @@ export class NavbarComponent implements OnInit, OnDestroy {
       this.router.navigate(['/login']);
       return;
     }
-    alert('Navigating to bookings overview...');
+    this.router.navigate(['/bookings']);
+    this.isProfileDropdownOpen.set(false);
   }
 
   public triggerCreateEventAction(): void {
@@ -104,7 +150,7 @@ export class NavbarComponent implements OnInit, OnDestroy {
       this.router.navigate(['/login']);
       return;
     }
-    alert('Navigating to event creation page...');
+    this.router.navigate(['/create-event']);
   }
 
   public triggerManageMyEventsAction(): void {
@@ -116,12 +162,7 @@ export class NavbarComponent implements OnInit, OnDestroy {
   }
 
   public triggerGetHelpAction(): void {
-    const aboutSection = document.getElementById('about-section');
-    if (aboutSection) {
-      aboutSection.scrollIntoView({ behavior: 'smooth' });
-    } else {
-      this.router.navigate(['/'], { fragment: 'about-section' });
-    }
+    this.router.navigate(['/help']);
     this.isProfileDropdownOpen.set(false);
   }
 }

@@ -16,13 +16,27 @@
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
         </span>
-        <input 
-          type="text" 
-          [(ngModel)]="searchKeyword" 
-          name="searchKeyword" 
-          placeholder="Search events, seminars, concerts..." 
-          class="search-input"
-        />
+        <div class="search-input-wrap">
+          <input 
+            type="text" 
+            [ngModel]="searchKeyword()" 
+            (ngModelChange)="onSearchInput($event)"
+            name="searchKeyword" 
+            placeholder="Search events, seminars, concerts..." 
+            class="search-input"
+            autocomplete="off"
+            (focus)="showRecommendations.set(true)"
+          />
+          @if (showRecommendations() && recommendations().length > 0) {
+            <div class="search-recommendations-dropdown">
+              @for (rec of recommendations(); track rec.event_Id) {
+                <div class="recommendation-item" (click)="selectRecommendation(rec)">
+                  <span class="rec-title">{{ rec.title }}</span>
+                </div>
+              }
+            </div>
+          }
+        </div>
         <div class="vertical-divider"></div>
         <div class="location-picker-trigger" (click)="onLocationPickerClick($event)">
           <svg class="icon pin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -115,7 +129,7 @@
             </a>
           </div>
         </div>
-      @} @else {
+      } @else {
         <!-- Sign In Button -->
         <a class="btn btn-primary login-nav-btn" routerLink="/login">
           Login

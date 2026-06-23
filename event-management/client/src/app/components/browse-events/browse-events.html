@@ -133,19 +133,6 @@
 
         <form (ngSubmit)="applyFilters()" class="filters-form">
           
-          <!-- Search Input -->
-          <div class="filter-group">
-            <label for="keyword">Search Keyword</label>
-            <input 
-              type="text" 
-              id="keyword" 
-              [(ngModel)]="filterKeyword" 
-              name="filterKeyword" 
-              placeholder="e.g. Carnatic, Tech, SaaS" 
-              class="form-control"
-            />
-          </div>
-
           <!-- Category Selection -->
           <div class="filter-group">
             <label for="category">Category</label>
@@ -164,60 +151,59 @@
             </select>
           </div>
 
-          <!-- Minimum Date Selection -->
+          <!-- Event Format Selection -->
           <div class="filter-group">
-            <label for="minDate">Min Date / Time</label>
-            <input 
-              type="date" 
-              id="minDate" 
-              [(ngModel)]="filterMinDate" 
-              name="filterMinDate" 
-              class="form-control"
-            />
+            <label for="format">Event Format</label>
+            <select 
+              id="format" 
+              [(ngModel)]="filterFormat" 
+              name="filterFormat" 
+              class="form-control select-control"
+            >
+              <option value="">All Formats</option>
+              <option value="physical">Physical</option>
+              <option value="virtual">Virtual</option>
+              <option value="hybrid">Hybrid</option>
+            </select>
           </div>
 
-          <!-- Nationwide Regions Toggle Switch -->
-          <div class="filter-group toggle-group" style="margin-top: 10px;">
-            <div class="toggle-container" style="display: flex; align-items: center; justify-content: space-between;">
-              <span class="toggle-label" style="font-weight: 700; font-size: 12px; text-transform: uppercase; color: var(--color-neutral-mid);">Show Nationwide Regions</span>
-              <label class="switch">
-                <input 
-                  type="checkbox" 
-                  [checked]="showNationwideRegions()" 
-                  (change)="showNationwideRegions.set(!showNationwideRegions())"
-                />
-                <span class="slider round"></span>
-              </label>
-            </div>
+          <!-- Max Price Selection -->
+          <div class="filter-group">
+            <label for="maxPrice">Max Price Limit</label>
+            <select 
+              id="maxPrice" 
+              [(ngModel)]="filterMaxPrice" 
+              name="filterMaxPrice" 
+              class="form-control select-control"
+            >
+              <option [ngValue]="null">Any Price</option>
+              <option [ngValue]="100">Under ₹100</option>
+              <option [ngValue]="200">Under ₹200</option>
+              <option [ngValue]="500">Under ₹500</option>
+              <option [ngValue]="1000">Under ₹1000</option>
+            </select>
           </div>
 
-          <!-- Nationwide Regions Checklist -->
-          @if (showNationwideRegions()) {
-            <div class="filter-group regions-checklist" style="margin-top: 8px; max-height: 180px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: var(--radius-common); padding: 12px; background-color: var(--color-canvas-muted);">
-              <label style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--color-accent); margin-bottom: 8px; display: block;">Select Regions</label>
-              @for (reg of regions(); track reg.region_Id) {
-                <div class="checkbox-item" style="display: flex; align-items: center; margin-bottom: 8px; cursor: pointer;">
-                  <input 
-                    type="checkbox" 
-                    [id]="'region-' + reg.region_Id" 
-                    [checked]="isRegionFilterChecked(reg.region_Id)" 
-                    (change)="toggleRegionFilter(reg.region_Id)"
-                    style="margin-right: 8px; cursor: pointer; width: 15px; height: 15px; accent-color: var(--color-accent);"
-                  />
-                  <label [for]="'region-' + reg.region_Id" style="font-size: 13px; color: var(--color-neutral-mid); cursor: pointer; text-transform: none; font-weight: normal; margin-bottom: 0; display: block; width: 100%;">
-                    {{ reg.name }}
-                  </label>
-                </div>
-              }
-            </div>
-          }
+          <!-- Sort Options -->
+          <div class="filter-group">
+            <label for="sortBy">Sort By</label>
+            <select 
+              id="sortBy" 
+              [(ngModel)]="filterSortBy" 
+              name="filterSortBy" 
+              class="form-control select-control"
+            >
+              <option value="">Default (Active Region)</option>
+              <option value="dateAsc">Date: Soonest first</option>
+              <option value="dateDesc">Date: Latest first</option>
+              <option value="priceAsc">Price: Low to High</option>
+              <option value="priceDesc">Price: High to Low</option>
+            </select>
+          </div>
 
           <div class="filter-actions">
             <button type="submit" class="btn btn-primary btn-block">
               Apply Filters
-            </button>
-            <button type="button" class="btn btn-outline btn-block" (click)="clearFilters()">
-              Clear Filters
             </button>
           </div>
 
@@ -229,11 +215,11 @@
     <section class="results-pane">
       <div class="results-header">
         <h2>Browse <span class="highlight-red">Events</span></h2>
-        <span class="results-count">{{ events().length }} events found</span>
+        <span class="results-count">{{ totalEvents() }} events found</span>
       </div>
 
       <!-- Active Filters Chips List -->
-      @if (filterKeyword || filterCategory || filterMinDate || filterRegionIds.length > 0) {
+      @if (filterKeyword || filterCategory || filterFormat || filterMaxPrice || filterRegionIds.length > 0) {
         <div class="active-filters-container">
           <span class="active-filters-title">Active Filters:</span>
           <div class="active-filters-list">
@@ -249,10 +235,16 @@
                 <button type="button" class="chip-close-btn" (click)="removeCategoryFilter()">&times;</button>
               </div>
             }
-            @if (filterMinDate) {
+            @if (filterFormat) {
               <div class="filter-chip">
-                <span>Min Date: {{ filterMinDate | date:'mediumDate' }}</span>
-                <button type="button" class="chip-close-btn" (click)="removeMinDateFilter()">&times;</button>
+                <span>Format: {{ filterFormat | titlecase }}</span>
+                <button type="button" class="chip-close-btn" (click)="removeFormatFilter()">&times;</button>
+              </div>
+            }
+            @if (filterMaxPrice) {
+              <div class="filter-chip">
+                <span>Max Price: ₹{{ filterMaxPrice }}</span>
+                <button type="button" class="chip-close-btn" (click)="removeMaxPriceFilter()">&times;</button>
               </div>
             }
 
@@ -271,7 +263,9 @@
       <!-- Loading skeleton -->
       @if (eventsLoading()) {
         <div class="results-skeleton">
-          <div class="skeleton-card" *ngFor="let item of [1, 2, 3]"></div>
+          @for (item of [1, 2, 3]; track item) {
+            <div class="skeleton-card"></div>
+          }
         </div>
       } @else {
         
@@ -280,7 +274,7 @@
           <div class="results-grid">
             @for (ev of events(); track ev.event_Id) {
               <!-- Clickable Event Card -->
-              <div class="event-card" (click)="triggerBookingAction()" style="cursor: pointer;">
+              <div class="event-card" (click)="navigateToBookingFlow(ev.event_Id)" style="cursor: pointer;">
                 <div class="card-image-wrapper">
                   <img [src]="ev.imageUrl || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=500&auto=format&fit=crop&q=80'" [alt]="ev.title" class="card-img">
                   <div class="card-badge">{{ ev.eventType }}</div>
@@ -344,43 +338,10 @@
 
   </main>
 
-  <!-- Footers -->
-  <footer class="footer">
-    <div class="footer-container">
-      <div class="footer-column brand-col">
-        <img src="/logo.png" alt="Logo" class="footer-logo">
-        <p class="footer-desc">The modern platform for tickets, reservations, and seamless gathering operations.</p>
-      </div>
-      <div class="footer-column">
-        <h4>Explore</h4>
-        <ul>
-          <li><a (click)="clearFilters()">Browse Events</a></li>
-          <li><a (click)="selectRegion('REG01', $event)">Chennai</a></li>
-          <li><a (click)="selectRegion('REG02', $event)">Coimbatore</a></li>
-          <li><a (click)="selectRegion('REG03', $event)">Madurai</a></li>
-        </ul>
-      </div>
-      <div class="footer-column">
-        <h4>Organizers</h4>
-        <ul>
-          <li><a (click)="triggerCreateEventAction()">Create an Event</a></li>
-          <li><a (click)="triggerManageMyEventsAction()">Host Resources</a></li>
-          <li><a (click)="triggerGetHelpAction()">Staffing Guides</a></li>
-        </ul>
-      </div>
-      <div class="footer-column">
-        <h4>Company</h4>
-        <ul>
-          <li><a (click)="triggerGetHelpAction()">Privacy Policy</a></li>
-          <li><a (click)="triggerGetHelpAction()">Terms of Service</a></li>
-          <li><a (click)="triggerGetHelpAction()">Contact Help</a></li>
-        </ul>
-      </div>
-    </div>
-    <div class="footer-bottom">
-      <p>&copy; 2026 EventManagement Inc. All rights reserved. Created for GenSpark Internship.</p>
-    </div>
-  </footer>
+
+
+  <!-- Global Reusable Footer -->
+  <app-footer></app-footer>
 
   <!-- Select Location Modal Dialog -->
   <app-location-modal 

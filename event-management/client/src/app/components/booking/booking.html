@@ -1,0 +1,189 @@
+<app-navbar></app-navbar>
+
+<div class="booking-page">
+
+  <!-- ────────────── SELECTION & COMPACT LAYOUT ────────────── -->
+  @if (event()) {
+    
+    <div class="booking-two-col-layout">
+      
+      <!-- LEFT COLUMN: Event Details (~70% width) -->
+      <div class="left-details-column">
+        
+        <!-- Large Banner Image -->
+        <div class="event-banner-wrap">
+          @if (event()!.imageUrl) {
+            <img [src]="event()!.imageUrl" [alt]="event()!.title" class="event-banner-img">
+            <div class="event-banner-overlay"></div>
+          }
+          <div class="event-type-badge" [class]="'badge-' + event()!.eventType.toLowerCase()">
+            {{ event()!.eventType }}
+          </div>
+        </div>
+
+        <!-- Title & Basic Meta Capsule info -->
+        <div class="event-headline-section">
+          <h1 class="event-main-title">{{ event()!.title }}</h1>
+          
+          <div class="event-metadata-row">
+            <div class="meta-capsule">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <span>{{ formatDate(event()!.dateTime) }}</span>
+            </div>
+            <div class="meta-capsule">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span>{{ formatTime(event()!.dateTime) }} &nbsp;·&nbsp; {{ event()!.durationHours }}h</span>
+            </div>
+            <div class="meta-capsule">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              <span>Age Limit: 18+ Only</span>
+            </div>
+            @if (event()!.venue_Name) {
+              <div class="meta-capsule location">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <span>{{ event()!.venue_Name }}</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- About this Event Section -->
+        <div class="info-section">
+          <h3 class="section-title-bar">About this Event</h3>
+          <div class="info-content-text">
+            @if (event()!.descriptionUrl) {
+              <p class="event-dynamic-description">{{ event()!.descriptionUrl }}</p>
+            }
+            <p>Welcome to <strong>{{ event()!.title }}</strong>! This event is designed to bring you the best-in-class performance, panel discussions, and collaborative networking opportunities. Guided by professional coordinators and domain leaders, we guarantee a secure, insightful, and premium experience.</p>
+            <p>Attendees will gain access to exclusive presentation decks, interactive Q&A sessions, live demonstrations, and follow-up resources. We look forward to hosting you!</p>
+          </div>
+        </div>
+
+        <!-- Location with Mock Map -->
+        <div class="info-section">
+          <h3 class="section-title-bar">Location & Venue</h3>
+          <p class="venue-address-text">
+            <strong>{{ event()!.venue_Name || 'Main Conference Center' }}</strong><br>
+            {{ event()!.region_Name || 'Chennai Region' }} Venue District, India.
+          </p>
+          
+          <!-- Interactive-looking map placeholder -->
+          <div class="map-placeholder-container">
+            <div class="map-grid-lines"></div>
+            <div class="map-marker-pin">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="marker-icon"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+              <span class="marker-label">{{ event()!.venue_Name }}</span>
+            </div>
+            <div class="map-controls">
+              <button class="map-zoom-btn">+</button>
+              <button class="map-zoom-btn">−</button>
+            </div>
+            <div class="map-attribution">Map data © OpenStreetMap contributors</div>
+          </div>
+        </div>
+
+        <!-- Organizer Details -->
+        <div class="info-section">
+          <h3 class="section-title-bar">Organizer Details</h3>
+          <div class="organizer-box">
+            <div class="organizer-avatar">
+              {{ (event()!.organizer_Name || 'Org').substring(0, 2).toUpperCase() }}
+            </div>
+            <div class="organizer-meta">
+              <h4 class="organizer-name">{{ event()!.organizer_Name || 'Prime Event Coordinators' }}</h4>
+              <p class="organizer-desc">Official event organizer registered on EventManagement platform. Hosting premium events, hybrid gatherings, and tech seminars.</p>
+              <button class="contact-org-btn" (click)="onContactOrg()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                Contact Organizer
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Related Events "You Might Also Like" Section -->
+        @if (relatedEvents().length > 0) {
+          <div class="info-section">
+            <h3 class="section-title-bar">You Might Also Like</h3>
+            <div class="related-events-list">
+              @for (rel of relatedEvents(); track rel.event_Id) {
+                <div class="related-event-card" (click)="navigateToRelatedEvent(rel.event_Id)">
+                  @if (rel.imageUrl) {
+                    <img [src]="rel.imageUrl" [alt]="rel.title" class="related-card-img">
+                  }
+                  <div class="related-card-body">
+                    <span class="related-badge badge-theme-type">{{ rel.eventType }}</span>
+                    <h4 class="related-event-title">{{ rel.title }}</h4>
+                    <p class="related-event-meta">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                      <span>{{ formatDate(rel.dateTime) }}</span>
+                    </p>
+                    <p class="related-event-meta">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                      <span>{{ rel.venue_Name }}, {{ rel.region_Name }}</span>
+                    </p>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+      </div>
+
+      <!-- RIGHT SIDEBAR COLUMN: Compact list ticket tier selection (sticky, 30% area) -->
+      <div class="right-sidebar-column">
+        <div class="sticky-ticket-panel">
+          <h3 class="sidebar-panel-title">Tickets</h3>
+          <p class="sidebar-panel-sub">Select your seats below:</p>
+
+          <!-- Vertical list style tiers -->
+          <div class="compact-tiers-list">
+            @for (tier of tiers(); track tier.tierName) {
+              <div class="sidebar-tier-item" [class.active]="tier.quantity > 0">
+                <div class="tier-item-row">
+                  <div class="tier-item-info">
+                    <span class="tier-item-name">{{ tier.tierName }}</span>
+                    <span class="tier-item-price">{{ formatCurrency(tier.price) }}</span>
+                    <span class="tier-item-seats">{{ tier.availableSeats }} left</span>
+                  </div>
+                  
+                  <div class="sidebar-qty-selector">
+                    <button class="qty-control-btn" (click)="decreaseQty(tier.tierName)" [disabled]="tier.quantity === 0">−</button>
+                    <span class="qty-control-value">{{ tier.quantity }}</span>
+                    <button class="qty-control-btn" (click)="increaseQty(tier.tierName)" [disabled]="tier.quantity >= tier.availableSeats || tier.quantity >= 10">+</button>
+                  </div>
+                </div>
+                
+                @if (tier.quantity > 0) {
+                  <div class="tier-item-subtotal">
+                    Subtotal: <span>{{ formatCurrency(tier.price * tier.quantity) }}</span>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+
+          <!-- Total subtotal box -->
+          @if (totalTickets() > 0) {
+            <div class="sidebar-total-box">
+              <span class="total-label">Total Amount:</span>
+              <span class="total-value">{{ formatCurrency(subtotalAmount()) }}</span>
+            </div>
+          }
+
+          <!-- Book Tickets CTA Button (renamed, disabled if totalTickets === 0) -->
+          <button class="book-tickets-btn" [disabled]="totalTickets() === 0" (click)="proceedToCheckout()">
+            Book Tickets
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  }
+
+</div>
+
+<!-- Global Footer -->
+<app-footer></app-footer>
+

@@ -42,7 +42,7 @@
               </div>
 
               <div class="slide-actions">
-                <button class="btn btn-primary btn-lg" (click)="triggerBookingAction()">
+                <button class="btn btn-primary btn-lg" (click)="navigateToBookingFlow(item.event_Id)">
                   Book Tickets Now
                 </button>
               </div>
@@ -77,9 +77,14 @@
     </div>
   } @else {
     <!-- Carousel Placeholder Skeleton -->
-    <div class="carousel-skeleton">
-      <div class="spinner"></div>
-      <p>Loading trending events...</p>
+    <div class="carousel-skeleton-pulse">
+      <div class="skeleton-content">
+        <div class="pulse-bar trending-pulse"></div>
+        <div class="pulse-bar title-pulse"></div>
+        <div class="pulse-bar desc-pulse"></div>
+        <div class="pulse-bar meta-pulse"></div>
+        <div class="pulse-bar btn-pulse"></div>
+      </div>
     </div>
   }
 </section>

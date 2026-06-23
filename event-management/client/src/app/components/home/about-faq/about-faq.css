@@ -25,6 +25,16 @@
   align-items: start;
 }
 
+.about-container.full-width-faq {
+  grid-template-columns: 1fr;
+}
+
+.about-container.full-width-about {
+  grid-template-columns: 1fr;
+  max-width: 680px;
+  margin: 0 auto;
+}
+
 .sub-title {
   display: block;
   font-size: 11px;

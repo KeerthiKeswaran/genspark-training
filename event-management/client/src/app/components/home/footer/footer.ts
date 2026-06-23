@@ -57,7 +57,7 @@ export class FooterComponent implements OnInit, OnDestroy {
       this.router.navigate(['/login']);
       return;
     }
-    alert('Navigating to event creation page...');
+    this.router.navigate(['/create-event']);
   }
 
   public triggerManageMyEventsAction(): void {
@@ -65,11 +65,6 @@ export class FooterComponent implements OnInit, OnDestroy {
   }
 
   public triggerGetHelpAction(): void {
-    const aboutSection = document.getElementById('about-section');
-    if (aboutSection) {
-      aboutSection.scrollIntoView({ behavior: 'smooth' });
-    } else {
-      this.router.navigate(['/'], { fragment: 'about-section' });
-    }
+    this.router.navigate(['/help']);
   }
 }

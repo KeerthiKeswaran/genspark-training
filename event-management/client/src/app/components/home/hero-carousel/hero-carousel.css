@@ -225,29 +225,60 @@
   border-radius: 5px;
 }
 
-.carousel-skeleton {
+/* Carousel Skeleton Pulsing Layout */
+.carousel-skeleton-pulse {
   width: 100%;
   height: 100%;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  color: var(--color-neutral-light);
-  gap: 16px;
+  background-color: #121212;
 }
 
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid rgba(255, 255, 255, 0.1);
-  border-top-color: var(--color-accent);
-  border-radius: 50%;
-  animation: spin 1s infinite linear;
+.skeleton-content {
+  width: 100%;
+  max-width: 620px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+.pulse-bar {
+  background: linear-gradient(90deg, #1f1f1f 25%, #2a2a2a 50%, #1f1f1f 75%);
+  background-size: 200% 100%;
+  animation: loading-pulse 1.5s infinite;
+  border-radius: var(--radius-common);
+}
+
+.trending-pulse {
+  width: 110px;
+  height: 24px;
+  border-radius: 20px;
+}
+
+.title-pulse {
+  width: 85%;
+  height: 48px;
+}
+
+.desc-pulse {
+  width: 100%;
+  height: 16px;
+}
+
+.meta-pulse {
+  width: 65%;
+  height: 16px;
+}
+
+.btn-pulse {
+  width: 170px;
+  height: 44px;
+}
+
+@keyframes loading-pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .btn {

@@ -22,9 +22,11 @@ export class EventService {
   public browseEvents(params: {
     keyword?: string;
     category?: string;
-    minDateTime?: string;
     regionId?: string;
     regionIds?: string[];
+    format?: string;
+    maxPrice?: number;
+    sortBy?: string;
     page?: number;
     size?: number;
   }): Observable<PagedResult<BrowsedEventResponse>> {
@@ -61,20 +63,37 @@ export class EventService {
       });
     }
 
-    if (params.minDateTime) {
-      const minDate = new Date(params.minDateTime);
-      filtered = filtered.filter(e => new Date(e.dateTime) >= minDate);
+    // Format Filter (Physical, Virtual, Hybrid)
+    if (params.format) {
+      const fmt = params.format.toLowerCase();
+      filtered = filtered.filter(e => e.eventType.toLowerCase() === fmt);
     }
 
-    // Sort active region first, then popular/other regions.
-    filtered.sort((a, b) => {
-      const aIsActive = a.region_Id === activeRegionId ? 1 : 0;
-      const bIsActive = b.region_Id === activeRegionId ? 1 : 0;
-      if (aIsActive !== bIsActive) {
-        return bIsActive - aIsActive; // active comes first
-      }
-      return a.event_Id - b.event_Id;
-    });
+    // Max Price Filter
+    if (params.maxPrice !== undefined && params.maxPrice !== null && !isNaN(params.maxPrice)) {
+      filtered = filtered.filter(e => e.minPrice !== undefined && e.minPrice <= params.maxPrice!);
+    }
+
+    // Custom Sorting Options
+    if (params.sortBy === 'priceAsc') {
+      filtered.sort((a, b) => (a.minPrice || 0) - (b.minPrice || 0));
+    } else if (params.sortBy === 'priceDesc') {
+      filtered.sort((a, b) => (b.minPrice || 0) - (a.minPrice || 0));
+    } else if (params.sortBy === 'dateAsc') {
+      filtered.sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+    } else if (params.sortBy === 'dateDesc') {
+      filtered.sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+    } else {
+      // Default: active region first, then soonest date first
+      filtered.sort((a, b) => {
+        const aIsActive = a.region_Id === activeRegionId ? 1 : 0;
+        const bIsActive = b.region_Id === activeRegionId ? 1 : 0;
+        if (aIsActive !== bIsActive) {
+          return bIsActive - aIsActive;
+        }
+        return new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime();
+      });
+    }
 
     const pageSize = params.size || 10;
     const pageNum = params.page || 1;
