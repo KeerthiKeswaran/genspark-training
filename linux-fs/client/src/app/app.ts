@@ -19,9 +19,9 @@ export interface WeatherForecast {
 })
 export class App implements OnInit {
   private readonly http = inject(HttpClient);
-  
-  // Base API URL (matches ASP.NET Core dev URL)
-  private readonly apiUrl = 'http://localhost:5062/weatherforecast';
+
+  // Base API URL (proxied through Nginx /api/)
+  private readonly apiUrl = '/api/weatherforecast';
 
   // Signals for reactive state
   readonly forecastList = signal<WeatherForecast[]>([]);
@@ -37,7 +37,7 @@ export class App implements OnInit {
     if (!query) {
       return list;
     }
-    return list.filter(item => 
+    return list.filter(item =>
       item.summary?.toLowerCase().includes(query) ||
       item.date.includes(query)
     );
