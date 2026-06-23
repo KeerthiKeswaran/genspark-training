@@ -1,0 +1,151 @@
+<div class="dashboard-wrapper">
+  <div class="dashboard-container">
+    <!-- Header Section -->
+    <header class="dashboard-header">
+      <div class="brand">
+        <h1>Weather Station</h1>
+        <p>ASP.NET Core & Angular API Integration</p>
+      </div>
+
+      <div class="actions">
+        <!-- Search Input -->
+        <div class="search-box">
+          <input 
+            type="text" 
+            placeholder="Search summary..." 
+            [ngModel]="searchQuery()" 
+            (ngModelChange)="searchQuery.set($event)"
+          />
+          @if (searchQuery()) {
+            <button class="clear-search" (click)="searchQuery.set('')">Clear</button>
+          }
+        </div>
+
+        <!-- Celsius/Fahrenheit Toggle -->
+        <button class="toggle-btn" (click)="toggleUnit()">
+          Unit: °{{ tempUnit() }}
+        </button>
+
+        <!-- Refresh Button -->
+        <button 
+          class="refresh-btn" 
+          [class.spinning]="isLoading()" 
+          (click)="fetchForecast()"
+        >
+          Refresh
+        </button>
+      </div>
+    </header>
+
+    <!-- Error Alert -->
+    @if (errorMessage()) {
+      <div class="error-container">
+        <h3>Connection Error</h3>
+        <p>{{ errorMessage() }}</p>
+        <div class="troubleshooting">
+          <strong>Troubleshooting steps:</strong>
+          <ul>
+            <li>Ensure backend API is running (<code>dotnet run</code> inside <code>linux-fs/server/</code>)</li>
+            <li>Verify API port <code>5062</code></li>
+          </ul>
+        </div>
+        <button class="retry-btn" (click)="fetchForecast()">Retry</button>
+      </div>
+    }
+
+    <!-- Loading State -->
+    @if (isLoading()) {
+      <div class="loading-container">
+        <p>Loading weather data...</p>
+      </div>
+    }
+
+    <!-- Main Content -->
+    @if (!isLoading() && !errorMessage()) {
+      <!-- Quick Stats -->
+      @if (forecastList().length > 0) {
+        <section class="analytics-grid">
+          <div class="stat-card">
+            <span class="stat-label">Average Temp</span>
+            <span class="stat-value">
+              @if (tempUnit() === 'C') {
+                {{ averageTemp() }}°C
+              } @else {
+                {{ 32 + (averageTemp() / 0.5556) | number:'1.0-0' }}°F
+              }
+            </span>
+          </div>
+
+          <div class="stat-card">
+            <span class="stat-label">Hottest Day</span>
+            @if (hottestDay(); as day) {
+              <span class="stat-value">
+                @if (tempUnit() === 'C') {
+                  {{ day.temperatureC }}°C
+                } @else {
+                  {{ day.temperatureF }}°F
+                }
+              </span>
+              <span class="stat-subtext">{{ day.date | date:'EEE, MMM d' }} ({{ day.summary }})</span>
+            }
+          </div>
+
+          <div class="stat-card">
+            <span class="stat-label">Coldest Day</span>
+            @if (coldestDay(); as day) {
+              <span class="stat-value">
+                @if (tempUnit() === 'C') {
+                  {{ day.temperatureC }}°C
+                } @else {
+                  {{ day.temperatureF }}°F
+                }
+              </span>
+              <span class="stat-subtext">{{ day.date | date:'EEE, MMM d' }} ({{ day.summary }})</span>
+            }
+          </div>
+        </section>
+      }
+
+      <!-- Weather Forecast Table -->
+      <main class="forecast-section">
+        <div class="section-title">
+          <h2>Forecast List</h2>
+          <span class="badge">{{ filteredForecasts().length }} items</span>
+        </div>
+
+        @if (filteredForecasts().length === 0) {
+          <div class="no-results">
+            <p>No results found for "{{ searchQuery() }}"</p>
+          </div>
+        } @else {
+          <table class="weather-table">
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>Date</th>
+                <th>Temperature</th>
+                <th>Summary</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of filteredForecasts(); track item.date) {
+                <tr>
+                  <td><strong>{{ item.date | date:'EEEE' }}</strong></td>
+                  <td>{{ item.date | date:'MMM d, y' }}</td>
+                  <td class="temp-cell">
+                    @if (tempUnit() === 'C') {
+                      {{ item.temperatureC }}°C
+                    } @else {
+                      {{ item.temperatureF }}°F
+                    }
+                  </td>
+                  <td>{{ item.summary }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </main>
+    }
+  </div>
+</div>
