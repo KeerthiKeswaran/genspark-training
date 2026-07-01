@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
@@ -18,6 +19,8 @@ namespace Event.Business.Services
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IUserRepository _userRepository;
         private readonly IEventRepository _eventRepository;
+        private readonly OtpService _otpService;
+        private readonly IEmailService _emailService;
 
         #endregion
 
@@ -26,11 +29,15 @@ namespace Event.Business.Services
         public UserService(
             IHttpContextAccessor httpContextAccessor, 
             IUserRepository userRepository,
-            IEventRepository eventRepository)
+            IEventRepository eventRepository,
+            OtpService otpService,
+            IEmailService emailService)
         {
             _httpContextAccessor = httpContextAccessor;
             _userRepository = userRepository;
             _eventRepository = eventRepository;
+            _otpService = otpService;
+            _emailService = emailService;
         }
 
         #endregion
@@ -158,7 +165,9 @@ namespace Event.Business.Services
                     Date_Time = ev.Date_Time,
                     Duration_Hours = ev.Duration_Hours,
                     Status = ev.Status,
-                    Venue_Name = ev.Venue?.Name
+                    Venue_Name = ev.Venue?.Name,
+                    Tickets_Sold = ev.TicketTiers?.Sum(t => t.Tickets_Sold) ?? 0,
+                    Net_Earnings = ev.TicketTiers?.Sum(t => t.Tickets_Sold * t.Price) ?? 0m
                 });
             }
             return response;
@@ -209,6 +218,50 @@ namespace Event.Business.Services
                 Virtual_Password_Hash = ev.Virtual_Password_Hash,
                 TicketTiers = ticketTiers
             };
+        }
+
+        #endregion
+
+        #region CloseAccountAsync
+
+        public async Task<bool> CloseAccountAsync(int userId, CloseAccountRequest request)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+                throw new NotFoundException($"User with ID {userId} not found.");
+
+            if (user.Status == "Deactivated")
+                throw new ValidationException("Account is already closed.");
+
+            if (!await _otpService.VerifyOtpAsync(user.Email, request.Otp, "close-account"))
+                throw new UnauthorizedException("Invalid or expired OTP.");
+
+            if (!string.Equals(user.Name, request.ConfirmName, StringComparison.OrdinalIgnoreCase))
+                throw new ValidationException("Confirmation name does not match your account name.");
+
+            user.Status = "Deactivated";
+            await _userRepository.UpdateAsync(user);
+
+            try
+            {
+                var emailDto = new EmailTemplateDto
+                {
+                    TemplateName = "CloseAccountTemplate.html",
+                    Placeholders = new Dictionary<string, string>
+                    {
+                        { "userName", user.Name },
+                        { "year", DateTime.UtcNow.Year.ToString() }
+                    }
+                };
+                string htmlBody = await _emailService.BuildEmailHtmlAsync(emailDto);
+                await _emailService.SendEmailAsync(user.Email, "Account Closed - Event Platform", htmlBody);
+            }
+            catch (Exception)
+            {
+                // Do not throw on email dispatch failure to keep deactivation state change robust
+            }
+
+            return true;
         }
 
         #endregion

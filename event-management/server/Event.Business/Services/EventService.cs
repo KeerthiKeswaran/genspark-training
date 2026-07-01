@@ -8,6 +8,7 @@ using Serilog;
 using Event.Business.Exceptions;
 using Event.Models.DTOs;
 using System.Collections.Generic;
+using System.IO;
 using Event.Business.Helpers;
 
 namespace Event.Business.Services
@@ -30,9 +31,11 @@ namespace Event.Business.Services
         private readonly IEmailService _emailService;
         private readonly IUserRepository _userRepository;
         private readonly IRefundService _refundService;
+        private readonly ITermsAndConditionsRepository _termsRepository;
+        private readonly IOrganizerPayoutRepository _payoutRepository;
 
         // Thread-safe in-memory cache for calculations (temporary memory store)
-        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Event.Models.DTOs.StaffAvailabilityResponse> _staffCache = 
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Event.Models.DTOs.StaffAvailabilityResponse> _staffCache =
             new System.Collections.Concurrent.ConcurrentDictionary<string, Event.Models.DTOs.StaffAvailabilityResponse>();
 
         #endregion
@@ -53,7 +56,9 @@ namespace Event.Business.Services
             IBookingPaymentRepository bookingPaymentRepository,
             IEmailService emailService,
             IUserRepository userRepository,
-            IRefundService refundService)
+            IRefundService refundService,
+            ITermsAndConditionsRepository termsRepository,
+            IOrganizerPayoutRepository payoutRepository)
         {
             _eventRepository = eventRepository;
             _bookingRepository = bookingRepository;
@@ -69,6 +74,8 @@ namespace Event.Business.Services
             _emailService = emailService;
             _userRepository = userRepository;
             _refundService = refundService;
+            _termsRepository = termsRepository;
+            _payoutRepository = payoutRepository;
         }
 
         #endregion
@@ -79,8 +86,8 @@ namespace Event.Business.Services
         {
             // 1. Calculate the cutoff search time (must be at least 30 minutes in the future)
             var cutoffTime = DateTime.UtcNow.AddMinutes(30);
-            var searchMinTime = minDateTime.HasValue && minDateTime.Value > cutoffTime 
-                ? minDateTime.Value 
+            var searchMinTime = minDateTime.HasValue && minDateTime.Value > cutoffTime
+                ? minDateTime.Value
                 : cutoffTime;
 
             // 2. Query event repository for paged results matching filters
@@ -106,37 +113,23 @@ namespace Event.Business.Services
                         }
                     }
 
-                    var reports = new List<BrowsedEventReportDto>();
-                    if (ev.Reports != null)
-                    {
-                        foreach (var report in ev.Reports)
-                        {
-                            reports.Add(new BrowsedEventReportDto
-                            {
-                                Report_Id = report.Report_Id,
-                                Reporter_Id = report.Reporter_Id,
-                                Reason = report.Reason,
-                                Created_At = report.Created_At
-                            });
-                        }
-                    }
-
                     mappedItems.Add(new BrowsedEventResponse
                     {
                         Event_Id = ev.Event_Id,
                         Organizer_Name = ev.Organizer?.Name ?? string.Empty,
+                        Organizer_Email = ev.Organizer?.Email,
                         Venue_Name = ev.Venue?.Name,
                         Address = ev.Venue?.Address,
                         Venue_Region_Name = ev.Venue?.Region?.Region_Name,
                         Event_Type = ev.Event_Type,
+                        Category = ev.Category,
                         Title = ev.Title,
                         Description_Url = ev.Description_Url,
                         Image_Url = ev.Image_Url,
                         Date_Time = ev.Date_Time,
                         Status = ev.Status,
                         Duration_Hours = ev.Duration_Hours,
-                        TicketTiers = ticketTiers,
-                        Reports = reports
+                        TicketTiers = ticketTiers
                     });
                 }
             }
@@ -198,6 +191,8 @@ namespace Event.Business.Services
                 Venue = venueDto,
                 Event_Type = ev.Event_Type,
                 Title = ev.Title,
+                Category = ev.Category,
+                Age_Category = ev.Age_Category,
                 Description_Url = ev.Description_Url,
                 Image_Url = ev.Image_Url,
                 Date_Time = ev.Date_Time,
@@ -218,15 +213,54 @@ namespace Event.Business.Services
             if (!evExists)
                 throw new NotFoundException($"Event with ID {eventId} not found.");
 
-            // 2. Create and save new event report
+            // 2. Write report details to a JSON file
+            string rootPath = Directory.GetCurrentDirectory().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string folderName = "Event.Business";
+            if (AppDomain.CurrentDomain.FriendlyName.Contains("Tests") ||
+                AppDomain.CurrentDomain.BaseDirectory.Contains("Tests") ||
+                Directory.GetCurrentDirectory().Contains("Tests"))
+            {
+                folderName = "Event.Business.Tests";
+            }
+
+            if (rootPath.Contains("bin"))
+            {
+                rootPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            }
+            else if (rootPath.EndsWith("Event.API") || rootPath.EndsWith("Event.Business.Tests") || rootPath.EndsWith("Event.Business"))
+            {
+                rootPath = Path.GetFullPath(Path.Combine(rootPath, "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            }
+
+            string relativeDir = Path.Combine("users", reporterId.ToString(), "reports");
+            string absoluteDir = Path.Combine(rootPath, folderName, "assets", relativeDir);
+            if (!Directory.Exists(absoluteDir))
+            {
+                Directory.CreateDirectory(absoluteDir);
+            }
+
+            // 3. Create and save new event report in database
             var eventReport = new EventReport
             {
                 Event_Id = eventId,
                 Reporter_Id = reporterId,
-                Reason = reason,
+                ReportUrl = $"/assets/{relativeDir}/report_pending.json",
                 Created_At = DateTime.UtcNow
             };
             await _eventRepository.AddReportAsync(eventReport);
+
+            string filename = $"report_{eventReport.Report_Id}.json";
+            string absolutePath = Path.Combine(absoluteDir, filename);
+
+            var reportData = new Dictionary<string, string>
+            {
+                { "Reason", reason }
+            };
+            string jsonText = System.Text.Json.JsonSerializer.Serialize(reportData, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(absolutePath, jsonText);
+
+            eventReport.ReportUrl = $"/assets/{relativeDir}/{filename}";
+            await _eventRepository.UpdateReportAsync(eventReport);
             return true;
         }
 
@@ -310,13 +344,13 @@ namespace Event.Business.Services
             // Rule 2: If available is more than 2, but still less than the requirement
             else if (availableStaff < requiredStaff)
             {
-                response.StaffingCost = settings.Staff_Flat_Rate * availableStaff;
+                response.StaffingCost = settings.Staff_Flat_Rate * availableStaff * request.DurationHours;
                 response.IsAdequate = false;
                 response.Message = $"Partial staff available ({availableStaff} of {requiredStaff} required).";
             }
             else
             {
-                response.StaffingCost = settings.Staff_Flat_Rate * requiredStaff;
+                response.StaffingCost = settings.Staff_Flat_Rate * requiredStaff * request.DurationHours;
                 response.IsAdequate = true;
                 response.Message = "Sufficient support staff are available.";
             }
@@ -335,12 +369,22 @@ namespace Event.Business.Services
         public async Task<EventDetailsResponse> CreateEventAsync(int organizerId, Event.Models.DTOs.CreateEventRequest request)
         {
             // 0. Validation: Policy acceptance
-            if (!request.HasAcceptedPolicy)
-                throw new ValidationException("You must accept the policy agreement before creating an event.");
+            var activeEventPolicy = await _termsRepository.GetActiveTermsByTypeAsync("EventCreation");
+            if (activeEventPolicy == null)
+                throw new ValidationException("No active Event Creation policy is defined on the platform.");
+
+            if (string.IsNullOrWhiteSpace(request.AcceptedPolicyId) || request.AcceptedPolicyId != activeEventPolicy.Terms_Id)
+                throw new ValidationException("You must accept the latest event creation policy agreement before creating an event.");
 
             // 1. Validation: Event type
             if (string.IsNullOrWhiteSpace(request.EventType))
                 throw new ValidationException("Event type is required.");
+
+            if (string.IsNullOrWhiteSpace(request.Category))
+                throw new ValidationException("Event category is required.");
+
+            if (string.IsNullOrWhiteSpace(request.AgeCategory) || !(request.AgeCategory == "ALL" || request.AgeCategory == "KID" || request.AgeCategory == "ADL"))
+                throw new ValidationException("Invalid age category. Must be one of: ALL, KID, ADL.");
 
             // 2. Validation: Event date must be at least 24 hours in the future
             if (request.DateTime < DateTime.UtcNow.AddHours(24))
@@ -353,7 +397,19 @@ namespace Event.Business.Services
 
             if (string.Equals(organizer.Status, "Restricted", StringComparison.OrdinalIgnoreCase))
                 throw new ValidationException("Your account is Restricted. You are disabled from creating further events.");
-            
+
+            // Append the policy ID to Consented_Terms_Id if not already present
+            if (string.IsNullOrEmpty(organizer.Consented_Terms_Id))
+            {
+                organizer.Consented_Terms_Id = activeEventPolicy.Terms_Id;
+                await _userRepository.UpdateAsync(organizer);
+            }
+            else if (!organizer.Consented_Terms_Id.Contains(activeEventPolicy.Terms_Id))
+            {
+                organizer.Consented_Terms_Id += activeEventPolicy.Terms_Id;
+                await _userRepository.UpdateAsync(organizer);
+            }
+
             if (string.Equals(organizer.Status, "Deactivated", StringComparison.OrdinalIgnoreCase))
                 throw new ValidationException("Your account is Deactivated.");
 
@@ -395,7 +451,7 @@ namespace Event.Business.Services
                         {
                             throw new ConflictException("Cannot book staff. No support staff are available in the region.");
                         }
-                        
+
                         // Add staff cost based on actual allocated or available count (or whatever we can allocate)
                         upfrontFee += cachedResult.StaffingCost;
                     }
@@ -403,7 +459,7 @@ namespace Event.Business.Services
                     {
                         int requiredStaffCount = CalculateRequiredStaffCount(venue);
                         int availableStaffCount = await _staffRepository.GetAvailableStaffCountAsync(venue.Region_Id, request.DateTime);
-                        
+
                         if (availableStaffCount < 2)
                         {
                             throw new ConflictException("Cannot book staff. No support staff are available in the region.");
@@ -434,6 +490,8 @@ namespace Event.Business.Services
                     Venue_Id = request.VenueId,
                     Event_Type = request.EventType,
                     Title = request.Title,
+                    Category = request.Category,
+                    Age_Category = request.AgeCategory,
                     Description_Url = request.DescriptionUrl,
                     Image_Url = request.ImageUrl,
                     Date_Time = request.DateTime,
@@ -516,6 +574,8 @@ namespace Event.Business.Services
                     Venue = venueDto,
                     Event_Type = newEvent.Event_Type,
                     Title = newEvent.Title,
+                    Category = newEvent.Category,
+                    Age_Category = newEvent.Age_Category,
                     Description_Url = newEvent.Description_Url,
                     Image_Url = newEvent.Image_Url,
                     Date_Time = newEvent.Date_Time,
@@ -529,6 +589,28 @@ namespace Event.Business.Services
                 await _bookingRepository.RollbackTransactionAsync();
                 throw;
             }
+        }
+
+        #endregion
+
+        #region CreateCheckoutSessionForEventCreationAsync
+
+        public async Task<(bool Success, string SessionId, string SessionUrl, string ErrorMessage)> CreateCheckoutSessionForEventCreationAsync(int eventId, string successUrl, string cancelUrl)
+        {
+            var ev = await _eventRepository.GetEventDetailsAsync(eventId);
+            if (ev == null)
+                throw new NotFoundException($"Event with ID {eventId} not found.");
+
+            if (ev.Status != "Activation Pending")
+                throw new ValidationException($"Event is already in '{ev.Status}' status.");
+
+            var transaction = await _transactionRepository.GetPendingOrganizerUpfrontTransactionAsync(eventId);
+            if (transaction == null)
+                throw new NotFoundException("Pending upfront payment transaction not found for this event.");
+
+            string itemName = $"Event Activation: {ev.Title}";
+
+            return await _paymentService.CreateCheckoutSessionAsync(transaction.Amount, transaction.Currency, itemName, successUrl, cancelUrl);
         }
 
         #endregion
@@ -556,17 +638,34 @@ namespace Event.Business.Services
                     throw new NotFoundException("Pending upfront payment transaction not found for this event.");
 
                 // Step 5: Charge the organizer's card using the payment gateway service (Stripe).
-                var chargeResult = await _paymentService.CreateChargeAsync(
-                    transaction.Amount,
-                    transaction.Currency,
-                    stripeChargeId,
-                    $"Organizer Upfront Payment for Event #{eventId}: {ev.Title}");
+                (bool Success, string TransactionReference, string ErrorMessage) paymentResult;
+                if (paymentMethod == "stripe_checkout")
+                {
+                    var sessionService = new Stripe.Checkout.SessionService();
+                    var session = await sessionService.GetAsync(stripeChargeId);
+                    if (session.PaymentStatus == "paid")
+                    {
+                        paymentResult = (true, session.PaymentIntentId ?? session.Id, string.Empty);
+                    }
+                    else
+                    {
+                        paymentResult = (false, string.Empty, $"Checkout session payment status is {session.PaymentStatus}");
+                    }
+                }
+                else
+                {
+                    paymentResult = await _paymentService.CreateChargeAsync(
+                        transaction.Amount,
+                        transaction.Currency,
+                        stripeChargeId,
+                        $"Organizer Upfront Payment for Event #{eventId}: {ev.Title}");
+                }
 
                 // Step 6: Handle payment failures by updating transaction logs and committing the failed state.
-                if (!chargeResult.Success)
+                if (!paymentResult.Success)
                 {
                     transaction.Status = "Failed";
-                    transaction.Remarks = chargeResult.ErrorMessage;
+                    transaction.Remarks = paymentResult.ErrorMessage;
                     await _transactionRepository.UpdateAsync(transaction);
                     await _bookingRepository.CommitTransactionAsync();
 
@@ -579,12 +678,12 @@ namespace Event.Business.Services
                         // Ignore inner exception to propagate the original charge failed validation exception
                     }
 
-                    throw new ValidationException($"Stripe charge failed: {chargeResult.ErrorMessage}");
+                    throw new ValidationException($"Stripe payment failed: {paymentResult.ErrorMessage}");
                 }
 
                 // Step 7: Update the transaction log to record successful checkout parameters.
                 transaction.Status = "Success";
-                transaction.Transaction_Reference = chargeResult.TransactionReference;
+                transaction.Transaction_Reference = paymentResult.TransactionReference;
                 transaction.Payment_Method_Details = paymentMethod;
                 await _transactionRepository.UpdateAsync(transaction);
 
@@ -601,7 +700,7 @@ namespace Event.Business.Services
 
                 // Step 9: Set the main Event Status to 'Live' indicating that it is active and viewable by users.
                 ev.Status = "Live";
-                
+
                 // Step 10: For Physical or Hybrid events, allocate support staffs.
                 if (ev.Event_Type.Equals("Physical", StringComparison.OrdinalIgnoreCase) ||
                     ev.Event_Type.Equals("Hybrid", StringComparison.OrdinalIgnoreCase))
@@ -639,7 +738,7 @@ namespace Event.Business.Services
                     ev.Virtual_Url = roomUrl;
                     ev.Virtual_Password_Hash = BCrypt.Net.BCrypt.HashPassword(rawPasscode);
                     generatedPasscode = rawPasscode;
-                    
+
                     transaction.Remarks += $"\n[Virtual Access Passcode]: {rawPasscode}";
                     await _transactionRepository.UpdateAsync(transaction);
                 }
@@ -735,6 +834,8 @@ namespace Event.Business.Services
                     Venue = venueDto,
                     Event_Type = ev.Event_Type,
                     Title = ev.Title,
+                    Category = ev.Category,
+                    Age_Category = ev.Age_Category,
                     Description_Url = ev.Description_Url,
                     Image_Url = ev.Image_Url,
                     Date_Time = ev.Date_Time,
@@ -792,6 +893,238 @@ namespace Event.Business.Services
             catch (Exception ex)
             {
                 logger.Error(ex, "An error occurred during the ReleaseExpiredEventCreationAsync background job execution.");
+            }
+        }
+
+        #endregion
+
+        #region ReleaseCompletedEventsAsync
+
+        public async Task ReleaseCompletedEventsAsync()
+        {
+            // Configure Serilog file logger pointing to logs/business.log.
+            var logger = new Serilog.LoggerConfiguration()
+                .WriteTo.File("logs/business.log", rollingInterval: Serilog.RollingInterval.Day)
+                .CreateLogger();
+
+            logger.Information("ReleaseCompletedEventsAsync job started at {Time}.", DateTime.UtcNow);
+
+            try
+            {
+                // 1. Fetch all live events
+                var liveEvents = await _eventRepository.GetLiveEventsWithDetailsAsync();
+                var now = DateTime.UtcNow;
+
+                // Filter live events whose end time has passed
+                var completedEvents = liveEvents
+                    .Where(e => e.Status == "Live" && e.Date_Time.AddHours((double)e.Duration_Hours) <= now)
+                    .ToList();
+
+                logger.Information("Found {Count} completed events to release.", completedEvents.Count);
+
+                foreach (var ev in completedEvents)
+                {
+                    await _bookingRepository.BeginTransactionAsync();
+                    try
+                    {
+                        logger.Information("Processing completion for Event ID {EventId}: '{Title}'...", ev.Event_Id, ev.Title);
+
+                        // a. Update Event Status
+                        ev.Status = "Completed";
+
+                        // b. Revoke Virtual/Hybrid Meeting Access
+                        ev.Virtual_Url = "Disabled";
+                        ev.Virtual_Password_Hash = null;
+
+                        await _eventRepository.UpdateAsync(ev);
+
+                        // c. Release & Deallocate Support Staff
+                        foreach (var allocation in ev.StaffAllocations)
+                        {
+                            var staff = await _staffRepository.GetByIdAsync(allocation.Employee_ID);
+                            if (staff != null)
+                            {
+                                staff.IsAllocated = false;
+                                await _staffRepository.UpdateAsync(staff);
+                            }
+                        }
+
+                        // d. Fetch bookings to calculate financial totals and trigger notifications
+                        var bookings = await _bookingRepository.GetBookingsByEventIdAsync(ev.Event_Id);
+
+                        decimal totalTicketSales = 0m;
+                        decimal platformCommission = 0m;
+
+                        foreach (var booking in bookings)
+                        {
+                            if (booking.Booking_Status == "Confirmed")
+                            {
+                                // Revoke booking virtual url
+                                booking.Virtual_Url = "Disabled";
+                                await _bookingRepository.UpdateAsync(booking);
+
+                                // Load success payment to aggregate financials
+                                var successPayment = booking.Payments?.FirstOrDefault(p => p.Payment_Status == "Success");
+                                if (successPayment != null)
+                                {
+                                    totalTicketSales += successPayment.Amount;
+                                    platformCommission += successPayment.Platform_Fee_Cut;
+                                }
+
+                                // Trigger email / notification invitation to submit feedback
+                                var attendeeEmail = booking.Attendee?.Email;
+                                if (!string.IsNullOrEmpty(attendeeEmail))
+                                {
+                                    try
+                                    {
+                                        var feedbackEmailDto = new Event.Models.DTOs.EmailTemplateDto
+                                        {
+                                            TemplateName = "EventCompletionTemplate.html",
+                                            Placeholders = new Dictionary<string, string>
+                                            {
+                                                { "eventName", ev.Title },
+                                                { "feedbackLink", $"http://localhost:4200/bookings?feedbackEventId={ev.Event_Id}" },
+                                                { "year", DateTime.UtcNow.Year.ToString() }
+                                            }
+                                        };
+                                        string htmlFeedbackBody = await _emailService.BuildEmailHtmlAsync(feedbackEmailDto);
+                                        await NotificationHelper.SendAndSaveNotificationAsync(
+                                            _notificationRepository,
+                                            _emailService,
+                                            attendeeEmail,
+                                            $"We value your feedback: {ev.Title}",
+                                            htmlFeedbackBody
+                                        );
+                                    }
+                                    catch (Exception emailEx)
+                                    {
+                                        logger.Error(emailEx, "Failed to send feedback invitation email to {Email} for Event ID {EventId}.", attendeeEmail, ev.Event_Id);
+                                    }
+                                }
+                            }
+                        }
+
+                        decimal payoutAmount = totalTicketSales - platformCommission;
+
+                        // e. Organizer Payout Rule
+                        // "Organizer payout, it must be cancelled if the event have any report and the response action is null/uphold by the admin.
+                        // only if the event does't have any reports or the response action is dismissed then it must proceed with the payout."
+                        var allReports = await _eventRepository.GetAllReportsAsync();
+                        var eventReports = allReports.Where(r => r.Event_Id == ev.Event_Id).ToList();
+
+                        bool hasActiveOrUpholdReports = eventReports.Any(r => r.ResponseAction == null || r.ResponseAction == "Upholds");
+
+                        string payoutStatus = hasActiveOrUpholdReports ? "Cancelled" : "Success";
+                        string transactionStatus = hasActiveOrUpholdReports ? "Cancelled" : "Success";
+                        string payoutRemarks = hasActiveOrUpholdReports
+                            ? $"Organizer payout cancelled due to active policy reports against event #{ev.Event_Id}."
+                            : $"Payout processed successfully for completed event #{ev.Event_Id}.";
+
+                        // Create Transaction entry
+                        var payoutTx = new Transaction
+                        {
+                            Sender_Id = "Platform_Escrow",
+                            Receiver_Id = $"Organizer_User_{ev.Organizer_Id}",
+                            Transaction_Type = "OrganizerPayout",
+                            Related_Id = ev.Event_Id,
+                            Amount = payoutAmount,
+                            Currency = "INR",
+                            Status = transactionStatus,
+                            Created_At = DateTime.UtcNow,
+                            Remarks = payoutRemarks
+                        };
+                        await _transactionRepository.AddAsync(payoutTx);
+
+                        // Create OrganizerPayout record
+                        var organizerPayout = new OrganizerPayout
+                        {
+                            Event_Id = ev.Event_Id,
+                            Transaction_Id = payoutTx.Transaction_Id,
+                            Total_Ticket_Sales = totalTicketSales,
+                            Platform_Commission = platformCommission,
+                            Payout_Amount = payoutAmount,
+                            Payout_Status = payoutStatus,
+                            Processed_At = DateTime.UtcNow
+                        };
+                        await _payoutRepository.AddAsync(organizerPayout);
+
+                        await _bookingRepository.CommitTransactionAsync();
+                        logger.Information("Completed processing for Event ID {EventId}.", ev.Event_Id);
+                    }
+                    catch (Exception ex)
+                    {
+                        await _bookingRepository.RollbackTransactionAsync();
+                        logger.Error(ex, "Failed to complete Event ID {EventId}.", ev.Event_Id);
+                    }
+                }
+
+                logger.Information("ReleaseCompletedEventsAsync job completed.");
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, "An error occurred during the ReleaseCompletedEventsAsync background job execution.");
+            }
+        }
+
+        public async Task ProcessDismissedPayoutsAsync()
+        {
+            var logger = new Serilog.LoggerConfiguration()
+                .WriteTo.File("logs/business.log", rollingInterval: Serilog.RollingInterval.Day)
+                .CreateLogger();
+
+            logger.Information("ProcessDismissedPayoutsAsync job started.");
+
+            try
+            {
+                var allEvents = await _eventRepository.GetAllAsync();
+                var completedEvents = System.Linq.Enumerable.ToList(System.Linq.Enumerable.Where(allEvents, e => e.Status == "Completed"));
+
+                logger.Information("Checking {Count} completed events for dismissed report payouts.", completedEvents.Count);
+
+                foreach (var ev in completedEvents)
+                {
+                    var payout = await _payoutRepository.GetPayoutByEventIdAsync(ev.Event_Id);
+                    if (payout != null && payout.Payout_Status == "Cancelled")
+                    {
+                        var allReports = await _eventRepository.GetAllReportsAsync();
+                        var eventReports = System.Linq.Enumerable.ToList(System.Linq.Enumerable.Where(allReports, r => r.Event_Id == ev.Event_Id));
+
+                        // Only process if reports exist and all of them are dismissed
+                        if (eventReports.Count > 0 && System.Linq.Enumerable.All(eventReports, r => r.ResponseAction == "Dismissed"))
+                        {
+                            logger.Information("Releasing payout for completed Event ID {EventId} (all reports are Dismissed).", ev.Event_Id);
+
+                            await _bookingRepository.BeginTransactionAsync();
+                            try
+                            {
+                                payout.Payout_Status = "Success";
+                                payout.Processed_At = DateTime.UtcNow;
+                                await _payoutRepository.UpdateAsync(payout);
+
+                                var txs = await _transactionRepository.GetAllAsync();
+                                var relatedTx = System.Linq.Enumerable.FirstOrDefault(txs, t => t.Transaction_Type == "OrganizerPayout" && t.Related_Id == ev.Event_Id);
+                                if (relatedTx != null)
+                                {
+                                    relatedTx.Status = "Success";
+                                    relatedTx.Remarks = "Payout released to organizer after reports were dismissed.";
+                                    await _transactionRepository.UpdateAsync(relatedTx);
+                                }
+
+                                await _bookingRepository.CommitTransactionAsync();
+                                logger.Information("Successfully released payout for Event ID {EventId}.", ev.Event_Id);
+                            }
+                            catch (Exception ex)
+                            {
+                                await _bookingRepository.RollbackTransactionAsync();
+                                logger.Error(ex, "Failed to release payout for Event ID {EventId}.", ev.Event_Id);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, "Error in ProcessDismissedPayoutsAsync job.");
             }
         }
 
@@ -900,7 +1233,7 @@ namespace Event.Business.Services
 
         #endregion
 
-
+        #region GetEventsByInterestedRegionsAsync
 
         public async Task<System.Collections.Generic.IEnumerable<BrowsedEventResponse>> GetEventsByInterestedRegionsAsync(int userId)
         {
@@ -934,25 +1267,11 @@ namespace Event.Business.Services
                     }
                 }
 
-                var reports = new List<BrowsedEventReportDto>();
-                if (ev.Reports != null)
-                {
-                    foreach (var report in ev.Reports)
-                    {
-                        reports.Add(new BrowsedEventReportDto
-                        {
-                            Report_Id = report.Report_Id,
-                            Reporter_Id = report.Reporter_Id,
-                            Reason = report.Reason,
-                            Created_At = report.Created_At
-                        });
-                    }
-                }
-
                 response.Add(new BrowsedEventResponse
                 {
                     Event_Id = ev.Event_Id,
                     Organizer_Name = ev.Organizer?.Name ?? string.Empty,
+                    Organizer_Email = ev.Organizer?.Email,
                     Venue_Name = ev.Venue?.Name,
                     Address = ev.Venue?.Address,
                     Venue_Region_Name = ev.Venue?.Region?.Region_Name,
@@ -963,12 +1282,269 @@ namespace Event.Business.Services
                     Date_Time = ev.Date_Time,
                     Status = ev.Status,
                     Duration_Hours = ev.Duration_Hours,
-                    TicketTiers = ticketTiers,
-                    Reports = reports
+                    TicketTiers = ticketTiers
                 });
             }
 
             return response;
         }
+
+        #endregion
+
+        #region GetPopularRegionsAsync
+
+        public async Task<IEnumerable<RegionResponse>> GetPopularRegionsAsync(int? rankNumber)
+        {
+            var regions = await _eventRepository.GetPopularRegionsAsync(rankNumber);
+            return regions.Select(r => new RegionResponse
+            {
+                Region_Id = r.Region_Id,
+                Region_Name = r.Region_Name,
+                No_Of_Staffs = r.No_Of_Staffs
+            });
+        }
+
+        #endregion
+
+        #region GetTrendingEventsAsync
+
+        public async Task<IEnumerable<BrowsedEventResponse>> GetTrendingEventsAsync(int? count)
+        {
+            var rawEvents = await _eventRepository.GetTrendingEventsAsync(count);
+            var response = new List<BrowsedEventResponse>();
+            foreach (var ev in rawEvents)
+            {
+                var ticketTiers = new List<TicketTierDetailsDto>();
+                if (ev.TicketTiers != null)
+                {
+                    foreach (var tier in ev.TicketTiers)
+                    {
+                        ticketTiers.Add(new TicketTierDetailsDto
+                        {
+                            Tier_Name = tier.Tier_Name,
+                            Price = tier.Price,
+                            Tickets_Sold = tier.Tickets_Sold
+                        });
+                    }
+                }
+
+                response.Add(new BrowsedEventResponse
+                {
+                    Event_Id = ev.Event_Id,
+                    Organizer_Name = ev.Organizer?.Name ?? string.Empty,
+                    Organizer_Email = ev.Organizer?.Email,
+                    Venue_Name = ev.Venue?.Name,
+                    Address = ev.Venue?.Address,
+                    Venue_Region_Name = ev.Venue?.Region?.Region_Name,
+                    Event_Type = ev.Event_Type,
+                    Title = ev.Title,
+                    Description_Url = ev.Description_Url,
+                    Image_Url = ev.Image_Url,
+                    Date_Time = ev.Date_Time,
+                    Status = ev.Status,
+                    Duration_Hours = ev.Duration_Hours,
+                    TicketTiers = ticketTiers
+                });
+            }
+
+            return response;
+        }
+
+        #endregion
+
+        #region GetPopularEventsInCommonAsync
+
+        public async Task<IEnumerable<BrowsedEventResponse>> GetPopularEventsInCommonAsync(int regionsLimit)
+        {
+            var rawEvents = await _eventRepository.GetPopularEventsInCommonAsync(regionsLimit);
+            var response = new List<BrowsedEventResponse>();
+            foreach (var ev in rawEvents)
+            {
+                var ticketTiers = new List<TicketTierDetailsDto>();
+                if (ev.TicketTiers != null)
+                {
+                    foreach (var tier in ev.TicketTiers)
+                    {
+                        ticketTiers.Add(new TicketTierDetailsDto
+                        {
+                            Tier_Name = tier.Tier_Name,
+                            Price = tier.Price,
+                            Tickets_Sold = tier.Tickets_Sold
+                        });
+                    }
+                }
+
+                response.Add(new BrowsedEventResponse
+                {
+                    Event_Id = ev.Event_Id,
+                    Organizer_Name = ev.Organizer?.Name ?? string.Empty,
+                    Organizer_Email = ev.Organizer?.Email,
+                    Venue_Name = ev.Venue?.Name,
+                    Address = ev.Venue?.Address,
+                    Venue_Region_Name = ev.Venue?.Region?.Region_Name,
+                    Event_Type = ev.Event_Type,
+                    Title = ev.Title,
+                    Description_Url = ev.Description_Url,
+                    Image_Url = ev.Image_Url,
+                    Date_Time = ev.Date_Time,
+                    Status = ev.Status,
+                    Duration_Hours = ev.Duration_Hours,
+                    TicketTiers = ticketTiers
+                });
+            }
+
+            return response;
+        }
+
+        #endregion
+
+        #region GetEventTicketTierCapacitiesAsync
+
+        public async Task<IEnumerable<TicketTierCapacityResponse>> GetEventTicketTierCapacitiesAsync(int eventId)
+        {
+            var ev = await _eventRepository.GetEventDetailsAsync(eventId);
+            if (ev == null)
+            {
+                throw new NotFoundException("Event not found.");
+            }
+
+            var response = new List<TicketTierCapacityResponse>();
+            bool isVirtual = ev.Event_Type.Equals("Virtual", StringComparison.OrdinalIgnoreCase);
+
+            foreach (var t in ev.TicketTiers)
+            {
+                int totalSeats = -1;
+                int availableSeats = -1;
+
+                if (!isVirtual && ev.Venue != null)
+                {
+                    var capacity = ev.Venue.SeatCapacities.FirstOrDefault(c => c.Tier_Name.Equals(t.Tier_Name, StringComparison.OrdinalIgnoreCase));
+                    if (capacity != null)
+                    {
+                        totalSeats = capacity.Total_Seats;
+                        availableSeats = Math.Max(0, totalSeats - t.Tickets_Sold);
+                    }
+                    else
+                    {
+                        totalSeats = 0;
+                        availableSeats = 0;
+                    }
+                }
+
+                response.Add(new TicketTierCapacityResponse
+                {
+                    Tier_Name = t.Tier_Name,
+                    Total_Seats = totalSeats,
+                    Available_Seats = availableSeats,
+                    Tickets_Sold = t.Tickets_Sold
+                });
+            }
+
+            return response;
+        }
+
+        private static string GetReasonFromReportUrl(string reportUrl)
+        {
+            if (string.IsNullOrEmpty(reportUrl)) return string.Empty;
+
+            try
+            {
+                string rootPath = Directory.GetCurrentDirectory().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                string folderName = "Event.Business";
+                if (AppDomain.CurrentDomain.FriendlyName.Contains("Tests") ||
+                    AppDomain.CurrentDomain.BaseDirectory.Contains("Tests") ||
+                    Directory.GetCurrentDirectory().Contains("Tests"))
+                {
+                    folderName = "Event.Business.Tests";
+                }
+
+                if (rootPath.Contains("bin"))
+                {
+                    rootPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                }
+                else if (rootPath.EndsWith("Event.API") || rootPath.EndsWith("Event.Business.Tests") || rootPath.EndsWith("Event.Business"))
+                {
+                    rootPath = Path.GetFullPath(Path.Combine(rootPath, "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                }
+
+                string relativePath = reportUrl.TrimStart('/');
+                if (relativePath.StartsWith("assets/"))
+                {
+                    relativePath = relativePath.Substring("assets/".Length);
+                }
+                string filePath = Path.Combine(rootPath, folderName, "assets", relativePath);
+
+                if (File.Exists(filePath))
+                {
+                    string jsonContent = File.ReadAllText(filePath);
+                    var data = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<string, string>>(jsonContent);
+                    if (data != null && data.ContainsKey("Reason"))
+                    {
+                        return data["Reason"];
+                    }
+                }
+            }
+            catch
+            {
+                // Fallback
+            }
+
+            return "Details in JSON file";
+        }
+
+        #endregion
+
+        #region GetPlatformSettingsAsync
+
+        public async Task<Event.Models.DTOs.PlatformSettingsResponse?> GetPlatformSettingsAsync()
+        {
+            var settings = await _settingsRepository.GetSettingsAsync();
+            if (settings == null) return null;
+
+            return new Event.Models.DTOs.PlatformSettingsResponse
+            {
+                Staff_Flat_Rate = settings.Staff_Flat_Rate,
+                Virtual_Event_Activation_Fee = settings.Virtual_Event_Activation_Fee,
+                Physical_Event_Activation_Fee = settings.Physical_Event_Activation_Fee,
+                Ticket_Commission_Percentage = settings.Ticket_Commission_Percentage,
+                Ticket_Fixed_Fee = settings.Ticket_Fixed_Fee,
+                Max_Tickets_Per_Booking = settings.Max_Tickets_Per_Booking
+            };
+        }
+
+        #endregion
+
+        #region FileStorage
+
+        private string GetBaseAssetsPath()
+        {
+            var currentDir = Directory.GetCurrentDirectory().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return currentDir.EndsWith("Event.API") 
+                ? Path.GetFullPath(Path.Combine(currentDir, "..", "Event.Business", "assets")) 
+                : Path.GetFullPath(Path.Combine(currentDir, "Event.Business", "assets"));
+        }
+
+        public async Task<string> SaveDescriptionFileAsync(string text)
+        {
+            var tempId = Guid.NewGuid().ToString("N");
+            var assetsDir = Path.Combine(GetBaseAssetsPath(), "events", "temp", tempId);
+            Directory.CreateDirectory(assetsDir);
+            var filePath = Path.Combine(assetsDir, "description.txt");
+            await File.WriteAllTextAsync(filePath, text);
+            return $"assets/events/temp/{tempId}/description.txt";
+        }
+
+        public async Task<string> SaveImageFileAsync(string fileName, byte[] fileBytes)
+        {
+            var tempId = Guid.NewGuid().ToString("N");
+            var assetsDir = Path.Combine(GetBaseAssetsPath(), "events", "temp", tempId);
+            Directory.CreateDirectory(assetsDir);
+            var ext = Path.GetExtension(fileName);
+            var filePath = Path.Combine(assetsDir, $"image{ext}");
+            await File.WriteAllBytesAsync(filePath, fileBytes);
+            return $"assets/events/temp/{tempId}/image{ext}";
+        }
+
+        #endregion
     }
 }

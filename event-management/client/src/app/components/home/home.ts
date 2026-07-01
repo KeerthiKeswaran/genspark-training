@@ -1,8 +1,9 @@
-import { Component, OnInit, OnDestroy, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, inject } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { AppStoreService } from '../../store/app-store.service';
 import { RegionService } from '../../services/region.service';
 import { EventService } from '../../services/event.service';
+import { LocationGeoService } from '../../services/location-geo.service';
 import { NavbarComponent } from './navbar/navbar';
 import { HeroCarouselComponent } from './hero-carousel/hero-carousel';
 import { EventsBrowsingComponent } from './events-browsing/events-browsing';
@@ -30,6 +31,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   public isLocationModalOpen = signal(false);
   private subscriptions = new Subscription();
 
+  private locationGeoService = inject(LocationGeoService);
+
   constructor(
     private store: AppStoreService,
     private regionService: RegionService,
@@ -37,11 +40,13 @@ export class HomeComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    // Initial seeds
+    // 1. Load all regions (populates the location modal list and popular-regions section)
     this.regionService.loadRegions().subscribe();
-    this.eventService.getTrendingEvents().subscribe();
 
-    // Listen to changes in the active region to load the corresponding events list
+    // 2. Load trending events (for HeroCarouselComponent)
+    this.eventService.getTrendingEvents(5).subscribe();
+
+    // 4. Listen to changes in the active region to load browse events
     this.subscriptions.add(
       this.store.select(state => state.regions.currentRegionId).subscribe(regId => {
         const activeRegionId = regId || 'REG01';
@@ -52,6 +57,29 @@ export class HomeComponent implements OnInit, OnDestroy {
         }).subscribe();
       })
     );
+
+    // 5. Load recommended events if user is logged in (auth-only endpoint)
+    const token = this.store.state.auth.token;
+    if (token) {
+      this.eventService.getRecommendedEvents().subscribe();
+    }
+
+    // 6. Auto-trigger location modal & permission prompt if user just registered
+    if (typeof window !== 'undefined' && localStorage.getItem('justRegistered') === 'true') {
+      localStorage.removeItem('justRegistered');
+      this.isLocationModalOpen.set(true);
+
+      // Prompt for Geolocation permission in the browser
+      this.locationGeoService.requestAndSyncLocation()
+        .then(() => {
+          // If user grants permission & location is resolved, close the modal
+          this.isLocationModalOpen.set(false);
+        })
+        .catch((err) => {
+          console.warn('Auto-geolocation permission request failed/denied:', err);
+          // Keep the modal open so the user can choose a location manually
+        });
+    }
   }
 
   ngOnDestroy(): void {

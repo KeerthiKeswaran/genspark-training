@@ -31,7 +31,16 @@
             <div class="search-recommendations-dropdown">
               @for (rec of recommendations(); track rec.event_Id) {
                 <div class="recommendation-item" (click)="selectRecommendation(rec)">
-                  <span class="rec-title">{{ rec.title }}</span>
+                  <div class="rec-details">
+                    <span class="rec-title">{{ rec.title }}</span>
+                    <span class="rec-meta">
+                      <svg class="rec-location-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                        <circle cx="12" cy="10" r="3"></circle>
+                      </svg>
+                      {{ rec.venue_Name }}, {{ rec.venue_Region_Name }}
+                    </span>
+                  </div>
                 </div>
               }
             </div>
@@ -70,17 +79,6 @@
           <span>Create Event</span>
         </a>
 
-        <!-- Bookings Option -->
-        <a class="nav-link" (click)="triggerBookingAction()" title="Bookings">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="16" y1="13" x2="8" y2="13"></line>
-            <line x1="16" y1="17" x2="8" y2="17"></line>
-            <polyline points="10 9 9 9 8 9"></polyline>
-          </svg>
-          <span>Bookings</span>
-        </a>
 
         <!-- Profile Dropdown Button -->
         <div class="profile-container" (click)="$event.stopPropagation()">

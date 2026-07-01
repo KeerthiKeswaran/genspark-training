@@ -29,6 +29,8 @@ namespace Event.Business.Tests.ServiceTests
         private Mock<INotificationRepository> _notificationRepositoryMock = null!;
         private Mock<IBookingPaymentRepository> _bookingPaymentRepositoryMock = null!;
         private Mock<IUserRepository> _userRepositoryMock = null!;
+        private Mock<ITermsAndConditionsRepository> _termsRepositoryMock = null!;
+        private Mock<IOrganizerPayoutRepository> _payoutRepositoryMock = null!;
         private IRefundService _refundService = null!;
 
         private IConfiguration _configuration = null!;
@@ -54,8 +56,14 @@ namespace Event.Business.Tests.ServiceTests
             _notificationRepositoryMock = new Mock<INotificationRepository>();
             _bookingPaymentRepositoryMock = new Mock<IBookingPaymentRepository>();
             _userRepositoryMock = new Mock<IUserRepository>();
+            _termsRepositoryMock = new Mock<ITermsAndConditionsRepository>();
+            _payoutRepositoryMock = new Mock<IOrganizerPayoutRepository>();
+
             _userRepositoryMock.Setup(r => r.GetByIdAsync(It.IsAny<int>()))
-                .ReturnsAsync((int id) => new User { User_Id = id, Name = TestName, Email = TestEmail, Status = "Active" });
+                .ReturnsAsync((int id) => new User { User_Id = id, Name = TestName, Email = TestEmail, Status = "Active", Consented_Terms_Id = "G10001" });
+
+            _termsRepositoryMock.Setup(r => r.GetActiveTermsByTypeAsync("EventCreation"))
+                .ReturnsAsync(new TermsAndConditions { Terms_Id = "E10001", Type = "EventCreation", Is_Active = true });
 
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             string apiDir = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "Event.API"));
@@ -103,7 +111,9 @@ namespace Event.Business.Tests.ServiceTests
                 _bookingPaymentRepositoryMock.Object,
                 _emailService,
                 _userRepositoryMock.Object,
-                _refundService
+                _refundService,
+                _termsRepositoryMock.Object,
+                _payoutRepositoryMock.Object
             );
         }
         #endregion
@@ -119,7 +129,9 @@ namespace Event.Business.Tests.ServiceTests
                 DateTime = DateTime.UtcNow.AddDays(2),
                 DurationHours = 2,
                 EventType = "Virtual",
-                HasAcceptedPolicy = true,
+                Category = "Tech",
+                AgeCategory = "ALL",
+                AcceptedPolicyId = "E10001",
                 TicketTiers = new List<CreateTicketTierRequest>
                 {
                     new CreateTicketTierRequest { TierName = "Free", Price = 0.00m }
@@ -158,9 +170,11 @@ namespace Event.Business.Tests.ServiceTests
                 DateTime = DateTime.UtcNow.AddDays(3),
                 DurationHours = 3,
                 EventType = "Physical",
+                Category = "Conference",
+                AgeCategory = "ALL",
                 VenueId = 10001,
                 RequiresStaff = false,
-                HasAcceptedPolicy = true,
+                AcceptedPolicyId = "E10001",
                 TicketTiers = new List<CreateTicketTierRequest>
                 {
                     new CreateTicketTierRequest { TierName = "General", Price = 10.00m }
@@ -209,9 +223,11 @@ namespace Event.Business.Tests.ServiceTests
                 DateTime = DateTime.UtcNow.AddDays(3),
                 DurationHours = 3,
                 EventType = "Physical",
+                Category = "Conference",
+                AgeCategory = "ALL",
                 VenueId = 10001,
                 RequiresStaff = false,
-                HasAcceptedPolicy = false,
+                AcceptedPolicyId = "",
                 TicketTiers = new List<CreateTicketTierRequest>
                 {
                     new CreateTicketTierRequest { TierName = "General", Price = 10.00m }
@@ -243,6 +259,54 @@ namespace Event.Business.Tests.ServiceTests
             {
                 LogTestDetail(Service, "GetEventDetailsAsync", "Retrieve event details", 10010, null, false, ex.Message);
                 throw;
+            }
+        }
+        #endregion
+
+        #region Test_ReportEventAsync_CreatesAssetFileAndUpdatesUrl
+        [Test]
+        public async Task Test_ReportEventAsync_CreatesAssetFileAndUpdatesUrl()
+        {
+            const int reporterId = 99877;
+            const int eventId = 20001;
+            var assetDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "Event.Business.Tests", "assets", "users", reporterId.ToString(), "reports");
+            var absoluteAssetDir = Path.GetFullPath(assetDir);
+            if (Directory.Exists(absoluteAssetDir))
+            {
+                Directory.Delete(absoluteAssetDir, recursive: true);
+            }
+
+            EventReport? savedReport = null;
+            _eventRepositoryMock.Setup(r => r.ExistsAsync(eventId)).ReturnsAsync(true);
+            _eventRepositoryMock.Setup(r => r.AddReportAsync(It.IsAny<EventReport>()))
+                .Callback<EventReport>(report => savedReport = report)
+                .Returns(Task.CompletedTask);
+            _eventRepositoryMock.Setup(r => r.UpdateReportAsync(It.IsAny<EventReport>()))
+                .Returns(Task.CompletedTask);
+
+            try
+            {
+                var result = await _eventService.ReportEventAsync(reporterId, eventId, "Unsafe content");
+
+                Assert.That(result, Is.True);
+                Assert.That(Directory.Exists(absoluteAssetDir), Is.True);
+                var files = Directory.GetFiles(absoluteAssetDir);
+                Assert.That(files, Is.Not.Empty);
+
+                var createdFile = files[0];
+                var content = await File.ReadAllTextAsync(createdFile);
+                Assert.That(content, Does.Contain("Unsafe content"));
+                Assert.That(savedReport, Is.Not.Null);
+                Assert.That(savedReport!.ReportUrl, Does.Contain($"/assets/users/{reporterId}/reports/"));
+
+                LogTestDetail(Service, "ReportEventAsync", "Create asset report file and update URL", new { ReporterId = reporterId, EventId = eventId }, savedReport.ReportUrl, true);
+            }
+            finally
+            {
+                if (Directory.Exists(absoluteAssetDir))
+                {
+                    Directory.Delete(absoluteAssetDir, recursive: true);
+                }
             }
         }
         #endregion
@@ -290,7 +354,7 @@ namespace Event.Business.Tests.ServiceTests
                 Title = "Gala Night",
                 Status = "Activation Pending",
                 Event_Type = "Virtual",
-                Organizer = new User { Name = TestName, Email = TestEmail }
+                Organizer = new User { User_Id = 10001, Name = TestName, Email = TestEmail }
             };
 
             var mockTransaction = new Transaction
@@ -333,7 +397,7 @@ namespace Event.Business.Tests.ServiceTests
                 Title = "Cancelled Gala",
                 Status = "Live",
                 Date_Time = DateTime.UtcNow.AddDays(3),
-                Organizer = new User { Name = TestName, Email = TestEmail }
+                Organizer = new User { User_Id = 10001, Name = TestName, Email = TestEmail }
             };
 
             _eventRepositoryMock.Setup(r => r.GetEventDetailsAsync(10005)).ReturnsAsync(mockEvent);
@@ -792,7 +856,9 @@ namespace Event.Business.Tests.ServiceTests
                 DateTime = DateTime.UtcNow.AddDays(2),
                 DurationHours = 1,
                 EventType = "Concert",
-                HasAcceptedPolicy = true,
+                Category = "Music",
+                AgeCategory = "ALL",
+                AcceptedPolicyId = "E10001",
                 TicketTiers = new List<CreateTicketTierRequest> { new CreateTicketTierRequest { TierName = "A", Price = 5m } }
             };
             _settingsRepositoryMock.Setup(r => r.GetSettingsAsync()).ReturnsAsync(new PlatformSettings());
@@ -804,9 +870,14 @@ namespace Event.Business.Tests.ServiceTests
         {
             var request = new CreateEventRequest
             {
-                Title = "Empty Type", DescriptionUrl = "desc",
-                DateTime = DateTime.UtcNow.AddDays(2), DurationHours = 1,
-                EventType = "", HasAcceptedPolicy = true,
+                Title = "Empty Type",
+                DescriptionUrl = "desc",
+                DateTime = DateTime.UtcNow.AddDays(2),
+                DurationHours = 1,
+                EventType = "",
+                Category = "Music",
+                AgeCategory = "ALL",
+                AcceptedPolicyId = "E10001",
                 TicketTiers = new List<CreateTicketTierRequest> { new CreateTicketTierRequest { TierName = "A", Price = 5m } }
             };
             Assert.ThrowsAsync<ValidationException>(async () => await _eventService.CreateEventAsync(10001, request));
@@ -817,9 +888,14 @@ namespace Event.Business.Tests.ServiceTests
         {
             var request = new CreateEventRequest
             {
-                Title = "Too Soon", DescriptionUrl = "desc",
-                DateTime = DateTime.UtcNow.AddHours(1), DurationHours = 2,
-                EventType = "Virtual", HasAcceptedPolicy = true,
+                Title = "Too Soon",
+                DescriptionUrl = "desc",
+                DateTime = DateTime.UtcNow.AddHours(1),
+                DurationHours = 2,
+                EventType = "Virtual",
+                Category = "Music",
+                AgeCategory = "ALL",
+                AcceptedPolicyId = "E10001",
                 TicketTiers = new List<CreateTicketTierRequest> { new CreateTicketTierRequest { TierName = "A", Price = 0m } }
             };
             Assert.ThrowsAsync<ValidationException>(async () => await _eventService.CreateEventAsync(10001, request));
@@ -830,9 +906,14 @@ namespace Event.Business.Tests.ServiceTests
         {
             var request = new CreateEventRequest
             {
-                Title = "Restricted", DescriptionUrl = "desc",
-                DateTime = DateTime.UtcNow.AddDays(2), DurationHours = 2,
-                EventType = "Virtual", HasAcceptedPolicy = true,
+                Title = "Restricted",
+                DescriptionUrl = "desc",
+                DateTime = DateTime.UtcNow.AddDays(2),
+                DurationHours = 2,
+                EventType = "Virtual",
+                Category = "Music",
+                AgeCategory = "ALL",
+                AcceptedPolicyId = "E10001",
                 TicketTiers = new List<CreateTicketTierRequest> { new CreateTicketTierRequest { TierName = "A", Price = 0m } }
             };
             _userRepositoryMock.Setup(r => r.GetByIdAsync(10001)).ReturnsAsync(new User { User_Id = 10001, Status = "Restricted" });
@@ -845,9 +926,14 @@ namespace Event.Business.Tests.ServiceTests
         {
             var request = new CreateEventRequest
             {
-                Title = "Deactivated", DescriptionUrl = "desc",
-                DateTime = DateTime.UtcNow.AddDays(2), DurationHours = 2,
-                EventType = "Virtual", HasAcceptedPolicy = true,
+                Title = "Deactivated",
+                DescriptionUrl = "desc",
+                DateTime = DateTime.UtcNow.AddDays(2),
+                DurationHours = 2,
+                EventType = "Virtual",
+                Category = "Music",
+                AgeCategory = "ALL",
+                AcceptedPolicyId = "E10001",
                 TicketTiers = new List<CreateTicketTierRequest> { new CreateTicketTierRequest { TierName = "A", Price = 0m } }
             };
             _userRepositoryMock.Setup(r => r.GetByIdAsync(10001)).ReturnsAsync(new User { User_Id = 10001, Status = "Deactivated" });
@@ -860,9 +946,14 @@ namespace Event.Business.Tests.ServiceTests
         {
             var request = new CreateEventRequest
             {
-                Title = "Ghost Org", DescriptionUrl = "desc",
-                DateTime = DateTime.UtcNow.AddDays(2), DurationHours = 2,
-                EventType = "Virtual", HasAcceptedPolicy = true,
+                Title = "Ghost Org",
+                DescriptionUrl = "desc",
+                DateTime = DateTime.UtcNow.AddDays(2),
+                DurationHours = 2,
+                EventType = "Virtual",
+                Category = "Music",
+                AgeCategory = "ALL",
+                AcceptedPolicyId = "E10001",
                 TicketTiers = new List<CreateTicketTierRequest> { new CreateTicketTierRequest { TierName = "A", Price = 0m } }
             };
             _userRepositoryMock.Setup(r => r.GetByIdAsync(99999)).ReturnsAsync((User?)null);
@@ -875,9 +966,15 @@ namespace Event.Business.Tests.ServiceTests
         {
             var request = new CreateEventRequest
             {
-                Title = "No Venue", DescriptionUrl = "desc",
-                DateTime = DateTime.UtcNow.AddDays(2), DurationHours = 2,
-                EventType = "Physical", VenueId = null, HasAcceptedPolicy = true,
+                Title = "No Venue",
+                DescriptionUrl = "desc",
+                DateTime = DateTime.UtcNow.AddDays(2),
+                DurationHours = 2,
+                EventType = "Physical",
+                Category = "Conference",
+                AgeCategory = "ALL",
+                VenueId = null,
+                AcceptedPolicyId = "E10001",
                 TicketTiers = new List<CreateTicketTierRequest> { new CreateTicketTierRequest { TierName = "A", Price = 10m } }
             };
             _settingsRepositoryMock.Setup(r => r.GetSettingsAsync()).ReturnsAsync(new PlatformSettings { Physical_Event_Activation_Fee = 100m });
@@ -889,9 +986,15 @@ namespace Event.Business.Tests.ServiceTests
         {
             var request = new CreateEventRequest
             {
-                Title = "Bad Venue", DescriptionUrl = "desc",
-                DateTime = DateTime.UtcNow.AddDays(2), DurationHours = 2,
-                EventType = "Physical", VenueId = 9999, HasAcceptedPolicy = true,
+                Title = "Bad Venue",
+                DescriptionUrl = "desc",
+                DateTime = DateTime.UtcNow.AddDays(2),
+                DurationHours = 2,
+                EventType = "Physical",
+                Category = "Conference",
+                AgeCategory = "ALL",
+                VenueId = 9999,
+                AcceptedPolicyId = "E10001",
                 TicketTiers = new List<CreateTicketTierRequest> { new CreateTicketTierRequest { TierName = "A", Price = 10m } }
             };
             _settingsRepositoryMock.Setup(r => r.GetSettingsAsync()).ReturnsAsync(new PlatformSettings { Physical_Event_Activation_Fee = 100m });
@@ -904,9 +1007,15 @@ namespace Event.Business.Tests.ServiceTests
         {
             var request = new CreateEventRequest
             {
-                Title = "Occupied", DescriptionUrl = "desc",
-                DateTime = DateTime.UtcNow.AddDays(2), DurationHours = 2,
-                EventType = "Physical", VenueId = 10001, HasAcceptedPolicy = true,
+                Title = "Occupied",
+                DescriptionUrl = "desc",
+                DateTime = DateTime.UtcNow.AddDays(2),
+                DurationHours = 2,
+                EventType = "Physical",
+                Category = "Conference",
+                AgeCategory = "ALL",
+                VenueId = 10001,
+                AcceptedPolicyId = "E10001",
                 TicketTiers = new List<CreateTicketTierRequest> { new CreateTicketTierRequest { TierName = "A", Price = 10m } }
             };
             var mockVenue = new Venue { Venue_Id = 10001, Is_Available = true, Hourly_Price = 50m };
@@ -921,14 +1030,24 @@ namespace Event.Business.Tests.ServiceTests
         {
             var request = new CreateEventRequest
             {
-                Title = "No Staff", DescriptionUrl = "desc",
-                DateTime = DateTime.UtcNow.AddDays(2), DurationHours = 2,
-                EventType = "Physical", VenueId = 10001, RequiresStaff = true, HasAcceptedPolicy = true,
+                Title = "No Staff",
+                DescriptionUrl = "desc",
+                DateTime = DateTime.UtcNow.AddDays(2),
+                DurationHours = 2,
+                EventType = "Physical",
+                Category = "Conference",
+                AgeCategory = "ALL",
+                VenueId = 10001,
+                RequiresStaff = true,
+                AcceptedPolicyId = "E10001",
                 TicketTiers = new List<CreateTicketTierRequest> { new CreateTicketTierRequest { TierName = "A", Price = 10m } }
             };
             var mockVenue = new Venue
             {
-                Venue_Id = 10001, Is_Available = true, Hourly_Price = 50m, Region_Id = "US-EAST",
+                Venue_Id = 10001,
+                Is_Available = true,
+                Hourly_Price = 50m,
+                Region_Id = "US-EAST",
                 SeatCapacities = new List<VenueSeatCapacity> { new VenueSeatCapacity { Total_Seats = 100 } }
             };
             _settingsRepositoryMock.Setup(r => r.GetSettingsAsync()).ReturnsAsync(new PlatformSettings { Physical_Event_Activation_Fee = 100m, Staff_Flat_Rate = 50m });
@@ -943,14 +1062,24 @@ namespace Event.Business.Tests.ServiceTests
         {
             var request = new CreateEventRequest
             {
-                Title = "Staff Computed", DescriptionUrl = "desc",
-                DateTime = DateTime.UtcNow.AddDays(2), DurationHours = 2,
-                EventType = "Physical", VenueId = 10001, RequiresStaff = true, HasAcceptedPolicy = true,
+                Title = "Staff Computed",
+                DescriptionUrl = "desc",
+                DateTime = DateTime.UtcNow.AddDays(2),
+                DurationHours = 2,
+                EventType = "Physical",
+                Category = "Conference",
+                AgeCategory = "ALL",
+                VenueId = 10001,
+                RequiresStaff = true,
+                AcceptedPolicyId = "E10001",
                 TicketTiers = new List<CreateTicketTierRequest> { new CreateTicketTierRequest { TierName = "A", Price = 10m } }
             };
             var mockVenue = new Venue
             {
-                Venue_Id = 10001, Is_Available = true, Hourly_Price = 50m, Region_Id = "US-EAST",
+                Venue_Id = 10001,
+                Is_Available = true,
+                Hourly_Price = 50m,
+                Region_Id = "US-EAST",
                 SeatCapacities = new List<VenueSeatCapacity> { new VenueSeatCapacity { Total_Seats = 100 } }
             };
             _settingsRepositoryMock.Setup(r => r.GetSettingsAsync()).ReturnsAsync(new PlatformSettings { Physical_Event_Activation_Fee = 100m, Staff_Flat_Rate = 50m });
@@ -980,9 +1109,16 @@ namespace Event.Business.Tests.ServiceTests
         {
             var request = new CreateEventRequest
             {
-                Title = "Hybrid Conf", DescriptionUrl = "desc",
-                DateTime = DateTime.UtcNow.AddDays(2), DurationHours = 3,
-                EventType = "Hybrid", VenueId = 10001, RequiresStaff = false, HasAcceptedPolicy = true,
+                Title = "Hybrid Conf",
+                DescriptionUrl = "desc",
+                DateTime = DateTime.UtcNow.AddDays(2),
+                DurationHours = 3,
+                EventType = "Hybrid",
+                Category = "Conference",
+                AgeCategory = "ALL",
+                VenueId = 10001,
+                RequiresStaff = false,
+                AcceptedPolicyId = "E10001",
                 TicketTiers = new List<CreateTicketTierRequest> { new CreateTicketTierRequest { TierName = "General", Price = 15m } }
             };
             var mockVenue = new Venue { Venue_Id = 10001, Is_Available = true, Hourly_Price = 50m };
@@ -1012,9 +1148,14 @@ namespace Event.Business.Tests.ServiceTests
         {
             var request = new CreateEventRequest
             {
-                Title = "DB Error", DescriptionUrl = "desc",
-                DateTime = DateTime.UtcNow.AddDays(2), DurationHours = 2,
-                EventType = "Virtual", HasAcceptedPolicy = true,
+                Title = "DB Error",
+                DescriptionUrl = "desc",
+                DateTime = DateTime.UtcNow.AddDays(2),
+                DurationHours = 2,
+                EventType = "Virtual",
+                Category = "Tech",
+                AgeCategory = "ALL",
+                AcceptedPolicyId = "E10001",
                 TicketTiers = new List<CreateTicketTierRequest> { new CreateTicketTierRequest { TierName = "A", Price = 0m } }
             };
             _settingsRepositoryMock.Setup(r => r.GetSettingsAsync()).ReturnsAsync(new PlatformSettings { Virtual_Event_Activation_Fee = 0 });
@@ -1053,8 +1194,10 @@ namespace Event.Business.Tests.ServiceTests
         {
             var mockEvent = new Event.Models.Event
             {
-                Event_Id = 10005, Status = "Activation Pending", Event_Type = "Virtual",
-                Organizer = new User { Name = TestName, Email = TestEmail }
+                Event_Id = 10005,
+                Status = "Activation Pending",
+                Event_Type = "Virtual",
+                Organizer = new User { User_Id = 10001, Name = TestName, Email = TestEmail }
             };
             _bookingRepositoryMock.Setup(r => r.BeginTransactionAsync()).Returns(Task.CompletedTask);
             _eventRepositoryMock.Setup(r => r.GetEventDetailsAsync(10005)).ReturnsAsync(mockEvent);
@@ -1068,8 +1211,10 @@ namespace Event.Business.Tests.ServiceTests
         {
             var mockEvent = new Event.Models.Event
             {
-                Event_Id = 10005, Status = "Activation Pending", Event_Type = "Virtual",
-                Organizer = new User { Name = TestName, Email = TestEmail }
+                Event_Id = 10005,
+                Status = "Activation Pending",
+                Event_Type = "Virtual",
+                Organizer = new User { User_Id = 10001, Name = TestName, Email = TestEmail }
             };
             var mockTx = new Transaction { Transaction_Id = 100L, Amount = 50m, Currency = "INR", Status = "Pending" };
             _bookingRepositoryMock.Setup(r => r.BeginTransactionAsync()).Returns(Task.CompletedTask);
@@ -1087,14 +1232,20 @@ namespace Event.Business.Tests.ServiceTests
         {
             var mockVenue = new Venue
             {
-                Venue_Id = 10001, Name = "Arena", Region_Id = "US-EAST",
+                Venue_Id = 10001,
+                Name = "Arena",
+                Region_Id = "US-EAST",
                 SeatCapacities = new List<VenueSeatCapacity> { new VenueSeatCapacity { Total_Seats = 200 } }
             };
             var mockEvent = new Event.Models.Event
             {
-                Event_Id = 10006, Status = "Activation Pending", Event_Type = "Physical",
-                Requires_Staff = true, Venue_Id = 10001, Venue = mockVenue,
-                Organizer = new User { Name = TestName, Email = TestEmail }
+                Event_Id = 10006,
+                Status = "Activation Pending",
+                Event_Type = "Physical",
+                Requires_Staff = true,
+                Venue_Id = 10001,
+                Venue = mockVenue,
+                Organizer = new User { User_Id = 10001, Name = TestName, Email = TestEmail }
             };
             var mockTx = new Transaction { Transaction_Id = 200L, Amount = 200m, Currency = "INR", Status = "Pending" };
             _bookingRepositoryMock.Setup(r => r.BeginTransactionAsync()).Returns(Task.CompletedTask);
@@ -1127,14 +1278,20 @@ namespace Event.Business.Tests.ServiceTests
         {
             var mockVenue = new Venue
             {
-                Venue_Id = 10001, Name = "Conference Hall", Region_Id = "IN-SOUTH",
+                Venue_Id = 10001,
+                Name = "Conference Hall",
+                Region_Id = "IN-SOUTH",
                 SeatCapacities = new List<VenueSeatCapacity> { new VenueSeatCapacity { Total_Seats = 100 } }
             };
             var mockEvent = new Event.Models.Event
             {
-                Event_Id = 10007, Status = "Activation Pending", Event_Type = "Hybrid",
-                Requires_Staff = true, Venue_Id = 10001, Venue = mockVenue,
-                Organizer = new User { Name = TestName, Email = TestEmail }
+                Event_Id = 10007,
+                Status = "Activation Pending",
+                Event_Type = "Hybrid",
+                Requires_Staff = true,
+                Venue_Id = 10001,
+                Venue = mockVenue,
+                Organizer = new User { User_Id = 10001, Name = TestName, Email = TestEmail }
             };
             var mockTx = new Transaction { Transaction_Id = 300L, Amount = 300m, Currency = "INR", Status = "Pending", Remarks = "Initial" };
             _bookingRepositoryMock.Setup(r => r.BeginTransactionAsync()).Returns(Task.CompletedTask);
@@ -1168,9 +1325,12 @@ namespace Event.Business.Tests.ServiceTests
         {
             var mockEvent = new Event.Models.Event
             {
-                Event_Id = 10008, Status = "Activation Pending", Event_Type = "Physical",
-                Requires_Staff = false, Venue = null,
-                Organizer = new User { Name = TestName, Email = TestEmail }
+                Event_Id = 10008,
+                Status = "Activation Pending",
+                Event_Type = "Physical",
+                Requires_Staff = false,
+                Venue = null,
+                Organizer = new User { User_Id = 10001, Name = TestName, Email = TestEmail }
             };
             var mockTx = new Transaction { Transaction_Id = 400L, Amount = 100m, Currency = "INR", Status = "Pending" };
             _bookingRepositoryMock.Setup(r => r.BeginTransactionAsync()).Returns(Task.CompletedTask);
@@ -1201,7 +1361,9 @@ namespace Event.Business.Tests.ServiceTests
             // (ev.Organizer != null && !string.IsNullOrEmpty(ev.Organizer.Email)), so email is skipped.
             var mockEvent = new Event.Models.Event
             {
-                Event_Id = 10009, Status = "Activation Pending", Event_Type = "Virtual",
+                Event_Id = 10009,
+                Status = "Activation Pending",
+                Event_Type = "Virtual",
                 Organizer = new User { User_Id = 1, Name = "No Email Org", Email = "" }
             };
             var mockTx = new Transaction { Transaction_Id = 500L, Amount = 0m, Currency = "INR", Status = "Pending" };
@@ -1254,9 +1416,10 @@ namespace Event.Business.Tests.ServiceTests
             var mockStaff = new Staff { Employee_ID = 3, IsAllocated = true };
             var mockEvent = new Event.Models.Event
             {
-                Event_Id = 10010, Status = "Live",
+                Event_Id = 10010,
+                Status = "Live",
                 Date_Time = DateTime.UtcNow.AddDays(3),
-                Organizer = new User { Name = TestName, Email = TestEmail },
+                Organizer = new User { User_Id = 10001, Name = TestName, Email = TestEmail },
                 StaffAllocations = new List<EventStaffAllocation> { new EventStaffAllocation { Employee_ID = 3 } }
             };
             _bookingRepositoryMock.Setup(r => r.BeginTransactionAsync()).Returns(Task.CompletedTask);
@@ -1308,7 +1471,10 @@ namespace Event.Business.Tests.ServiceTests
         {
             var pagedResult = new PagedResult<Event.Models.Event>
             {
-                Items = null!, TotalCount = 0, Page = 1, PageSize = 10
+                Items = null!,
+                TotalCount = 0,
+                Page = 1,
+                PageSize = 10
             };
             _eventRepositoryMock.Setup(r => r.SearchEventsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>()))
                 .ReturnsAsync(pagedResult);
@@ -1330,7 +1496,10 @@ namespace Event.Business.Tests.ServiceTests
         {
             var pagedResult = new PagedResult<Event.Models.Event>
             {
-                Items = new List<Event.Models.Event>(), TotalCount = 0, Page = 1, PageSize = 10
+                Items = new List<Event.Models.Event>(),
+                TotalCount = 0,
+                Page = 1,
+                PageSize = 10
             };
             _eventRepositoryMock.Setup(r => r.SearchEventsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>()))
                 .ReturnsAsync(pagedResult);
@@ -1355,10 +1524,10 @@ namespace Event.Business.Tests.ServiceTests
                 new Event.Models.Event
                 {
                     Event_Id = 200, Title = "Gala",
-                    Organizer = new User { Name = "Org One" },
+                    Organizer = new User { User_Id = 10001, Name = "Org One" },
                     Venue = new Venue { Name = "Hall A", Address = "123 St", Region = new Region { Region_Name = "South" } },
                     TicketTiers = new List<EventTicketTier> { new EventTicketTier { Tier_Name = "VIP", Price = 100m, Tickets_Sold = 5 } },
-                    Reports = new List<EventReport> { new EventReport { Report_Id = 1, Reporter_Id = 99, Reason = "Spam", Created_At = DateTime.UtcNow } }
+                    Reports = new List<EventReport> { new EventReport { Report_Id = 1, Reporter_Id = 99, ReportUrl = "/assets/events/200/reports/99_report.json", Created_At = DateTime.UtcNow } }
                 }
             };
             var pagedResult = new PagedResult<Event.Models.Event> { Items = mockEvents, TotalCount = 1, Page = 1, PageSize = 10 };
@@ -1369,7 +1538,7 @@ namespace Event.Business.Tests.ServiceTests
                 var result = await _eventService.BrowseEventsAsync(null, null, null, null, 1, 10);
                 var item = result.Items.First();
                 Assert.That(item.TicketTiers, Has.Count.EqualTo(1));
-                Assert.That(item.Reports, Has.Count.EqualTo(1));
+                Assert.That(item.Reports, Has.Count.EqualTo(0));
                 Assert.That(item.Venue_Region_Name, Is.EqualTo("South"));
                 LogTestDetail(Service, "BrowseEventsAsync", "Events with reports and tiers mapped", null, item, true);
             }
@@ -1396,7 +1565,8 @@ namespace Event.Business.Tests.ServiceTests
         {
             var mockEvent = new Event.Models.Event
             {
-                Event_Id = 10011, Title = "Virtual Only",
+                Event_Id = 10011,
+                Title = "Virtual Only",
                 Organizer = new User { User_Id = 1, Name = "OrgUser", Email = "org@test.com" },
                 Venue = null,
                 TicketTiers = new List<EventTicketTier> { new EventTicketTier { Tier_Name = "Free", Price = 0m, Tickets_Sold = 0 } }
@@ -1433,10 +1603,10 @@ namespace Event.Business.Tests.ServiceTests
                 new Event.Models.Event
                 {
                     Event_Id = 300, Title = "North Summit",
-                    Organizer = new User { Name = "Summit Org" },
+                    Organizer = new User { User_Id = 10001, Name = "Summit Org" },
                     Venue = new Venue { Name = "North Hall", Address = "456 Road", Region = new Region { Region_Name = "North" } },
                     TicketTiers = new List<EventTicketTier> { new EventTicketTier { Tier_Name = "Standard", Price = 50m, Tickets_Sold = 10 } },
-                    Reports = new List<EventReport> { new EventReport { Report_Id = 2, Reporter_Id = 77, Reason = "Offensive", Created_At = DateTime.UtcNow } }
+                    Reports = new List<EventReport> { new EventReport { Report_Id = 2, Reporter_Id = 77, ReportUrl = "/assets/events/300/reports/77_report.json", Created_At = DateTime.UtcNow } }
                 }
             };
             _userRepositoryMock.Setup(r => r.GetUserProfileAsync(10)).ReturnsAsync(user);
@@ -1446,7 +1616,7 @@ namespace Event.Business.Tests.ServiceTests
                 var result = await _eventService.GetEventsByInterestedRegionsAsync(10);
                 var item = result.First();
                 Assert.That(item.TicketTiers, Has.Count.EqualTo(1));
-                Assert.That(item.Reports, Has.Count.EqualTo(1));
+                Assert.That(item.Reports, Has.Count.EqualTo(0));
                 LogTestDetail(Service, "GetEventsByInterestedRegionsAsync", "Events with tiers+reports mapped", 10, item, true);
             }
             catch (Exception ex)
@@ -1510,7 +1680,10 @@ namespace Event.Business.Tests.ServiceTests
         {
             var cacheVenue = new Venue
             {
-                Venue_Id = 20001, Is_Available = true, Hourly_Price = 50m, Region_Id = "EU-WEST",
+                Venue_Id = 20001,
+                Is_Available = true,
+                Hourly_Price = 50m,
+                Region_Id = "EU-WEST",
                 SeatCapacities = new List<VenueSeatCapacity> { new VenueSeatCapacity { Total_Seats = 100 } }
             };
             _venueRepositoryMock.Setup(r => r.GetByIdAsync(20001)).ReturnsAsync(cacheVenue);
@@ -1530,9 +1703,16 @@ namespace Event.Business.Tests.ServiceTests
 
             var request = new CreateEventRequest
             {
-                Title = "Cache Hit Event", DescriptionUrl = "desc",
-                DateTime = cacheDate, DurationHours = 2,
-                EventType = "Physical", VenueId = 20001, RequiresStaff = true, HasAcceptedPolicy = true,
+                Title = "Cache Hit Event",
+                DescriptionUrl = "desc",
+                DateTime = cacheDate,
+                DurationHours = 2,
+                EventType = "Physical",
+                Category = "Conference",
+                AgeCategory = "ALL",
+                VenueId = 20001,
+                RequiresStaff = true,
+                AcceptedPolicyId = "E10001",
                 TicketTiers = new List<CreateTicketTierRequest> { new CreateTicketTierRequest { TierName = "A", Price = 10m } }
             };
             try
@@ -1553,7 +1733,10 @@ namespace Event.Business.Tests.ServiceTests
         {
             var cacheVenue = new Venue
             {
-                Venue_Id = 20002, Is_Available = true, Hourly_Price = 50m, Region_Id = "EU-NORTH",
+                Venue_Id = 20002,
+                Is_Available = true,
+                Hourly_Price = 50m,
+                Region_Id = "EU-NORTH",
                 SeatCapacities = new List<VenueSeatCapacity> { new VenueSeatCapacity { Total_Seats = 100 } }
             };
             _venueRepositoryMock.Setup(r => r.GetByIdAsync(20002)).ReturnsAsync(cacheVenue);
@@ -1569,12 +1752,284 @@ namespace Event.Business.Tests.ServiceTests
 
             var request = new CreateEventRequest
             {
-                Title = "Cache Zero Staff", DescriptionUrl = "desc",
-                DateTime = cacheDate, DurationHours = 2,
-                EventType = "Physical", VenueId = 20002, RequiresStaff = true, HasAcceptedPolicy = true,
+                Title = "Cache Zero Staff",
+                DescriptionUrl = "desc",
+                DateTime = cacheDate,
+                DurationHours = 2,
+                EventType = "Physical",
+                Category = "Conference",
+                AgeCategory = "ALL",
+                VenueId = 20002,
+                RequiresStaff = true,
+                AcceptedPolicyId = "E10001",
                 TicketTiers = new List<CreateTicketTierRequest> { new CreateTicketTierRequest { TierName = "A", Price = 10m } }
             };
             Assert.ThrowsAsync<ConflictException>(async () => await _eventService.CreateEventAsync(10001, request));
+        }
+
+        [Test]
+        public async Task Test_GetPopularRegionsAsync_Success()
+        {
+            var mockRegions = new List<Region>
+            {
+                new Region { Region_Id = "REG01", Region_Name = "Chennai", No_Of_Staffs = 10 },
+                new Region { Region_Id = "REG02", Region_Name = "Coimbatore", No_Of_Staffs = 5 }
+            };
+
+            _eventRepositoryMock.Setup(r => r.GetPopularRegionsAsync(4))
+                .ReturnsAsync(mockRegions);
+
+            var result = await _eventService.GetPopularRegionsAsync(4);
+
+            Assert.That(result, Is.Not.Null);
+            var list = result.ToList();
+            Assert.That(list.Count, Is.EqualTo(2));
+            Assert.That(list[0].Region_Id, Is.EqualTo("REG01"));
+            Assert.That(list[0].Region_Name, Is.EqualTo("Chennai"));
+            Assert.That(list[0].No_Of_Staffs, Is.EqualTo(10));
+            Assert.That(list[1].Region_Id, Is.EqualTo("REG02"));
+            Assert.That(list[1].Region_Name, Is.EqualTo("Coimbatore"));
+            Assert.That(list[1].No_Of_Staffs, Is.EqualTo(5));
+        }
+
+        [Test]
+        public async Task Test_GetTrendingEventsAsync_Success()
+        {
+            var mockEvents = new List<Event.Models.Event>
+            {
+                new Event.Models.Event
+                {
+                    Event_Id = 10001,
+                    Title = "Trending Tech Event",
+                    Event_Type = "Hybrid",
+                    Status = "Live",
+                    Date_Time = DateTime.UtcNow.AddDays(2),
+                    Duration_Hours = 3,
+                    Organizer = new User { User_Id = 10001, Name = "KeerthiKeswaran" },
+                    Venue = new Venue { Name = "Grand Auditorium", Address = "123 Main St", Region = new Region { Region_Name = "Chennai" } },
+                    TicketTiers = new List<EventTicketTier> { new EventTicketTier { Tier_Name = "VIP", Price = 100m, Tickets_Sold = 5 } },
+                    Reports = new List<EventReport> { new EventReport { Report_Id = 1, Reporter_Id = 10002, ReportUrl = "/assets/events/10001/reports/10002_report.json", Created_At = DateTime.UtcNow } }
+                }
+            };
+
+            _eventRepositoryMock.Setup(r => r.GetTrendingEventsAsync(5))
+                .ReturnsAsync(mockEvents);
+
+            var result = await _eventService.GetTrendingEventsAsync(5);
+
+            Assert.That(result, Is.Not.Null);
+            var list = result.ToList();
+            Assert.That(list.Count, Is.EqualTo(1));
+            Assert.That(list[0].Event_Id, Is.EqualTo(10001));
+            Assert.That(list[0].Title, Is.EqualTo("Trending Tech Event"));
+            Assert.That(list[0].Organizer_Name, Is.EqualTo("KeerthiKeswaran"));
+            Assert.That(list[0].Venue_Name, Is.EqualTo("Grand Auditorium"));
+            Assert.That(list[0].TicketTiers[0].Tier_Name, Is.EqualTo("VIP"));
+            Assert.That(list[0].Reports, Is.Empty);
+        }
+
+        [Test]
+        public void Test_GetEventTicketTierCapacitiesAsync_EventNotFound_ThrowsNotFoundException()
+        {
+            _eventRepositoryMock.Setup(r => r.GetEventDetailsAsync(999))
+                .ReturnsAsync((Event.Models.Event?)null);
+
+            Assert.ThrowsAsync<NotFoundException>(async () => await _eventService.GetEventTicketTierCapacitiesAsync(999));
+        }
+
+        [Test]
+        public async Task Test_GetEventTicketTierCapacitiesAsync_PhysicalEvent_Success()
+        {
+            var mockEvent = new Event.Models.Event
+            {
+                Event_Id = 10001,
+                Event_Type = "Physical",
+                Venue = new Venue
+                {
+                    SeatCapacities = new List<VenueSeatCapacity>
+                    {
+                        new VenueSeatCapacity { Tier_Name = "VIP", Total_Seats = 100 },
+                        new VenueSeatCapacity { Tier_Name = "General", Total_Seats = 200 }
+                    }
+                },
+                TicketTiers = new List<EventTicketTier>
+                {
+                    new EventTicketTier { Tier_Name = "VIP", Price = 100m, Tickets_Sold = 10 },
+                    new EventTicketTier { Tier_Name = "General", Price = 50m, Tickets_Sold = 50 },
+                    new EventTicketTier { Tier_Name = "UnknownTier", Price = 20m, Tickets_Sold = 5 }
+                }
+            };
+
+            _eventRepositoryMock.Setup(r => r.GetEventDetailsAsync(10001))
+                .ReturnsAsync(mockEvent);
+
+            var result = await _eventService.GetEventTicketTierCapacitiesAsync(10001);
+
+            Assert.That(result, Is.Not.Null);
+            var list = result.ToList();
+            Assert.That(list.Count, Is.EqualTo(3));
+
+            var vip = list.First(x => x.Tier_Name == "VIP");
+            Assert.That(vip.Total_Seats, Is.EqualTo(100));
+            Assert.That(vip.Available_Seats, Is.EqualTo(90));
+            Assert.That(vip.Tickets_Sold, Is.EqualTo(10));
+
+            var general = list.First(x => x.Tier_Name == "General");
+            Assert.That(general.Total_Seats, Is.EqualTo(200));
+            Assert.That(general.Available_Seats, Is.EqualTo(150));
+            Assert.That(general.Tickets_Sold, Is.EqualTo(50));
+
+            var unknown = list.First(x => x.Tier_Name == "UnknownTier");
+            Assert.That(unknown.Total_Seats, Is.EqualTo(0));
+            Assert.That(unknown.Available_Seats, Is.EqualTo(0));
+            Assert.That(unknown.Tickets_Sold, Is.EqualTo(5));
+        }
+
+        [Test]
+        public async Task Test_GetEventTicketTierCapacitiesAsync_VirtualEvent_Success()
+        {
+            var mockEvent = new Event.Models.Event
+            {
+                Event_Id = 10001,
+                Event_Type = "Virtual",
+                Venue = null,
+                TicketTiers = new List<EventTicketTier>
+                {
+                    new EventTicketTier { Tier_Name = "Online", Price = 10m, Tickets_Sold = 120 }
+                }
+            };
+
+            _eventRepositoryMock.Setup(r => r.GetEventDetailsAsync(10001))
+                .ReturnsAsync(mockEvent);
+
+            var result = await _eventService.GetEventTicketTierCapacitiesAsync(10001);
+
+            Assert.That(result, Is.Not.Null);
+            var list = result.ToList();
+            Assert.That(list.Count, Is.EqualTo(1));
+
+            var online = list[0];
+            Assert.That(online.Tier_Name, Is.EqualTo("Online"));
+            Assert.That(online.Total_Seats, Is.EqualTo(-1));
+            Assert.That(online.Available_Seats, Is.EqualTo(-1));
+            Assert.That(online.Tickets_Sold, Is.EqualTo(120));
+        }
+
+        #endregion
+
+        #region ReleaseCompletedEventsAsync and ProcessDismissedPayoutsAsync Tests
+
+        [Test]
+        public async Task Test_ReleaseCompletedEventsAsync_Success()
+        {
+            var eventId = 10050;
+            var staffId = 888;
+            var attendeeEmail = "attendee@test.com";
+
+            var mockEvent = new Event.Models.Event
+            {
+                Event_Id = eventId,
+                Title = "Completed Masterclass",
+                Status = "Live",
+                Event_Type = "Virtual",
+                Date_Time = DateTime.UtcNow.AddHours(-3),
+                Duration_Hours = 2,
+                Organizer_Id = 900,
+                Virtual_Url = "https://zoom.us/test",
+                Virtual_Password_Hash = "hash123",
+                StaffAllocations = new List<EventStaffAllocation>
+                {
+                    new EventStaffAllocation { Employee_ID = staffId }
+                }
+            };
+
+            var mockStaff = new Staff { Employee_ID = staffId, IsAllocated = true };
+
+            var mockBooking = new Booking
+            {
+                Booking_Id = 777,
+                Event_Id = eventId,
+                Booking_Status = "Confirmed",
+                Attendee = new User { Email = attendeeEmail },
+                Payments = new List<BookingPayment>
+                {
+                    new BookingPayment { Payment_Status = "Success", Amount = 1000m, Platform_Fee_Cut = 50m }
+                }
+            };
+
+            _eventRepositoryMock.Setup(r => r.GetLiveEventsWithDetailsAsync())
+                .ReturnsAsync(new List<Event.Models.Event> { mockEvent });
+            _staffRepositoryMock.Setup(r => r.GetByIdAsync(staffId))
+                .ReturnsAsync(mockStaff);
+            _bookingRepositoryMock.Setup(r => r.GetBookingsByEventIdAsync(eventId))
+                .ReturnsAsync(new List<Booking> { mockBooking });
+            _eventRepositoryMock.Setup(r => r.GetAllReportsAsync())
+                .ReturnsAsync(new List<EventReport>()); // no reports
+
+            Mock.Get(_emailService).Setup(m => m.BuildEmailHtmlAsync(It.IsAny<EmailTemplateDto>()))
+                .ReturnsAsync("Mock Feedback Email HTML Content");
+
+            await _eventService.ReleaseCompletedEventsAsync();
+
+            Assert.That(mockEvent.Status, Is.EqualTo("Completed"));
+            Assert.That(mockEvent.Virtual_Url, Is.EqualTo("Disabled"));
+            Assert.That(mockEvent.Virtual_Password_Hash, Is.Null);
+            Assert.That(mockStaff.IsAllocated, Is.False);
+            Assert.That(mockBooking.Virtual_Url, Is.EqualTo("Disabled"));
+
+            _eventRepositoryMock.Verify(r => r.UpdateAsync(mockEvent), Times.Once);
+            _staffRepositoryMock.Verify(r => r.UpdateAsync(mockStaff), Times.Once);
+            _bookingRepositoryMock.Verify(r => r.UpdateAsync(mockBooking), Times.Once);
+            _transactionRepositoryMock.Verify(r => r.AddAsync(It.Is<Transaction>(t => t.Status == "Success" && t.Amount == 950m)), Times.Once);
+            _payoutRepositoryMock.Verify(r => r.AddAsync(It.Is<OrganizerPayout>(p => p.Payout_Status == "Success" && p.Payout_Amount == 950m)), Times.Once);
+        }
+
+        [Test]
+        public async Task Test_ProcessDismissedPayoutsAsync_Success()
+        {
+            var eventId = 10060;
+            var mockEvent = new Event.Models.Event
+            {
+                Event_Id = eventId,
+                Status = "Completed"
+            };
+
+            var mockPayout = new OrganizerPayout
+            {
+                Event_Id = eventId,
+                Payout_Status = "Cancelled",
+                Payout_Amount = 800m
+            };
+
+            var mockReport = new EventReport
+            {
+                Event_Id = eventId,
+                ResponseAction = "Dismissed"
+            };
+
+            var mockTransaction = new Transaction
+            {
+                Transaction_Type = "OrganizerPayout",
+                Related_Id = eventId,
+                Status = "Cancelled"
+            };
+
+            _eventRepositoryMock.Setup(r => r.GetAllAsync())
+                .ReturnsAsync(new List<Event.Models.Event> { mockEvent });
+            _payoutRepositoryMock.Setup(r => r.GetPayoutByEventIdAsync(eventId))
+                .ReturnsAsync(mockPayout);
+            _eventRepositoryMock.Setup(r => r.GetAllReportsAsync())
+                .ReturnsAsync(new List<EventReport> { mockReport });
+            _transactionRepositoryMock.Setup(r => r.GetAllAsync())
+                .ReturnsAsync(new List<Transaction> { mockTransaction });
+
+            await _eventService.ProcessDismissedPayoutsAsync();
+
+            Assert.That(mockPayout.Payout_Status, Is.EqualTo("Success"));
+            Assert.That(mockTransaction.Status, Is.EqualTo("Success"));
+
+            _payoutRepositoryMock.Verify(r => r.UpdateAsync(mockPayout), Times.Once);
+            _transactionRepositoryMock.Verify(r => r.UpdateAsync(mockTransaction), Times.Once);
         }
 
         #endregion

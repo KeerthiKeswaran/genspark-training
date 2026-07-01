@@ -4,11 +4,12 @@ import { Router } from '@angular/router';
 import { Subscription, interval } from 'rxjs';
 import { AppStoreService } from '../../../store/app-store.service';
 import { BrowsedEventResponse } from '../../../models/event.model';
+import { ResolveDescriptionPipe } from '../../../pipes/resolve-description.pipe';
 
 @Component({
   selector: 'app-hero-carousel',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ResolveDescriptionPipe],
   templateUrl: './hero-carousel.html',
   styleUrl: './hero-carousel.css'
 })
@@ -87,11 +88,14 @@ export class HeroCarouselComponent implements OnInit, OnDestroy {
     this.router.navigate(['/bookings']);
   }
 
-  public navigateToBookingFlow(eventId: number): void {
+  public navigateToBookingFlow(eventObj: any): void {
     if (!this.isLoggedIn()) {
       this.router.navigate(['/login']);
       return;
     }
-    this.router.navigate(['/booking'], { queryParams: { eventId } });
+    this.router.navigate(['/booking'], { 
+      queryParams: { eventId: eventObj.event_Id },
+      state: { event: eventObj }
+    });
   }
 }

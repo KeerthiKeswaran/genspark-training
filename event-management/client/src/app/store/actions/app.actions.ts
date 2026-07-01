@@ -15,9 +15,18 @@ export enum ActionTypes {
   LOAD_TRENDING_START = '[Events] Load Trending Start',
   LOAD_TRENDING_SUCCESS = '[Events] Load Trending Success',
   LOAD_TRENDING_FAIL = '[Events] Load Trending Fail',
+
+  LOAD_RECOMMENDED_START = '[Events] Load Recommended Start',
+  LOAD_RECOMMENDED_SUCCESS = '[Events] Load Recommended Success',
+  LOAD_RECOMMENDED_FAIL = '[Events] Load Recommended Fail',
   
   LOAD_REGIONS_START = '[Regions] Load Regions Start',
   LOAD_REGIONS_SUCCESS = '[Regions] Load Regions Success',
   LOAD_REGIONS_FAIL = '[Regions] Load Regions Fail',
   SET_REGION = '[Regions] Set Region',
+
+  LOAD_POPULAR_REGIONS_START = '[Regions] Load Popular Regions Start',
+  LOAD_POPULAR_REGIONS_SUCCESS = '[Regions] Load Popular Regions Success',
+  LOAD_POPULAR_REGIONS_FAIL = '[Regions] Load Popular Regions Fail',
 }
+

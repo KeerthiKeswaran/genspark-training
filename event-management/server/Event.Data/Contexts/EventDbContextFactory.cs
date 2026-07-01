@@ -10,7 +10,7 @@ namespace Event.Data.Contexts
     {
         public EventDbContext CreateDbContext(string[] args)
         {
-            var baseDirectory = Directory.GetCurrentDirectory();
+            var baseDirectory = Directory.GetCurrentDirectory().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             var apiPath = baseDirectory;
 
             if (baseDirectory.EndsWith("Event.Data"))

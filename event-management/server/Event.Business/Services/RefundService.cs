@@ -347,7 +347,7 @@ namespace Event.Business.Services
 
         #region CalculateAttendeeRefund
 
-        private (decimal RefundAmount, string Remarks) CalculateAttendeeRefund(DateTime eventDateTime, decimal originalAmount, string refundType, decimal alreadyRefunded)
+        public (decimal RefundAmount, string Remarks) CalculateAttendeeRefund(DateTime eventDateTime, decimal originalAmount, string refundType, decimal alreadyRefunded)
         {
             if (string.Equals(refundType, "Full", StringComparison.OrdinalIgnoreCase))
             {

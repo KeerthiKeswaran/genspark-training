@@ -4,9 +4,8 @@ namespace Event.Models.DTOs
 {
     public class PolicyResponse
     {
-        public int TermsId { get; set; }
+        public string TermsId { get; set; } = string.Empty;
         public string Version { get; set; } = string.Empty;
-        public string Type { get; set; } = string.Empty;
-        public string Content { get; set; } = string.Empty;
+        public string FilePath { get; set; } = string.Empty;
     }
 }

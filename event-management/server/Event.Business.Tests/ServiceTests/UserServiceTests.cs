@@ -8,6 +8,7 @@ using NUnit.Framework;
 using Event.Models;
 using Event.Models.DTOs;
 using Event.Contracts.IRepositories;
+using Event.Contracts.IServices;
 using Event.Business.Services;
 using Event.Business.Exceptions;
 
@@ -19,6 +20,10 @@ namespace Event.Business.Tests.ServiceTests
         private Mock<IHttpContextAccessor> _httpContextAccessorMock = null!;
         private Mock<IUserRepository> _userRepositoryMock = null!;
         private Mock<IEventRepository> _eventRepositoryMock = null!;
+        private Mock<ICacheService> _cacheServiceMock = null!;
+        private Mock<IAdminRepository> _adminRepositoryMock = null!;
+        private OtpService _otpService = null!;
+        private IEmailService _emailService = null!;
         private UserService _userService = null!;
 
         private const string Service = "UserService";
@@ -32,7 +37,24 @@ namespace Event.Business.Tests.ServiceTests
             _httpContextAccessorMock = new Mock<IHttpContextAccessor>();
             _userRepositoryMock = new Mock<IUserRepository>();
             _eventRepositoryMock = new Mock<IEventRepository>();
-            _userService = new UserService(_httpContextAccessorMock.Object, _userRepositoryMock.Object, _eventRepositoryMock.Object);
+            _cacheServiceMock = new Mock<ICacheService>();
+            _adminRepositoryMock = new Mock<IAdminRepository>();
+            _emailService = CreateMockEmailService();
+
+            _otpService = new OtpService(
+                _emailService,
+                _userRepositoryMock.Object,
+                _adminRepositoryMock.Object,
+                _cacheServiceMock.Object
+            );
+
+            _userService = new UserService(
+                _httpContextAccessorMock.Object, 
+                _userRepositoryMock.Object, 
+                _eventRepositoryMock.Object,
+                _otpService,
+                _emailService
+            );
         }
         #endregion
 
@@ -245,6 +267,153 @@ namespace Event.Business.Tests.ServiceTests
             catch (Exception ex)
             {
                 LogTestDetail(Service, "GetMyEventDetailsAsync", "Retrieve my event full details", 101, null, false, ex.Message);
+                throw;
+            }
+        }
+        #endregion
+
+        #region CloseAccountAsync Tests
+        [Test]
+        public async Task Test_CloseAccountAsync_Success()
+        {
+            int userId = 1;
+            var mockUser = new User
+            {
+                User_Id = userId,
+                Name = "KeerthiKeswaran",
+                Email = "keshwarankeerthi@gmail.com",
+                Status = "Active"
+            };
+
+            var request = new CloseAccountRequest
+            {
+                Reason = "No longer needed",
+                Explanation = "Closing my account",
+                ConfirmName = "KeerthiKeswaran",
+                Otp = "123456"
+            };
+
+            _userRepositoryMock.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(mockUser);
+            _cacheServiceMock.Setup(c => c.GetAsync<string>("otp:close-account:keshwarankeerthi@gmail.com")).ReturnsAsync("123456");
+            _userRepositoryMock.Setup(r => r.UpdateAsync(mockUser)).Returns(Task.CompletedTask);
+
+            try
+            {
+                var result = await _userService.CloseAccountAsync(userId, request);
+                Assert.That(result, Is.True);
+                Assert.That(mockUser.Status, Is.EqualTo("Deactivated"));
+                LogTestDetail(Service, "CloseAccountAsync", "Deactivate account successfully", userId, result, true);
+            }
+            catch (Exception ex)
+            {
+                LogTestDetail(Service, "CloseAccountAsync", "Deactivate account successfully", userId, null, false, ex.Message);
+                throw;
+            }
+        }
+
+        [Test]
+        public void Test_CloseAccountAsync_UserNotFound_ThrowsNotFoundException()
+        {
+            int userId = 999;
+            var request = new CloseAccountRequest { Otp = "123456", ConfirmName = "Keerthi" };
+            _userRepositoryMock.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync((User?)null);
+
+            try
+            {
+                Assert.ThrowsAsync<NotFoundException>(async () =>
+                    await _userService.CloseAccountAsync(userId, request)
+                );
+                LogTestDetail(Service, "CloseAccountAsync", "User not found throws NotFoundException", userId, "NotFoundException", true);
+            }
+            catch (Exception ex)
+            {
+                LogTestDetail(Service, "CloseAccountAsync", "User not found throws NotFoundException", userId, null, false, ex.Message);
+                throw;
+            }
+        }
+
+        [Test]
+        public void Test_CloseAccountAsync_AlreadyDeactivated_ThrowsValidationException()
+        {
+            int userId = 1;
+            var mockUser = new User
+            {
+                User_Id = userId,
+                Name = "KeerthiKeswaran",
+                Email = "keshwarankeerthi@gmail.com",
+                Status = "Deactivated"
+            };
+            var request = new CloseAccountRequest { Otp = "123456", ConfirmName = "KeerthiKeswaran" };
+            _userRepositoryMock.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(mockUser);
+
+            try
+            {
+                Assert.ThrowsAsync<ValidationException>(async () =>
+                    await _userService.CloseAccountAsync(userId, request)
+                );
+                LogTestDetail(Service, "CloseAccountAsync", "Already deactivated throws ValidationException", userId, "ValidationException", true);
+            }
+            catch (Exception ex)
+            {
+                LogTestDetail(Service, "CloseAccountAsync", "Already deactivated throws ValidationException", userId, null, false, ex.Message);
+                throw;
+            }
+        }
+
+        [Test]
+        public void Test_CloseAccountAsync_InvalidOtp_ThrowsUnauthorizedException()
+        {
+            int userId = 1;
+            var mockUser = new User
+            {
+                User_Id = userId,
+                Name = "KeerthiKeswaran",
+                Email = "keshwarankeerthi@gmail.com",
+                Status = "Active"
+            };
+            var request = new CloseAccountRequest { Otp = "999999", ConfirmName = "KeerthiKeswaran" };
+            _userRepositoryMock.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(mockUser);
+            _cacheServiceMock.Setup(c => c.GetAsync<string>("otp:close-account:keshwarankeerthi@gmail.com")).ReturnsAsync("123456");
+
+            try
+            {
+                Assert.ThrowsAsync<UnauthorizedException>(async () =>
+                    await _userService.CloseAccountAsync(userId, request)
+                );
+                LogTestDetail(Service, "CloseAccountAsync", "Invalid OTP throws UnauthorizedException", userId, "UnauthorizedException", true);
+            }
+            catch (Exception ex)
+            {
+                LogTestDetail(Service, "CloseAccountAsync", "Invalid OTP throws UnauthorizedException", userId, null, false, ex.Message);
+                throw;
+            }
+        }
+
+        [Test]
+        public void Test_CloseAccountAsync_MismatchedName_ThrowsValidationException()
+        {
+            int userId = 1;
+            var mockUser = new User
+            {
+                User_Id = userId,
+                Name = "KeerthiKeswaran",
+                Email = "keshwarankeerthi@gmail.com",
+                Status = "Active"
+            };
+            var request = new CloseAccountRequest { Otp = "123456", ConfirmName = "WrongName" };
+            _userRepositoryMock.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(mockUser);
+            _cacheServiceMock.Setup(c => c.GetAsync<string>("otp:close-account:keshwarankeerthi@gmail.com")).ReturnsAsync("123456");
+
+            try
+            {
+                Assert.ThrowsAsync<ValidationException>(async () =>
+                    await _userService.CloseAccountAsync(userId, request)
+                );
+                LogTestDetail(Service, "CloseAccountAsync", "Mismatched name throws ValidationException", userId, "ValidationException", true);
+            }
+            catch (Exception ex)
+            {
+                LogTestDetail(Service, "CloseAccountAsync", "Mismatched name throws ValidationException", userId, null, false, ex.Message);
                 throw;
             }
         }

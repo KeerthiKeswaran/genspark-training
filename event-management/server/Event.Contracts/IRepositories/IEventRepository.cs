@@ -19,5 +19,8 @@ namespace Event.Contracts.IRepositories
         Task<System.Collections.Generic.IEnumerable<Event.Models.Event>> GetLiveEventsWithDetailsAsync();
         Task<System.Collections.Generic.IEnumerable<Event.Models.Event>> GetEventsByOrganizerAsync(int organizerId);
         Task<PagedResult<Event.Models.Event>> GetEventsPagedAsync(string? keyword, string? eventType, string? status, DateTime? startDate, DateTime? endDate, string? sortBy, int page, int size);
+        Task<System.Collections.Generic.IEnumerable<Region>> GetPopularRegionsAsync(int? limit);
+        Task<System.Collections.Generic.IEnumerable<Event.Models.Event>> GetTrendingEventsAsync(int? limit);
+        Task<System.Collections.Generic.IEnumerable<Event.Models.Event>> GetPopularEventsInCommonAsync(int regionsLimit);
     }
 }

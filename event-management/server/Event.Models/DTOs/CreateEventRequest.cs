@@ -23,6 +23,13 @@ namespace Event.Models.DTOs
         public string Title { get; set; } = string.Empty;
 
         [Required]
+        public string Category { get; set; } = string.Empty; // E.g., "Music", "Conference", "Tech", "Sports"
+
+        [Required]
+        [RegularExpression("^(ALL|KID|ADL)$", ErrorMessage = "Age Category must be one of: ALL (All Ages), KID (Kids), ADL (Adults).")]
+        public string AgeCategory { get; set; } = string.Empty; // Must be "ALL" (All Ages), "KID" (Kids), or "ADL" (Adults)
+
+        [Required]
         public string DescriptionUrl { get; set; } = string.Empty;
 
         public string? ImageUrl { get; set; }
@@ -37,7 +44,7 @@ namespace Event.Models.DTOs
 
         public int? VenueId { get; set; }
 
-        public bool HasAcceptedPolicy { get; set; }
+        public string AcceptedPolicyId { get; set; } = string.Empty;
 
         [Required]
         public List<CreateTicketTierRequest> TicketTiers { get; set; } = new List<CreateTicketTierRequest>();

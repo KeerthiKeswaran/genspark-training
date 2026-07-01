@@ -25,11 +25,13 @@ export interface BookingModel {
   event_Venue?: string;
   event_Region?: string;
   booking_Status: 'Pending' | 'Confirmed' | 'Cancelled';
-  qr_Code_Data?: string;  // base64 QR code
+  qr_Code_Path?: string;
   checkIn_Status: 'Pending' | 'CheckedIn' | 'Missed';
   created_At: string;
   virtual_Url?: string;
+  event_Status?: string;
   total_Amount: number;
+  amount_Paid?: number;
   details: BookingDetail[];
 }
 
@@ -48,4 +50,37 @@ export interface BookingStep {
   label: string;
   completed: boolean;
   active: boolean;
+}
+
+export interface InitiateBookingResponse {
+  booking_Id: number;
+  attendee_Id: number;
+  event_Id: number;
+  event_Title: string;
+  event_Type: string;
+  event_Date_Time: string;
+  total_Price: number;
+  fixed_Fee_Rate: number;
+  commission_Percentage: number;
+}
+
+export interface ConfirmBookingResponse {
+  booking_Id: number;
+  attendee_Id: number;
+  event_Id: number;
+  event_Title: string;
+  event_Type: string;
+  event_Date_Time: string;
+  qr_Code_Path: string;
+  virtual_Url: string;
+  event_Image_Url?: string;
+  total_Amount: number;
+  details: { tier_Name: string; quantity: number; price?: number }[];
+}
+
+export interface ActiveVirtualLinkResponse {
+  booking_Id: number;
+  event_Id: number;
+  virtual_Url: string;
+  link_Status: string;
 }

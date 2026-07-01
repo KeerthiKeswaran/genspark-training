@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Event.Contracts.IServices;
 using Event.Models.DTOs;
+using Event.Business.Exceptions;
 
 namespace Event.API.Controllers
 {
@@ -14,11 +15,13 @@ namespace Event.API.Controllers
     {
         private readonly IBookingService _bookingService;
         private readonly IUserService _userService;
+        private readonly IRefundService _refundService;
 
-        public BookingController(IBookingService bookingService, IUserService userService)
+        public BookingController(IBookingService bookingService, IUserService userService, IRefundService refundService)
         {
             _bookingService = bookingService;
             _userService = userService;
+            _refundService = refundService;
         }
 
         [HttpPost]
@@ -64,6 +67,22 @@ namespace Event.API.Controllers
             }
         }
 
+        [HttpPost("{bookingId}/create-checkout-session")]
+        public async Task<IActionResult> CreateCheckoutSession(int bookingId, [FromBody] CreateCheckoutSessionRequest request)
+        {
+            var result = await _bookingService.CreateCheckoutSessionForBookingAsync(bookingId, request.SuccessUrl, request.CancelUrl);
+            if (!result.Success)
+            {
+                return BadRequest(new { Message = result.ErrorMessage });
+            }
+
+            return Ok(new
+            {
+                SessionId = result.SessionId,
+                SessionUrl = result.SessionUrl
+            });
+        }
+
         [HttpPost("{bookingId}/cancel")]
         public async Task<IActionResult> CancelBooking(int bookingId)
         {
@@ -84,6 +103,48 @@ namespace Event.API.Controllers
                     return BadRequest(new { Message = "Booking revert failed." });
 
                 return Ok(new { Message = "Booking reverted successfully." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpGet("{bookingId}/refund-estimate")]
+        public async Task<IActionResult> GetRefundEstimate(int bookingId)
+        {
+            try
+            {
+                var (eventDateTime, originalAmount) = await _bookingService.GetBookingRefundDetailsAsync(bookingId);
+                var (estimatedRefund, _) = _refundService.CalculateAttendeeRefund(eventDateTime, originalAmount, "Dynamic", 0m);
+                return Ok(new { EstimatedRefund = estimatedRefund });
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (ValidationException ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpGet("active-links")]
+        public async Task<IActionResult> GetActiveVirtualLinks()
+        {
+            try
+            {
+                int attendeeId = _userService.GetCurrentUserId();
+                var links = await _bookingService.GetActiveVirtualLinksAsync(attendeeId);
+                return Ok(links);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { Message = ex.Message });
             }
             catch (Exception ex)
             {

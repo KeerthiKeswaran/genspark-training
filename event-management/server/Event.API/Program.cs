@@ -102,6 +102,7 @@ builder.Services.AddScoped<IQrCodeService, QrCodeService>();
 builder.Services.AddScoped<IVirtualMeetingService, VirtualMeetingService>();
 builder.Services.AddScoped<IPolicyService, PolicyService>();
 builder.Services.AddHostedService<Event.Business.Services.BackgroundService>();
+builder.Services.AddHostedService<Event.Business.Services.PayoutBackgroundService>();
 
 var app = builder.Build();
 
@@ -113,7 +114,11 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseStaticFiles();
 
 // Serve the assets folder containing user QR codes under /assets route
-var assetsPath = Path.Combine(Directory.GetCurrentDirectory(), "assets");
+var currentDir = Directory.GetCurrentDirectory().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+string assetsPath = currentDir.EndsWith("Event.API") 
+    ? Path.GetFullPath(Path.Combine(currentDir, "..", "Event.Business", "assets")) 
+    : Path.GetFullPath(Path.Combine(currentDir, "Event.Business", "assets"));
+
 if (!Directory.Exists(assetsPath))
 {
     Directory.CreateDirectory(assetsPath);
@@ -138,4 +143,20 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
+// Database seeding is only triggered explicitly via:
+//   dotnet run --project Event.API seed
+// It does NOT run during normal startup.
+if (args != null && System.Array.IndexOf(args, "seed") >= 0)
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var context = scope.ServiceProvider.GetRequiredService<EventDbContext>();
+        System.Console.WriteLine("Executing database seeding...");
+        await Event.Data.Seed.DbSeed.SeedAsync(context);
+        System.Console.WriteLine("Database seeding completed successfully.");
+    }
+    return; // Exit after seeding — do not start the web server
+}
+
 app.Run();
+

@@ -28,13 +28,13 @@
       @if (localEvents().length > 0) {
         <div class="events-grid">
           @for (ev of localEvents(); track ev.event_Id) {
-            <div class="event-card" (click)="navigateToBookingFlow(ev.event_Id)" style="cursor: pointer;">
+            <div class="event-card" (click)="navigateToBookingFlow(ev)" style="cursor: pointer;">
               <div class="card-image-wrapper">
-                <img [src]="ev.imageUrl || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=500&auto=format&fit=crop&q=80'" [alt]="ev.title" class="card-img">
-                <div class="card-badge">{{ ev.eventType }}</div>
+                <img [src]="ev.image_Url || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=500&auto=format&fit=crop&q=80'" [alt]="ev.title" class="card-img">
+                <div class="card-badge">{{ ev.event_Type }}</div>
               </div>
               <div class="card-body">
-                <div class="card-date">{{ ev.dateTime | date:'MMM d, y • h:mm a' }}</div>
+                <div class="card-date">{{ ev.date_Time | date:'MMM d, y • h:mm a' }}</div>
                 <h3 class="card-title">{{ ev.title }}</h3>
                 <p class="card-venue">
                   <svg class="icon inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -78,13 +78,13 @@
       @if (otherRegionEvents().length > 0) {
         <div class="events-grid">
           @for (ev of otherRegionEvents(); track ev.event_Id) {
-            <div class="event-card" (click)="navigateToBookingFlow(ev.event_Id)" style="cursor: pointer;">
+            <div class="event-card" (click)="navigateToBookingFlow(ev)" style="cursor: pointer;">
               <div class="card-image-wrapper">
-                <img [src]="ev.imageUrl || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=500&auto=format&fit=crop&q=80'" [alt]="ev.title" class="card-img">
-                <div class="card-badge other-region-badge" style="background-color: var(--color-neutral-dark, #121212); color: #ffffff;">{{ ev.region_Name }}</div>
+                <img [src]="ev.image_Url || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=500&auto=format&fit=crop&q=80'" [alt]="ev.title" class="card-img">
+                <div class="card-badge other-region-badge" style="background-color: var(--color-neutral-dark, #121212); color: #ffffff;">{{ ev.venue_Region_Name }}</div>
               </div>
               <div class="card-body">
-                <div class="card-date">{{ ev.dateTime | date:'MMM d, y • h:mm a' }}</div>
+                <div class="card-date">{{ ev.date_Time | date:'MMM d, y • h:mm a' }}</div>
                 <h3 class="card-title">{{ ev.title }}</h3>
                 <p class="card-venue">
                   <svg class="icon inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

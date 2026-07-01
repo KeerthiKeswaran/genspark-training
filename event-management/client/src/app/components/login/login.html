@@ -97,7 +97,7 @@
         </button>
 
         <div class="form-footer-action">
-          <p>First time? <a routerLink="/register" class="accent-link">Create an account</a></p>
+          <p>First time? <a [routerLink]="['/register']" [queryParams]="{ returnUrl: returnUrl }" class="accent-link">Create an account</a></p>
         </div>
 
 

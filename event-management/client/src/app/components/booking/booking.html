@@ -1,9 +1,120 @@
 <app-navbar></app-navbar>
 
+<!-- ==================== PROFESSIONAL EVENT REVIEW MODAL ==================== -->
+@if (showReviewModal()) {
+  <div class="review-modal-backdrop">
+    <div class="review-modal-container">
+      <div class="review-modal-header">
+        <h3>Review Your Booking Details</h3>
+      </div>
+      <div class="review-modal-body">
+        <div class="review-modal-section">
+          <h4>Event Details</h4>
+          <table class="review-modal-table">
+            <tr>
+              <td class="lbl">Event Title:</td>
+              <td class="val">{{ event()?.title }}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Date & Time:</td>
+              <td class="val">{{ event() ? formatDate(event()!.date_Time) : '' }} at {{ event() ? formatTime(event()!.date_Time) : '' }}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Format:</td>
+              <td class="val">{{ event()?.event_Type }}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Location:</td>
+              <td class="val">
+                @if (event()?.event_Type === 'Virtual') {
+                  Online Platform
+                } @else {
+                  {{ event()?.venue_Name }}
+                  @if (event()?.address || event()?.venue_Region_Name) {
+                    <br><span style="font-size: 13px; color: var(--text-muted); display: block; margin-top: 4px;">{{ event()?.address }}{{ event()?.address && event()?.venue_Region_Name ? ', ' : '' }}{{ event()?.venue_Region_Name }}</span>
+                  }
+                }
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="review-modal-section">
+          <h4>Ticket Selection</h4>
+          <table class="review-modal-table grid">
+            <thead>
+              <tr>
+                <th>Tier</th>
+                <th>Quantity</th>
+                <th>Price</th>
+                <th>Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (tier of tiers(); track tier.tierName) {
+                @if (tier.quantity > 0) {
+                  <tr>
+                    <td>{{ tier.tierName }}</td>
+                    <td>{{ tier.quantity }}</td>
+                    <td>{{ formatCurrency(tier.price) }}</td>
+                    <td>{{ formatCurrency(tier.price * tier.quantity) }}</td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="review-modal-section">
+          <h4>Payment Summary</h4>
+          <table class="review-modal-table">
+            <tr style="border-top: 2px solid #e1e7f0; font-weight: 600; font-size: 1.1rem; color: #1e293b;">
+              <td class="lbl" style="padding-top: 12px;">Total Amount:</td>
+              <td class="val" style="padding-top: 12px;">{{ formatCurrency(subtotalAmount()) }}</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      <div class="review-modal-footer">
+        <button class="review-btn-secondary" (click)="onCancelReview()">Cancel</button>
+        <button class="review-btn-primary" (click)="onConfirmReview()" [disabled]="isInitiatingBooking()">
+          @if (isInitiatingBooking()) {
+            <span class="btn-spinner"></span> Confirming Booking...
+          } @else {
+            Confirm
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
 <div class="booking-page">
 
   <!-- ────────────── SELECTION & COMPACT LAYOUT ────────────── -->
-  @if (event()) {
+  @if (isLoading() || !event()) {
+    <div class="booking-skeleton-container">
+      <div class="skeleton-two-col">
+        <div class="skeleton-left">
+          <div class="skeleton-banner-pulse"></div>
+          <div class="skeleton-headline-pulse"></div>
+          <div class="skeleton-meta-row-pulse">
+            <div class="skeleton-meta-capsule"></div>
+            <div class="skeleton-meta-capsule"></div>
+            <div class="skeleton-meta-capsule"></div>
+          </div>
+          <div class="skeleton-text-block">
+            <div class="skeleton-text-line short"></div>
+            <div class="skeleton-text-line"></div>
+            <div class="skeleton-text-line"></div>
+          </div>
+        </div>
+        <div class="skeleton-right">
+          <div class="skeleton-panel-pulse"></div>
+        </div>
+      </div>
+    </div>
+  } @else {
     
     <div class="booking-two-col-layout">
       
@@ -12,12 +123,12 @@
         
         <!-- Large Banner Image -->
         <div class="event-banner-wrap">
-          @if (event()!.imageUrl) {
-            <img [src]="event()!.imageUrl" [alt]="event()!.title" class="event-banner-img">
+          @if (event()!.image_Url) {
+            <img [src]="event()!.image_Url" [alt]="event()!.title" class="event-banner-img">
             <div class="event-banner-overlay"></div>
           }
-          <div class="event-type-badge" [class]="'badge-' + event()!.eventType.toLowerCase()">
-            {{ event()!.eventType }}
+          <div class="event-type-badge" [class]="'badge-' + event()!.event_Type.toLowerCase()">
+            {{ event()!.event_Type }}
           </div>
         </div>
 
@@ -28,11 +139,11 @@
           <div class="event-metadata-row">
             <div class="meta-capsule">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              <span>{{ formatDate(event()!.dateTime) }}</span>
+              <span>{{ formatDate(event()!.date_Time) }}</span>
             </div>
             <div class="meta-capsule">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              <span>{{ formatTime(event()!.dateTime) }} &nbsp;·&nbsp; {{ event()!.durationHours }}h</span>
+              <span>{{ formatTime(event()!.date_Time) }} &nbsp;·&nbsp; {{ event()!.duration_Hours }}h</span>
             </div>
             <div class="meta-capsule">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
@@ -51,8 +162,8 @@
         <div class="info-section">
           <h3 class="section-title-bar">About this Event</h3>
           <div class="info-content-text">
-            @if (event()!.descriptionUrl) {
-              <p class="event-dynamic-description">{{ event()!.descriptionUrl }}</p>
+            @if (event()!.description_Url) {
+              <p class="event-dynamic-description">{{ event()!.description_Url | resolveDescription | async }}</p>
             }
             <p>Welcome to <strong>{{ event()!.title }}</strong>! This event is designed to bring you the best-in-class performance, panel discussions, and collaborative networking opportunities. Guided by professional coordinators and domain leaders, we guarantee a secure, insightful, and premium experience.</p>
             <p>Attendees will gain access to exclusive presentation decks, interactive Q&A sessions, live demonstrations, and follow-up resources. We look forward to hosting you!</p>
@@ -64,7 +175,7 @@
           <h3 class="section-title-bar">Location & Venue</h3>
           <p class="venue-address-text">
             <strong>{{ event()!.venue_Name || 'Main Conference Center' }}</strong><br>
-            {{ event()!.region_Name || 'Chennai Region' }} Venue District, India.
+            {{ event()!.venue_Region_Name || 'Chennai Region' }} Venue District, India.
           </p>
           
           <!-- Interactive-looking map placeholder -->
@@ -106,20 +217,20 @@
             <h3 class="section-title-bar">You Might Also Like</h3>
             <div class="related-events-list">
               @for (rel of relatedEvents(); track rel.event_Id) {
-                <div class="related-event-card" (click)="navigateToRelatedEvent(rel.event_Id)">
-                  @if (rel.imageUrl) {
-                    <img [src]="rel.imageUrl" [alt]="rel.title" class="related-card-img">
+                <div class="related-event-card" (click)="navigateToRelatedEvent(rel)">
+                  @if (rel.image_Url) {
+                    <img [src]="rel.image_Url" [alt]="rel.title" class="related-card-img">
                   }
                   <div class="related-card-body">
-                    <span class="related-badge badge-theme-type">{{ rel.eventType }}</span>
+                    <span class="related-badge badge-theme-type">{{ rel.event_Type }}</span>
                     <h4 class="related-event-title">{{ rel.title }}</h4>
                     <p class="related-event-meta">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                      <span>{{ formatDate(rel.dateTime) }}</span>
+                      <span>{{ formatDate(rel.date_Time) }}</span>
                     </p>
                     <p class="related-event-meta">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                      <span>{{ rel.venue_Name }}, {{ rel.region_Name }}</span>
+                      <span>{{ rel.venue_Name }}, {{ rel.venue_Region_Name }}</span>
                     </p>
                   </div>
                 </div>
@@ -147,18 +258,15 @@
                     <span class="tier-item-seats">{{ tier.availableSeats }} left</span>
                   </div>
                   
-                  <div class="sidebar-qty-selector">
-                    <button class="qty-control-btn" (click)="decreaseQty(tier.tierName)" [disabled]="tier.quantity === 0">−</button>
-                    <span class="qty-control-value">{{ tier.quantity }}</span>
-                    <button class="qty-control-btn" (click)="increaseQty(tier.tierName)" [disabled]="tier.quantity >= tier.availableSeats || tier.quantity >= 10">+</button>
+                  <div class="tier-right-col">
+                    <span class="tier-item-subtotal-right" [style.visibility]="tier.quantity > 0 ? 'visible' : 'hidden'">Subtotal: <strong>{{ formatCurrency(tier.price * tier.quantity) }}</strong></span>
+                    <div class="sidebar-qty-selector">
+                      <button class="qty-control-btn" (click)="decreaseQty(tier.tierName)" [disabled]="tier.quantity === 0">−</button>
+                      <span class="qty-control-value">{{ tier.quantity }}</span>
+                      <button class="qty-control-btn" (click)="increaseQty(tier.tierName)" [disabled]="tier.quantity >= tier.availableSeats || tier.quantity >= 10">+</button>
+                    </div>
                   </div>
                 </div>
-                
-                @if (tier.quantity > 0) {
-                  <div class="tier-item-subtotal">
-                    Subtotal: <span>{{ formatCurrency(tier.price * tier.quantity) }}</span>
-                  </div>
-                }
               </div>
             }
           </div>

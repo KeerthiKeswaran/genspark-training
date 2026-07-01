@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { NavbarComponent } from '../../home/navbar/navbar';
 import { FooterComponent } from '../../home/footer/footer';
@@ -14,7 +14,7 @@ import { SupportTicket } from '../help';
 @Component({
   selector: 'app-raise-ticket',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, NavbarComponent, FooterComponent],
+  imports: [CommonModule, FormsModule, NavbarComponent, FooterComponent],
   templateUrl: './raise-ticket.html',
   styleUrl: './raise-ticket.css'
 })
@@ -94,40 +94,55 @@ export class RaiseTicketComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const generatedId = `TKT-${Math.floor(Math.random() * 90000) + 10000}`;
-    
-    const newTicket: SupportTicket = {
-      ticketId: generatedId,
-      bookingId: this.ticketBookingId || 'General',
-      category: this.ticketCategory,
+    const relatedIdVal = this.ticketBookingId && this.ticketBookingId !== 'General' 
+      ? Number(this.ticketBookingId) 
+      : undefined;
+
+    const payload = {
       subject: this.ticketSubject.trim(),
-      details: this.ticketDetails.trim(),
-      status: 'Open',
-      createdAt: new Date().toLocaleString('en-IN')
+      message: this.ticketDetails.trim(),
+      requestType: this.ticketCategory.toLowerCase() || 'general',
+      relatedId: relatedIdVal
     };
 
-    // Load existing tickets from LocalStorage
-    let raisedTickets: SupportTicket[] = [];
-    const storedTickets = localStorage.getItem('raisedSupportTickets');
-    if (storedTickets) {
-      try {
-        raisedTickets = JSON.parse(storedTickets);
-      } catch {
-        raisedTickets = [];
+    this.bookingService.submitSupportTicket(payload).subscribe({
+      next: (res) => {
+        // Save in LocalStorage too
+        const newTicket: SupportTicket = {
+          ticketId: String(res?.ticket_Id || res?.Ticket_Id || `TKT-${Math.floor(Math.random() * 90000) + 10000}`),
+          bookingId: this.ticketBookingId || 'General',
+          category: this.ticketCategory,
+          subject: this.ticketSubject.trim(),
+          details: this.ticketDetails.trim(),
+          status: 'Open',
+          createdAt: new Date().toLocaleString('en-IN')
+        };
+
+        let raisedTickets: SupportTicket[] = [];
+        const storedTickets = localStorage.getItem('raisedSupportTickets');
+        if (storedTickets) {
+          try {
+            raisedTickets = JSON.parse(storedTickets);
+          } catch {
+            raisedTickets = [];
+          }
+        }
+
+        raisedTickets = [newTicket, ...raisedTickets];
+        localStorage.setItem('raisedSupportTickets', JSON.stringify(raisedTickets));
+
+        // Show tick animation
+        this.successTicketId.set(newTicket.ticketId);
+        this.isSuccessAnimating.set(true);
+
+        this.redirectTimer = setTimeout(() => {
+          this.backToSupport();
+        }, 5000);
+      },
+      error: (err) => {
+        this.ticketErrorMessage.set(err?.error?.message || 'Failed to submit support ticket.');
       }
-    }
-
-    raisedTickets = [newTicket, ...raisedTickets];
-    localStorage.setItem('raisedSupportTickets', JSON.stringify(raisedTickets));
-
-    // Show tick animation
-    this.successTicketId.set(generatedId);
-    this.isSuccessAnimating.set(true);
-
-    // Auto redirect after 5 seconds
-    this.redirectTimer = setTimeout(() => {
-      this.backToSupport();
-    }, 5000);
+    });
   }
 
   public backToSupport(): void {

@@ -9,10 +9,14 @@ import { mockAllEvents } from '../../data/event.mock';
 import { NavbarComponent } from '../home/navbar/navbar';
 import { FooterComponent } from '../home/footer/footer';
 
+import { ResolveDescriptionPipe } from '../../pipes/resolve-description.pipe';
+import { EventService } from '../../services/event.service';
+import { BookingService } from '../../services/booking.service';
+
 @Component({
   selector: 'app-booking',
   standalone: true,
-  imports: [CommonModule, FormsModule, NavbarComponent, FooterComponent],
+  imports: [CommonModule, FormsModule, NavbarComponent, FooterComponent, ResolveDescriptionPipe],
   templateUrl: './booking.html',
   styleUrl: './booking.css'
 })
@@ -21,11 +25,17 @@ export class BookingComponent implements OnInit, OnDestroy {
   public tiers = signal<TicketTierSelection[]>([]);
   public relatedEvents = signal<BrowsedEventResponse[]>([]);
 
+  public isLoading = signal(false);
+
   private subscriptions = new Subscription();
 
   public subtotalAmount = computed(() =>
     this.tiers().reduce((sum, t) => sum + t.price * t.quantity, 0)
   );
+
+  public gstAmount = computed(() => this.subtotalAmount() * 0.18);
+
+  public totalAmount = computed(() => this.subtotalAmount() + this.gstAmount());
 
   public totalTickets = computed(() =>
     this.tiers().reduce((sum, t) => sum + t.quantity, 0)
@@ -33,7 +43,9 @@ export class BookingComponent implements OnInit, OnDestroy {
 
   constructor(
     private route: ActivatedRoute,
-    private router: Router
+    private router: Router,
+    private eventService: EventService,
+    private bookingService: BookingService
   ) {}
 
   ngOnInit(): void {
@@ -45,61 +57,90 @@ export class BookingComponent implements OnInit, OnDestroy {
           return;
         }
 
-        // Load event from mock data
-        const found = mockAllEvents.find(e => e.event_Id === eventId);
-        if (!found) {
-          this.router.navigate(['/browse']);
+        this.isLoading.set(true);
+
+        // 1. Try loading from history navigation state (all existing data from clicked card)
+        const stateEvent = history.state?.event as BrowsedEventResponse;
+        if (stateEvent && Number(stateEvent.event_Id) === eventId) {
+          this.initializeEvent(stateEvent);
+          this.isLoading.set(false);
           return;
         }
-        this.event.set(found);
 
-        // Build tier selection list with mock seat data
-        const mockTierData: TicketTierSelection[] = this.buildMockTiers(found);
-        this.tiers.set(mockTierData);
+        // 2. Try loading from local mock events list
+        const found = mockAllEvents.find(e => e.event_Id === eventId);
+        if (found) {
+          this.initializeEvent(found);
+          this.isLoading.set(false);
+          return;
+        }
 
-        // Load related events (matching type/region but excluding current event)
-        const related = mockAllEvents
-          .filter(e => e.event_Id !== found.event_Id && (e.eventType === found.eventType || e.region_Id === found.region_Id))
-          .slice(0, 3);
-        this.relatedEvents.set(related);
+        // 3. Fall back to loading from the backend API directly using EventService
+        this.eventService.getEventById(eventId).subscribe({
+          next: (ev) => {
+            this.isLoading.set(false);
+            if (ev) {
+              this.initializeEvent(ev);
+            } else {
+              this.router.navigate(['/browse']);
+            }
+          },
+          error: () => {
+            this.isLoading.set(false);
+            this.router.navigate(['/browse']);
+          }
+        });
       })
     );
   }
 
-  private buildMockTiers(event: BrowsedEventResponse): TicketTierSelection[] {
-    const baseTiers: TicketTierSelection[] = [];
+  private initializeEvent(found: BrowsedEventResponse): void {
+    this.event.set(found);
 
-    if (event.minPrice !== undefined) {
-      baseTiers.push({
-        tierName: 'General',
-        price: event.minPrice,
-        quantity: 0,
-        totalSeats: 200,
-        availableSeats: 142
-      });
+    // Build tier selection list from the event's actual ticketTiers
+    const tierData: TicketTierSelection[] = (found.ticketTiers ?? []).map(t => ({
+      tierName: t.tier_Name,
+      price: t.price,
+      quantity: 0,
+      totalSeats: 200,
+      availableSeats: Math.max(0, 200 - t.tickets_Sold)
+    }));
+    this.tiers.set(tierData);
 
-      if (event.eventType !== 'Virtual') {
-        baseTiers.push({
-          tierName: 'VIP',
-          price: event.minPrice * 2.5,
-          quantity: 0,
-          totalSeats: 50,
-          availableSeats: 18
-        });
-
-        if (event.eventType === 'Hybrid' || event.eventType === 'Physical') {
-          baseTiers.push({
-            tierName: 'Backstage',
-            price: event.minPrice * 5,
-            quantity: 0,
-            totalSeats: 10,
-            availableSeats: 4
+    // Load related events (matching similar categories via browseEvents API)
+    const category = found.category || 'General';
+    this.eventService.browseEvents({ category, page: 1, size: 24 }).subscribe({
+      next: (result) => {
+        let list = (result.items || []).filter(e => e.event_Id !== found.event_Id);
+        
+        // Ensure at least 2 events by combining with all events if same-category count is too low
+        if (list.length < 2) {
+          this.eventService.browseEvents({ page: 1, size: 24 }).subscribe({
+            next: (allResult) => {
+              const extra = (allResult.items || []).filter(
+                e => e.event_Id !== found.event_Id && !list.some(l => l.event_Id === e.event_Id)
+              );
+              list = [...list, ...extra].slice(0, 4);
+              this.relatedEvents.set(list);
+            },
+            error: () => {
+              this.relatedEvents.set(this.getMockRelatedEvents(found));
+            }
           });
+        } else {
+          this.relatedEvents.set(list.slice(0, 4));
         }
+      },
+      error: () => {
+        this.relatedEvents.set(this.getMockRelatedEvents(found));
       }
-    }
+    });
+  }
 
-    return baseTiers;
+  private getMockRelatedEvents(found: BrowsedEventResponse): BrowsedEventResponse[] {
+    return mockAllEvents
+      .filter(e => e.event_Id !== found.event_Id && (e.event_Type === found.event_Type || e.region_Id === found.region_Id))
+      .slice(0, 4);
   }
 
   public increaseQty(tierName: string): void {
@@ -123,9 +164,19 @@ export class BookingComponent implements OnInit, OnDestroy {
     return Math.round(((tier.totalSeats - tier.availableSeats) / tier.totalSeats) * 100);
   }
 
+  public showReviewModal = signal(false);
+  public isInitiatingBooking = signal(false);
+
   public proceedToCheckout(): void {
     if (this.totalTickets() === 0) return;
+    this.showReviewModal.set(true);
+  }
 
+  public onCancelReview(): void {
+    this.showReviewModal.set(false);
+  }
+
+  public onConfirmReview(): void {
     const tierQuantities: Record<string, number> = {};
     this.tiers().filter(t => t.quantity > 0).forEach(t => {
       tierQuantities[t.tierName] = t.quantity;
@@ -134,16 +185,41 @@ export class BookingComponent implements OnInit, OnDestroy {
     const event = this.event();
     const eventId = event ? event.event_Id : 0;
 
-    this.router.navigate(['/checkout'], {
-      queryParams: {
-        eventId,
-        quantities: JSON.stringify(tierQuantities)
-      }
-    });
+    this.isInitiatingBooking.set(true);
+
+    this.subscriptions.add(
+      this.bookingService.initiateBooking({
+        eventId: eventId,
+        tierQuantities: tierQuantities
+      }).subscribe({
+        next: (res) => {
+          const pendingBookingId = res.booking_Id;
+          const successUrl = `http://localhost:4200/checkout?eventId=${eventId}&session_id={CHECKOUT_SESSION_ID}&bookingId=${pendingBookingId}`;
+          const cancelUrl = `http://localhost:4200/booking?eventId=${eventId}`;
+
+          this.bookingService.createCheckoutSession(pendingBookingId, successUrl, cancelUrl).subscribe({
+            next: (stripeRes) => {
+              window.location.href = stripeRes.sessionUrl;
+            },
+            error: (err) => {
+              this.isInitiatingBooking.set(false);
+              console.error('Failed to create checkout session', err);
+            }
+          });
+        },
+        error: (err) => {
+          this.isInitiatingBooking.set(false);
+          console.error('Failed to initiate booking', err);
+        }
+      })
+    );
   }
 
-  public navigateToRelatedEvent(eventId: number): void {
-    this.router.navigate(['/booking'], { queryParams: { eventId } });
+  public navigateToRelatedEvent(eventObj: any): void {
+    this.router.navigate(['/booking'], { 
+      queryParams: { eventId: eventObj.event_Id },
+      state: { event: eventObj }
+    });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -164,7 +240,12 @@ export class BookingComponent implements OnInit, OnDestroy {
   }
 
   public onContactOrg(): void {
-    alert('Contact functionality will be operational post organizers verification.');
+    const orgEmail = this.event()?.organizer_Email;
+    if (orgEmail) {
+      window.open(`https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=${orgEmail}`, '_blank');
+    } else {
+      alert('Contact functionality will be operational post organizers verification.');
+    }
   }
 
   ngOnDestroy(): void {

@@ -20,7 +20,7 @@ namespace Event.Models
         public string Password_Hash { get; set; } = string.Empty;
         
         [Required]
-        public int Consented_Terms_Id { get; set; }
+        public string Consented_Terms_Id { get; set; } = string.Empty;
         
         public bool Has_Marketing_Consent { get; set; }
         

@@ -91,7 +91,9 @@ namespace Event.Business.Tests.ServiceTests
                 _bookingPaymentRepositoryMock.Object,
                 _emailService,
                 _userRepositoryMock.Object,
-                refundService
+                refundService,
+                new Mock<ITermsAndConditionsRepository>().Object,
+                new Mock<IOrganizerPayoutRepository>().Object
             );
 
             _adminService = new AdminService(
@@ -117,7 +119,7 @@ namespace Event.Business.Tests.ServiceTests
         {
             // Arrange: mock aggregated data from all repositories
             _userRepositoryMock.Setup(r => r.GetAllAsync())
-                .ReturnsAsync(new List<User> { new User(), new User() });
+                .ReturnsAsync(new List<User> { new User { User_Id = 10001 }, new User { User_Id = 10001 } });
 
             _eventRepositoryMock.Setup(r => r.GetAllAsync())
                 .ReturnsAsync(new List<Event.Models.Event>
@@ -183,7 +185,7 @@ namespace Event.Business.Tests.ServiceTests
                         new VenueSeatCapacity { Tier_Name = "Elite", Total_Seats = 50 }
                     }
                 },
-                Organizer        = new User { Name = TestName, Email = TestEmail },
+                Organizer        = new User { User_Id = 10001, Name = TestName, Email = TestEmail },
                 StaffAllocations = new List<EventStaffAllocation>()
             };
 
@@ -396,8 +398,8 @@ namespace Event.Business.Tests.ServiceTests
                     Report_Id  = 10001,
                     Event_Id   = 10100,
                     Reporter_Id = 10001,
-                    Reporter   = new User { Name = TestName, Email = TestEmail },
-                    Reason     = "Misleading information",
+                    Reporter   = new User { User_Id = 10001, Name = TestName, Email = TestEmail },
+                    ReportUrl  = "/assets/events/10100/reports/10001_report.json",
                     Created_At = DateTime.UtcNow
                 },
                 new EventReport
@@ -405,8 +407,8 @@ namespace Event.Business.Tests.ServiceTests
                     Report_Id  = 10002,
                     Event_Id   = 10100,
                     Reporter_Id = 10002,
-                    Reporter   = new User { Name = TestName, Email = TestEmail },
-                    Reason     = "Spam",
+                    Reporter   = new User { User_Id = 10001, Name = TestName, Email = TestEmail },
+                    ReportUrl  = "/assets/events/10100/reports/10002_report.json",
                     Created_At = DateTime.UtcNow
                 }
             };

@@ -1,8 +1,7 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
-import { BookingModel, InitiateBookingRequest, ConfirmBookingRequest } from '../models/booking.model';
-import { mockBookings } from '../data/booking.mock';
+import { BookingModel, InitiateBookingRequest, ConfirmBookingRequest, InitiateBookingResponse, ConfirmBookingResponse, ActiveVirtualLinkResponse } from '../models/booking.model';
 
 @Injectable({
   providedIn: 'root'
@@ -16,65 +15,54 @@ export class BookingService {
    * API: GET /api/booking?status=<status>
    */
   getMyBookings(status?: string): Observable<BookingModel[]> {
-    // === MOCK DATA (remove when API is ready) ===
-    let filtered = [...mockBookings];
+    let params = new HttpParams();
     if (status) {
-      filtered = filtered.filter(b => b.booking_Status === status);
+      params = params.set('status', status);
     }
-    return of(filtered);
-    // ============================================
-    // const params: any = {};
-    // if (status) params['status'] = status;
-    // return this.http.get<BookingModel[]>(this.baseUrl, { params });
+    return this.http.get<BookingModel[]>(this.baseUrl, { params });
   }
 
   /**
    * Initiate a new booking for an event.
    * API: POST /api/booking
    */
-  initiateBooking(request: InitiateBookingRequest): Observable<{ booking_Id: number }> {
-    // === MOCK RESPONSE (remove when API is ready) ===
-    return of({ booking_Id: Math.floor(Math.random() * 90000) + 10000 });
-    // ================================================
-    // return this.http.post<{ booking_Id: number }>(this.baseUrl, request);
+  initiateBooking(request: InitiateBookingRequest): Observable<InitiateBookingResponse> {
+    return this.http.post<InitiateBookingResponse>(this.baseUrl, request);
   }
 
   /**
    * Confirm a booking after payment.
    * API: POST /api/booking/{bookingId}/confirm
    */
-  confirmBooking(bookingId: number, request: ConfirmBookingRequest): Observable<BookingModel> {
-    // === MOCK RESPONSE (remove when API is ready) ===
-    const mock: BookingModel = {
-      booking_Id: bookingId,
-      attendee_Id: 10000,
-      event_Id: 0,
-      event_Title: 'Mock Event',
-      event_Type: 'Physical',
-      event_Date_Time: new Date().toISOString(),
-      booking_Status: 'Confirmed',
-      qr_Code_Data: `BOOKING-${bookingId}-CONFIRMED-${Date.now()}`,
-      checkIn_Status: 'Pending',
-      created_At: new Date().toISOString(),
-      total_Amount: 0,
-      details: []
-    };
-    return of(mock);
-    // ================================================
-    // return this.http.post<BookingModel>(`${this.baseUrl}/${bookingId}/confirm`, request);
+  confirmBooking(bookingId: number, request: ConfirmBookingRequest): Observable<ConfirmBookingResponse> {
+    return this.http.post<ConfirmBookingResponse>(`${this.baseUrl}/${bookingId}/confirm`, request);
+  }
+
+  /**
+   * Create a Stripe Checkout session.
+   * API: POST /api/booking/{bookingId}/create-checkout-session
+   */
+  createCheckoutSession(bookingId: number, successUrl: string, cancelUrl: string): Observable<{ sessionId: string, sessionUrl: string }> {
+    return this.http.post<{ sessionId: string, sessionUrl: string }>(`${this.baseUrl}/${bookingId}/create-checkout-session`, { successUrl, cancelUrl });
+  }
+
+  /**
+   * Get set of virtual urls for which the event has been started.
+   * API: GET /api/booking/active-links
+   */
+  getActiveVirtualLinks(): Observable<ActiveVirtualLinkResponse[]> {
+    return this.http.get<ActiveVirtualLinkResponse[]>(`${this.baseUrl}/active-links`);
   }
 
   /**
    * Calculate booking and ticket fees.
-   * API: POST /api/booking/calculate-fee
+   * API: POST /api/booking/calculate-fee (calculated locally)
    */
   calculateTicketFee(eventId: number, tierQuantities: Record<string, number>): Observable<{ fee: number }> {
-    // === MOCK DATA (remove when API is ready) ===
     let count = 0;
     Object.values(tierQuantities).forEach(q => count += q);
-    return of({ fee: count * 45 }); // Mock handling fee of ₹45 per ticket
-    // ============================================
-    // return this.http.post<{ fee: number }>(`${this.baseUrl}/calculate-fee`, { eventId, tierQuantities });
+    // Platform fee calculation: ₹45 handling fee per ticket
+    return of({ fee: count * 45 });
   }
 
   /**
@@ -82,10 +70,7 @@ export class BookingService {
    * API: POST /api/booking/{bookingId}/cancel
    */
   cancelBooking(bookingId: number): Observable<void> {
-    // === MOCK RESPONSE (remove when API is ready) ===
-    return of(undefined);
-    // ================================================
-    // return this.http.post<void>(`${this.baseUrl}/${bookingId}/cancel`, {});
+    return this.http.post<void>(`${this.baseUrl}/${bookingId}/cancel`, {});
   }
 
   /**
@@ -93,9 +78,22 @@ export class BookingService {
    * API: POST /api/booking/{bookingId}/revert
    */
   revertBooking(bookingId: number): Observable<void> {
-    // === MOCK RESPONSE (remove when API is ready) ===
-    return of(undefined);
-    // ================================================
-    // return this.http.post<void>(`${this.baseUrl}/${bookingId}/revert`, {});
+    return this.http.post<void>(`${this.baseUrl}/${bookingId}/revert`, {});
+  }
+
+  /**
+   * Submit feedback for an event.
+   * API: POST /api/event/{eventId}/feedback
+   */
+  submitEventFeedback(eventId: number, feedback: { rating: number; review: string }): Observable<any> {
+    return this.http.post<any>(`http://localhost:5106/api/event/${eventId}/feedback`, feedback);
+  }
+
+  /**
+   * Submit support ticket.
+   * API: POST /api/support/tickets
+   */
+  submitSupportTicket(payload: { subject: string; message: string; requestType: string; relatedId?: number }): Observable<any> {
+    return this.http.post<any>(`http://localhost:5106/api/support/tickets`, payload);
   }
 }

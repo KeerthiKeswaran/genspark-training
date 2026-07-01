@@ -184,7 +184,7 @@ namespace Event.Business.Services
             }
 
             // 3. Edit the local JSON file containing Subject, Message, and Response
-            string rootPath = Directory.GetCurrentDirectory();
+            string rootPath = Directory.GetCurrentDirectory().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             string folderName = "Event.Business";
             if (AppDomain.CurrentDomain.FriendlyName.Contains("Tests") || 
                 AppDomain.CurrentDomain.BaseDirectory.Contains("Tests") ||
@@ -195,11 +195,11 @@ namespace Event.Business.Services
 
             if (rootPath.Contains("bin"))
             {
-                rootPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", ".."));
+                rootPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             }
             else if (rootPath.EndsWith("Event.API") || rootPath.EndsWith("Event.Business.Tests") || rootPath.EndsWith("Event.Business"))
             {
-                rootPath = Path.GetFullPath(Path.Combine(rootPath, ".."));
+                rootPath = Path.GetFullPath(Path.Combine(rootPath, "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             }
 
             string relativeConcern = ticket.ConcernUrl.TrimStart('/');
@@ -335,7 +335,7 @@ namespace Event.Business.Services
                         reportId = r.Report_Id,
                         reporterId = r.Reporter_Id,
                         reporterName = r.Reporter?.Name ?? "Unknown",
-                        reason = r.Reason,
+                        reason = GetReasonFromReportUrl(r.ReportUrl),
                         responseAction = r.ResponseAction,
                         createdAt = r.Created_At
                     });
@@ -349,6 +349,55 @@ namespace Event.Business.Services
             }
             
             return grouped;
+        }
+
+        private static string GetReasonFromReportUrl(string reportUrl)
+        {
+            if (string.IsNullOrEmpty(reportUrl)) return string.Empty;
+
+            try
+            {
+                string rootPath = Directory.GetCurrentDirectory().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                string folderName = "Event.Business";
+                if (AppDomain.CurrentDomain.FriendlyName.Contains("Tests") || 
+                    AppDomain.CurrentDomain.BaseDirectory.Contains("Tests") ||
+                    Directory.GetCurrentDirectory().Contains("Tests"))
+                {
+                    folderName = "Event.Business.Tests";
+                }
+
+                if (rootPath.Contains("bin"))
+                {
+                    rootPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                }
+                else if (rootPath.EndsWith("Event.API") || rootPath.EndsWith("Event.Business.Tests") || rootPath.EndsWith("Event.Business"))
+                {
+                    rootPath = Path.GetFullPath(Path.Combine(rootPath, "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                }
+
+                string relativePath = reportUrl.TrimStart('/');
+                if (relativePath.StartsWith("assets/"))
+                {
+                    relativePath = relativePath.Substring("assets/".Length);
+                }
+                string filePath = Path.Combine(rootPath, folderName, "assets", relativePath);
+
+                if (File.Exists(filePath))
+                {
+                    string jsonContent = File.ReadAllText(filePath);
+                    var data = JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<string, string>>(jsonContent);
+                    if (data != null && data.ContainsKey("Reason"))
+                    {
+                        return data["Reason"];
+                    }
+                }
+            }
+            catch
+            {
+                // Fallback
+            }
+
+            return "Details in JSON file";
         }
 
         #endregion
@@ -381,8 +430,40 @@ namespace Event.Business.Services
             if (ev == null)
                 throw new NotFoundException($"Event associated with report {reportId} not found.");
 
-            // 2. Update organizer status based on organizerAction status
+            // 2. Cancel the event and trigger email to the organizer
+            if (ev.Status != "Cancelled")
+            {
+                ev.Status = "Cancelled";
+                await _eventRepository.UpdateAsync(ev);
+            }
+
             var organizer = await _userRepository.GetByIdAsync(ev.Organizer_Id);
+
+            try
+            {
+                var eventCancelEmailDto = new EmailTemplateDto
+                {
+                    TemplateName = "EventCancellationTemplate.html",
+                    Placeholders = new Dictionary<string, string>
+                    {
+                        { "eventName", ev.Title },
+                        { "refundStatusMessage", "A refund will be processed shortly if applicable." },
+                        { "year", DateTime.UtcNow.Year.ToString() }
+                    }
+                };
+
+                string htmlCancelBody = await _emailService.BuildEmailHtmlAsync(eventCancelEmailDto);
+                await NotificationHelper.SendAndSaveNotificationAsync(
+                    _notificationRepository,
+                    _emailService,
+                    organizer?.Email ?? ev.Organizer?.Email ?? string.Empty,
+                    $"Event Cancelled: {ev.Title}",
+                    htmlCancelBody
+                );
+            }
+            catch (Exception) { }
+
+            // 3. Update organizer status based on organizerAction status
             if (organizer != null)
             {
                 if (string.Equals(organizerAction, "Restrict", StringComparison.OrdinalIgnoreCase))
@@ -398,55 +479,7 @@ namespace Event.Business.Services
                 // If "No Action", do not change status.
             }
 
-            // 3. Create ticket concern file
-            string filename = $"escalation_report_{reportId}.json";
-            string rootPath = Directory.GetCurrentDirectory();
-            string folderName = "Event.Business";
-            if (AppDomain.CurrentDomain.FriendlyName.Contains("Tests") || 
-                AppDomain.CurrentDomain.BaseDirectory.Contains("Tests") ||
-                Directory.GetCurrentDirectory().Contains("Tests"))
-            {
-                folderName = "Event.Business.Tests";
-            }
-
-            if (rootPath.Contains("bin"))
-            {
-                rootPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", ".."));
-            }
-            else if (rootPath.EndsWith("Event.API") || rootPath.EndsWith("Event.Business.Tests") || rootPath.EndsWith("Event.Business"))
-            {
-                rootPath = Path.GetFullPath(Path.Combine(rootPath, ".."));
-            }
-
-            string absoluteDir = Path.Combine(rootPath, folderName, "assets", "esclation");
-            if (!Directory.Exists(absoluteDir))
-            {
-                Directory.CreateDirectory(absoluteDir);
-            }
-
-            string absolutePath = Path.Combine(absoluteDir, filename);
-            var ticketData = new System.Collections.Generic.Dictionary<string, string>
-            {
-                { "Subject", "Escalated Policy Violation: Event Flagged" },
-                { "Message", $"This ticket was automatically escalated because Event #{ev.Event_Id} ('{ev.Title}') was flagged and upheld. Action: {actionReason}." },
-                { "Response", $"Organizer Action: {organizerAction}." }
-            };
-
-            var jsonText = JsonSerializer.Serialize(ticketData, new JsonSerializerOptions { WriteIndented = true });
-            await File.WriteAllTextAsync(absolutePath, jsonText);
-
-            // 4. Save SupportTicket record in database
-            var ticket = new SupportTicket
-            {
-                User_Id = ev.Organizer_Id,
-                ConcernUrl = $"/assets/esclation/{filename}",
-                RequestType = "REF",
-                Status = "Open",
-                EsclationStatus = "Escalated"
-            };
-            await _supportTicketRepository.AddAsync(ticket);
-
-            // 5. Save AdminAction in database
+            // 4. Save AdminAction in database
             var action = new AdminAction
             {
                 AdminId = adminId,
@@ -454,14 +487,14 @@ namespace Event.Business.Services
                 TargetType = "ORG",
                 TargetId = ev.Organizer_Id,
                 ReferenceId = ev.Event_Id,
-                TicketId = ticket.Ticket_Id,
+                TicketId = null,
                 ActionStatus = "Pending",
                 Remarks = $"Event #{ev.Event_Id} flagged and report upheld. Escalated for refund.",
                 CreatedAt = DateTime.UtcNow
             };
             await _adminActionRepository.AddAsync(action);
 
-            // 6. Update report state to Upholds
+            // 5. Update report state to Upholds
             report.ResponseAction = "Upholds";
             await _eventRepository.UpdateReportAsync(report);
 
@@ -491,7 +524,9 @@ namespace Event.Business.Services
         {
             var venues = await _venueRepository.GetAllWithDetailsAsync();
 
-            return venues.Select(v => new VenueResponse
+            return venues
+                .Where(v => v.Is_Available)
+                .Select(v => new VenueResponse
             {
                 Venue_Id     = v.Venue_Id,
                 Region_Id    = v.Region_Id,

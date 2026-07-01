@@ -20,8 +20,8 @@
           </span>
           <input 
             type="text" 
-            [(ngModel)]="filterKeyword" 
-            name="filterKeyword" 
+            [(ngModel)]="navSearchKeyword" 
+            name="navSearchKeyword" 
             placeholder="Search events, seminars, concerts..." 
             class="search-input"
           />
@@ -143,11 +143,9 @@
               class="form-control select-control"
             >
               <option value="">All Categories</option>
-              <option value="music">Music & Concerts</option>
-              <option value="technology">Technology & AI</option>
-              <option value="food">Food & Festivals</option>
-              <option value="business">Business & Summits</option>
-              <option value="art">Art & Exhibitions</option>
+              @for (cat of categories(); track cat) {
+                <option [value]="cat">{{ cat }}</option>
+              }
             </select>
           </div>
 
@@ -215,8 +213,8 @@
     <section class="results-pane">
       <div class="results-header">
         <h2>Browse <span class="highlight-red">Events</span></h2>
-        <span class="results-count">{{ totalEvents() }} events found</span>
       </div>
+      <p class="results-count">{{ totalEvents() }} events found</p>
 
       <!-- Active Filters Chips List -->
       @if (filterKeyword || filterCategory || filterFormat || filterMaxPrice || filterRegionIds.length > 0) {
@@ -274,13 +272,13 @@
           <div class="results-grid">
             @for (ev of events(); track ev.event_Id) {
               <!-- Clickable Event Card -->
-              <div class="event-card" (click)="navigateToBookingFlow(ev.event_Id)" style="cursor: pointer;">
+              <div class="event-card" (click)="navigateToBookingFlow(ev)" style="cursor: pointer;">
                 <div class="card-image-wrapper">
-                  <img [src]="ev.imageUrl || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=500&auto=format&fit=crop&q=80'" [alt]="ev.title" class="card-img">
-                  <div class="card-badge">{{ ev.eventType }}</div>
+                  <img [src]="ev.image_Url || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=500&auto=format&fit=crop&q=80'" [alt]="ev.title" class="card-img">
+                  <div class="card-badge">{{ ev.event_Type }}</div>
                 </div>
                 <div class="card-body">
-                  <div class="card-date">{{ ev.dateTime | date:'MMM d, y • h:mm a' }}</div>
+                  <div class="card-date">{{ ev.date_Time | date:'MMM d, y • h:mm a' }}</div>
                   <h3 class="card-title">{{ ev.title }}</h3>
                   <p class="card-venue">
                     <svg class="icon inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -289,7 +287,7 @@
                     </svg>
                     {{ ev.venue_Name || 'Main Exhibition Grounds' }}
                   </p>
-                  <div class="card-desc">{{ ev.descriptionUrl }}</div>
+                  <div class="card-desc">{{ ev.description_Url | resolveDescription | async }}</div>
                   <div class="card-footer">
                     <span class="card-price"><span class="price-prefix">From</span> ₹{{ ev.minPrice ? ev.minPrice.toFixed(2) : '0.00' }}</span>
                   </div>

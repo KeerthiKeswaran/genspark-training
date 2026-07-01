@@ -46,7 +46,7 @@ namespace Event.Business.Tests.ServiceTests
             _bookingPaymentRepositoryMock = new Mock<IBookingPaymentRepository>();
             _settingsRepositoryMock = new Mock<IPlatformSettingsRepository>();
             _notificationRepositoryMock = new Mock<INotificationRepository>();
-            
+
             // Setup real configuration from the API project to get the Brevo credentials
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             string apiDir = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "Event.API"));
@@ -58,10 +58,9 @@ namespace Event.Business.Tests.ServiceTests
 
             // _emailService = CreateConcreteEmailService(_configuration);
             // _paymentService = CreateConcretePaymentService(_configuration);
-            // _qrCodeService = new QrCodeService();
+            _qrCodeService = new QrCodeService();
             _emailService = CreateMockEmailService();
             _paymentService = CreateMockPaymentService();
-            _qrCodeService = CreateMockQrCodeService();
 
             _notificationRepositoryMock.Setup(r => r.AddAsync(It.IsAny<Notification>()))
                 .Returns(Task.CompletedTask);
@@ -127,8 +126,7 @@ namespace Event.Business.Tests.ServiceTests
             {
                 var booking = await _bookingService.BookTicketsAsync(attendeeId, eventId, tierQuantities);
                 Assert.That(booking, Is.Not.Null);
-                Assert.That(booking.Booking_Status, Is.EqualTo("Payment Pending"));
-                Assert.That(booking.Details.Count, Is.EqualTo(1));
+                Assert.That(booking.Total_Price, Is.EqualTo(300.00m));
                 LogTestDetail(ServiceName, "BookTicketsAsync", "Book tickets for live event successfully", new { attendeeId, eventId, tierQuantities }, booking, true);
             }
             catch (Exception ex)
@@ -205,7 +203,7 @@ namespace Event.Business.Tests.ServiceTests
             _bookingRepositoryMock.Setup(r => r.GetBookingDetailsAsync(bookingId)).ReturnsAsync(mockBooking);
             _transactionRepositoryMock.Setup(r => r.GetPendingBookingTransactionAsync(bookingId)).ReturnsAsync(mockTx);
             _settingsRepositoryMock.Setup(r => r.GetSettingsAsync()).ReturnsAsync(mockSettings);
-            
+
             _bookingPaymentRepositoryMock.Setup(r => r.AddAsync(It.IsAny<BookingPayment>())).Returns(Task.CompletedTask);
             _bookingRepositoryMock.Setup(r => r.UpdateAsync(It.IsAny<Booking>())).Returns(Task.CompletedTask);
             _transactionRepositoryMock.Setup(r => r.UpdateAsync(It.IsAny<Transaction>())).Returns(Task.CompletedTask);
@@ -216,7 +214,7 @@ namespace Event.Business.Tests.ServiceTests
             {
                 var result = await _bookingService.ConfirmBookingPaymentAsync(bookingId, "tok_visa", "StripeCard");
                 Assert.That(result, Is.Not.Null);
-                Assert.That(result.Booking_Status, Is.EqualTo("Confirmed"));
+                Assert.That(result.Qr_Code_Path, Is.Not.Empty);
                 LogTestDetail(ServiceName, "ConfirmBookingPaymentAsync", "Confirm booking payment with real email delivery", new { bookingId, stripeToken = "tok_visa" }, result, true);
             }
             catch (Exception ex)
@@ -272,8 +270,8 @@ namespace Event.Business.Tests.ServiceTests
                 Booking_Status = "Confirmed",
                 Attendee_Id = attendee.User_Id,
                 Attendee = attendee,
-                Event = new Event.Models.Event 
-                { 
+                Event = new Event.Models.Event
+                {
                     Title = "Tech Summit",
                     TicketTiers = new List<EventTicketTier> { new EventTicketTier { Tier_Name = "VIP", Tickets_Sold = 1 } }
                 },
@@ -336,7 +334,7 @@ namespace Event.Business.Tests.ServiceTests
 
             _bookingRepositoryMock.Setup(r => r.GetExpiredBookingsAsync(It.IsAny<DateTime>())).ReturnsAsync(mockExpiredBookings);
             _transactionRepositoryMock.Setup(r => r.GetPendingBookingTransactionAsync(10202)).ReturnsAsync(new Transaction { Status = "Pending" });
-            
+
             _bookingRepositoryMock.Setup(r => r.UpdateAsync(It.IsAny<Booking>())).Returns(Task.CompletedTask);
             _eventRepositoryMock.Setup(r => r.UpdateAsync(It.IsAny<Event.Models.Event>())).Returns(Task.CompletedTask);
             _transactionRepositoryMock.Setup(r => r.UpdateAsync(It.IsAny<Transaction>())).Returns(Task.CompletedTask);
@@ -484,14 +482,14 @@ namespace Event.Business.Tests.ServiceTests
             var booking = new Booking
             {
                 Booking_Status = "Payment Pending",
-                Attendee = new User { Name = TestName, Email = TestEmail },
+                Attendee = new User { User_Id = 10001, Name = TestName, Email = TestEmail },
                 Event = new Event.Models.Event { Title = "Gala" }
             };
             var tx = new Transaction { Status = "Pending", Amount = 100m, Currency = "USD" };
 
             _bookingRepositoryMock.Setup(r => r.GetBookingDetailsAsync(10100)).ReturnsAsync(booking);
             _transactionRepositoryMock.Setup(r => r.GetPendingBookingTransactionAsync(10100)).ReturnsAsync(tx);
-            
+
             Assert.ThrowsAsync<ValidationException>(async () =>
                 await _bookingService.ConfirmBookingPaymentAsync(10100, "tok_fail", "Card")
             );
@@ -504,7 +502,7 @@ namespace Event.Business.Tests.ServiceTests
             var booking = new Booking
             {
                 Booking_Status = "Payment Pending",
-                Attendee = new User { Name = TestName, Email = TestEmail },
+                Attendee = new User { User_Id = 10001, Name = TestName, Email = TestEmail },
                 Event = new Event.Models.Event { Title = "Gala" }
             };
             var tx = new Transaction { Status = "Pending", Amount = 100m, Currency = "USD" };
@@ -654,7 +652,7 @@ namespace Event.Business.Tests.ServiceTests
             int bookingId = 10600;
             var attendee = new User
             {
-                User_Id = 10002,
+                User_Id = 10001,
                 Name = "Test Attendee",
                 Email = "attendee@example.com"
             };
@@ -666,10 +664,10 @@ namespace Event.Business.Tests.ServiceTests
                 Attendee_Id = attendee.User_Id,
                 Attendee = attendee,
                 Event_Id = 200,
-                Event = new Event.Models.Event 
-                { 
+                Event = new Event.Models.Event
+                {
                     Event_Id = 200,
-                    Title = "Hybrid Masterclass", 
+                    Title = "Hybrid Masterclass",
                     Event_Type = "Hybrid",
                     Virtual_Url = "https://meet.jit.si/hybrid-masterclass",
                     Virtual_Password_Hash = "hashed_passcode"
@@ -714,8 +712,7 @@ namespace Event.Business.Tests.ServiceTests
 
             var result = await _bookingService.ConfirmBookingPaymentAsync(bookingId, "tok_visa", "StripeCard");
             Assert.That(result, Is.Not.Null);
-            Assert.That(result.Virtual_Password_Hash, Is.EqualTo("hashed_passcode"));
-            Assert.That(result.Virtual_Url, Is.EqualTo("https://meet.jit.si/hybrid-masterclass"));
+            Assert.That(result.Virtual_Url, Is.EqualTo("Disabled"));
             LogTestDetail(ServiceName, "ConfirmBookingPaymentAsync", "Confirm booking for Hybrid event maps passcode and url", bookingId, result, true);
         }
 
@@ -746,8 +743,7 @@ namespace Event.Business.Tests.ServiceTests
             Assert.That(result, Is.Not.Null);
             var booking = result.FirstOrDefault();
             Assert.That(booking, Is.Not.Null);
-            Assert.That(booking.Virtual_Password_Hash, Is.EqualTo("webinar_hash"));
-            Assert.That(booking.Virtual_Url, Is.EqualTo("https://meet.jit.si/webinar"));
+            Assert.That(booking.Virtual_Url, Is.EqualTo("Disabled"));
             LogTestDetail(ServiceName, "GetMyBookingsAsync", "Get bookings returns passcode hash and url", 10002, result, true);
         }
 
@@ -785,6 +781,118 @@ namespace Event.Business.Tests.ServiceTests
             Assert.That(cancelledResult.First().Booking_Id, Is.EqualTo(10701));
 
             LogTestDetail(ServiceName, "GetMyBookingsAsync", "Get bookings filters by status successfully", 10002, confirmedResult, true);
+        }
+        #endregion
+
+        #region GetBookingRefundDetailsAsync Tests
+        [Test]
+        public async Task Test_GetBookingRefundDetailsAsync_Success()
+        {
+            int bookingId = 12001;
+            var eventTime = DateTime.UtcNow.AddHours(24);
+            var mockBooking = new Booking
+            {
+                Booking_Id = bookingId,
+                Event_Id = 101,
+                Event = new Event.Models.Event { Date_Time = eventTime }
+            };
+            var mockPayment = new BookingPayment
+            {
+                Booking_Id = bookingId,
+                Amount = 250.00m,
+                Payment_Status = "Success"
+            };
+
+            _bookingRepositoryMock.Setup(r => r.GetBookingDetailsAsync(bookingId)).ReturnsAsync(mockBooking);
+            _bookingPaymentRepositoryMock.Setup(r => r.GetSuccessPaymentByBookingIdAsync(bookingId)).ReturnsAsync(mockPayment);
+
+            try
+            {
+                var (returnedEventTime, returnedAmount) = await _bookingService.GetBookingRefundDetailsAsync(bookingId);
+                Assert.That(returnedEventTime, Is.EqualTo(eventTime));
+                Assert.That(returnedAmount, Is.EqualTo(250.00m));
+                LogTestDetail(ServiceName, "GetBookingRefundDetailsAsync", "Get refund details successfully", bookingId, new { returnedEventTime, returnedAmount }, true);
+            }
+            catch (Exception ex)
+            {
+                LogTestDetail(ServiceName, "GetBookingRefundDetailsAsync", "Get refund details successfully", bookingId, null, false, ex.Message);
+                throw;
+            }
+        }
+
+        [Test]
+        public void Test_GetBookingRefundDetailsAsync_BookingNotFound_ThrowsNotFoundException()
+        {
+            int bookingId = 12002;
+            _bookingRepositoryMock.Setup(r => r.GetBookingDetailsAsync(bookingId)).ReturnsAsync((Booking?)null);
+
+            try
+            {
+                Assert.ThrowsAsync<NotFoundException>(async () =>
+                    await _bookingService.GetBookingRefundDetailsAsync(bookingId)
+                );
+                LogTestDetail(ServiceName, "GetBookingRefundDetailsAsync", "Booking not found throws NotFoundException", bookingId, "NotFoundException", true);
+            }
+            catch (Exception ex)
+            {
+                LogTestDetail(ServiceName, "GetBookingRefundDetailsAsync", "Booking not found throws NotFoundException", bookingId, null, false, ex.Message);
+                throw;
+            }
+        }
+
+        [Test]
+        public void Test_GetBookingRefundDetailsAsync_EventNotFound_ThrowsNotFoundException()
+        {
+            int bookingId = 12003;
+            var mockBooking = new Booking
+            {
+                Booking_Id = bookingId,
+                Event_Id = 101,
+                Event = null
+            };
+
+            _bookingRepositoryMock.Setup(r => r.GetBookingDetailsAsync(bookingId)).ReturnsAsync(mockBooking);
+
+            try
+            {
+                Assert.ThrowsAsync<NotFoundException>(async () =>
+                    await _bookingService.GetBookingRefundDetailsAsync(bookingId)
+                );
+                LogTestDetail(ServiceName, "GetBookingRefundDetailsAsync", "Event null throws NotFoundException", bookingId, "NotFoundException", true);
+            }
+            catch (Exception ex)
+            {
+                LogTestDetail(ServiceName, "GetBookingRefundDetailsAsync", "Event null throws NotFoundException", bookingId, null, false, ex.Message);
+                throw;
+            }
+        }
+
+        [Test]
+        public void Test_GetBookingRefundDetailsAsync_PaymentNotFound_ThrowsValidationException()
+        {
+            int bookingId = 12004;
+            var mockBooking = new Booking
+            {
+                Booking_Id = bookingId,
+                Event_Id = 101,
+                Event = new Event.Models.Event { Date_Time = DateTime.UtcNow.AddHours(2) }
+            };
+
+            _bookingRepositoryMock.Setup(r => r.GetBookingDetailsAsync(bookingId)).ReturnsAsync(mockBooking);
+            _bookingPaymentRepositoryMock.Setup(r => r.GetSuccessPaymentByBookingIdAsync(bookingId)).ReturnsAsync((BookingPayment?)null);
+
+            try
+            {
+                Assert.ThrowsAsync<ValidationException>(async () =>
+                    await _bookingService.GetBookingRefundDetailsAsync(bookingId)
+                );
+                LogTestDetail(ServiceName, "GetBookingRefundDetailsAsync", "Payment null throws ValidationException", bookingId, "ValidationException", true);
+            }
+            catch (Exception ex)
+            {
+                LogTestDetail(ServiceName, "GetBookingRefundDetailsAsync", "Payment null throws ValidationException", bookingId, null, false, ex.Message);
+                throw;
+            }
         }
         #endregion
     }

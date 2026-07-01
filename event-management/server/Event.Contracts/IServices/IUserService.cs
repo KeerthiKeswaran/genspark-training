@@ -13,5 +13,6 @@ namespace Event.Contracts.IServices
         Task<UserProfileResponse?> GetUserProfileAsync(int userId);
         Task<IEnumerable<MyEventOverviewResponse>> GetMyEventsAsync(int organizerId);
         Task<MyEventDetailsResponse?> GetMyEventDetailsAsync(int organizerId, int eventId);
+        Task<bool> CloseAccountAsync(int userId, CloseAccountRequest request);
     }
 }

@@ -117,5 +117,49 @@ namespace Event.Business.Services
         }
 
         #endregion
+
+        #region CreateCheckoutSessionAsync
+
+        public async Task<(bool Success, string SessionId, string SessionUrl, string ErrorMessage)> CreateCheckoutSessionAsync(
+            decimal amount, string currency, string itemName, string successUrl, string cancelUrl)
+        {
+            try
+            {
+                var options = new Stripe.Checkout.SessionCreateOptions
+                {
+                    PaymentMethodTypes = new System.Collections.Generic.List<string> { "card" },
+                    LineItems = new System.Collections.Generic.List<Stripe.Checkout.SessionLineItemOptions>
+                    {
+                        new Stripe.Checkout.SessionLineItemOptions
+                        {
+                            PriceData = new Stripe.Checkout.SessionLineItemPriceDataOptions
+                            {
+                                UnitAmount = (long)(amount * 100),
+                                Currency = currency.ToLower(),
+                                ProductData = new Stripe.Checkout.SessionLineItemPriceDataProductDataOptions
+                                {
+                                    Name = itemName,
+                                },
+                            },
+                            Quantity = 1,
+                        },
+                    },
+                    Mode = "payment",
+                    SuccessUrl = successUrl,
+                    CancelUrl = cancelUrl,
+                };
+
+                var service = new Stripe.Checkout.SessionService();
+                var session = await service.CreateAsync(options);
+
+                return (true, session.Id, session.Url, string.Empty);
+            }
+            catch (StripeException ex)
+            {
+                return (false, string.Empty, string.Empty, ex.Message);
+            }
+        }
+
+        #endregion
     }
 }

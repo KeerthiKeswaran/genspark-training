@@ -15,7 +15,7 @@ namespace Event.Models
         public virtual User Reporter { get; set; } = null!;
         
         [Required]
-        public string Reason { get; set; } = string.Empty;
+        public string ReportUrl { get; set; } = string.Empty;
 
         public string? ResponseAction { get; set; } // "Dismissed", "Upholds"
         

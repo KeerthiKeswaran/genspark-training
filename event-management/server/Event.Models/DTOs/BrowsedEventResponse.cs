@@ -7,10 +7,12 @@ namespace Event.Models.DTOs
     {
         public int Event_Id { get; set; }
         public string Organizer_Name { get; set; } = string.Empty;
+        public string? Organizer_Email { get; set; }
         public string? Venue_Name { get; set; }
         public string? Address { get; set; }
         public string? Venue_Region_Name { get; set; }
         public string Event_Type { get; set; } = string.Empty;
+        public string? Category { get; set; }
         public string Title { get; set; } = string.Empty;
         public string Description_Url { get; set; } = string.Empty;
         public string? Image_Url { get; set; }

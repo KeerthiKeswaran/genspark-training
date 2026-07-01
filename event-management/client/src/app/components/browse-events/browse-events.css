@@ -526,6 +526,8 @@
   font-size: 13.5px;
   color: var(--color-neutral-light);
   font-weight: 500;
+  margin: 4px 0 16px 0;
+  display: block;
 }
 
 /* Event Cards Grid */

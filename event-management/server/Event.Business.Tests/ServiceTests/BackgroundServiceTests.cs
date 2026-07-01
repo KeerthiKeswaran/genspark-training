@@ -78,7 +78,9 @@ namespace Event.Business.Tests.ServiceTests
                 bookingPaymentRepositoryMock.Object,
                 emailService,
                 userRepositoryMock.Object,
-                refundService
+                refundService,
+                new Mock<ITermsAndConditionsRepository>().Object,
+                new Mock<IOrganizerPayoutRepository>().Object
             );
 
             var bookingService = new BookingService(

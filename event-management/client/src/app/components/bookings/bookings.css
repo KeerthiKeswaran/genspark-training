@@ -256,9 +256,22 @@
   letter-spacing: 0.5px;
 }
 
-.status-confirmed { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+.status-confirmed { background: rgba(37, 99, 235, 0.1); color: #2563eb; } /* Steel Blue */
 .status-pending   { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
 .status-cancelled { background: rgba(156, 163, 175, 0.15); color: #6b7280; }
+
+.booking-type-badge-inline {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 12px;
+  letter-spacing: 0.5px;
+  display: inline-block;
+}
+.inline-badge-physical { background: rgba(16,185,129,0.1); color: #10b981; border: 1px solid rgba(16,185,129,0.2); }
+.inline-badge-virtual  { background: rgba(99,102,241,0.1); color: #6366f1; border: 1px solid rgba(99,102,241,0.2); }
+.inline-badge-hybrid   { background: rgba(245,158,11,0.1); color: #f59e0b; border: 1px solid rgba(245,158,11,0.2); }
 
 /* Metadata Grid */
 .booking-meta-grid {
@@ -369,6 +382,18 @@
   box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
 }
 
+.action-btn.join-meeting.disabled-link {
+  background: var(--bg-muted, #374151);
+  color: var(--text-muted, #9ca3af);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.action-btn.join-meeting.disabled-link:hover {
+  background: var(--bg-muted, #374151);
+  box-shadow: none;
+}
+
 .action-btn.cancel-booking {
   background: var(--bg-canvas);
   border: 1.5px solid var(--border);
@@ -472,6 +497,13 @@
   position: relative;
 }
 
+.qr-real-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
 .qr-corner {
   position: absolute;
   width: 24px;
@@ -572,4 +604,138 @@
     width: 100%;
     justify-content: center;
   }
+}
+
+/* --- Feedback Modal Styles --- */
+.feedback-modal {
+  background: var(--bg-canvas);
+  border-radius: 20px;
+  padding: 36px 40px;
+  max-width: 450px;
+  width: 90%;
+  box-shadow: var(--shadow-lg);
+  position: relative;
+  animation: slideUpModal 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.feedback-modal-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  letter-spacing: -0.4px;
+}
+
+.feedback-modal-sub {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin-bottom: 24px;
+}
+
+.modal-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rating-container, .review-container {
+  margin-bottom: 20px;
+}
+
+.star-rating {
+  display: flex;
+  gap: 8px;
+  font-size: 32px;
+  color: var(--text-muted);
+}
+
+.star {
+  cursor: pointer;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.star:hover {
+  transform: scale(1.15);
+}
+
+.star.filled {
+  color: #ffb800;
+}
+
+.review-textarea {
+  width: 100%;
+  min-height: 100px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+  outline: none;
+  transition: var(--transition);
+}
+
+.review-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.feedback-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.modal-btn {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: var(--transition);
+  border: none;
+}
+
+.modal-btn.cancel-btn {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.modal-btn.cancel-btn:hover {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.modal-btn.submit-btn {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.modal-btn.submit-btn:hover:not(:disabled) {
+  background: var(--accent-dark);
+}
+
+.modal-btn.submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-btn.leave-feedback {
+  background: var(--accent-light);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.action-btn.leave-feedback:hover {
+  background: var(--accent);
+  color: #ffffff;
 }

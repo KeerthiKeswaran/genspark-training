@@ -11,6 +11,8 @@ namespace Event.Models.DTOs
         public VenueDetailsDto? Venue { get; set; }
         public string Event_Type { get; set; } = string.Empty;
         public string Title { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public string Age_Category { get; set; } = string.Empty;
         public string Description_Url { get; set; } = string.Empty;
         public string? Image_Url { get; set; }
         public DateTime Date_Time { get; set; }

@@ -63,7 +63,7 @@ namespace Event.Business.Services
 
         #region BookTicketsAsync
 
-        public async Task<BookingResponse?> BookTicketsAsync(int attendeeId, int eventId, Dictionary<string, int> tierQuantities)
+        public async Task<InitiateBookingResponse?> BookTicketsAsync(int attendeeId, int eventId, Dictionary<string, int> tierQuantities)
         {
             // 1. Validate inputs (ensure tiers are specified and quantities are positive)
             if (tierQuantities == null || !tierQuantities.Any() || tierQuantities.Values.Any(q => q <= 0))
@@ -73,7 +73,7 @@ namespace Event.Business.Services
 
             // 2. Retrieve platform settings for ticket limits
             var settings = await _settingsRepository.GetSettingsAsync()
-                ?? new PlatformSettings { Max_Tickets_Per_Booking = 10 };
+                ?? new PlatformSettings { Max_Tickets_Per_Booking = 10, Ticket_Fixed_Fee = 0.99m, Ticket_Commission_Percentage = 5.0m };
 
             // 3. Verify total tickets do not exceed platform limitations
             if (totalRequested > settings.Max_Tickets_Per_Booking)
@@ -106,7 +106,7 @@ namespace Event.Business.Services
                     if (eventTier == null)
                         throw new NotFoundException($"Ticket tier '{tierName}' not found for event '{ev.Title}'.");
 
-                    if (ev.Event_Type.Equals("Physical", StringComparison.OrdinalIgnoreCase) || 
+                    if (ev.Event_Type.Equals("Physical", StringComparison.OrdinalIgnoreCase) ||
                         ev.Event_Type.Equals("Hybrid", StringComparison.OrdinalIgnoreCase))
                     {
                         if (ev.Venue == null)
@@ -160,8 +160,21 @@ namespace Event.Business.Services
 
                 // 11. Commit the transaction and return the booking details
                 await _bookingRepository.CommitTransactionAsync();
-                booking.Event = ev;
-                return MapToBookingResponse(booking);
+                
+                var response = new InitiateBookingResponse
+                {
+                    Booking_Id = booking.Booking_Id,
+                    Attendee_Id = booking.Attendee_Id,
+                    Event_Id = booking.Event_Id,
+                    Event_Title = ev.Title,
+                    Event_Type = ev.Event_Type,
+                    Event_Date_Time = ev.Date_Time,
+                    Total_Price = totalAmount,
+                    Fixed_Fee_Rate = settings.Ticket_Fixed_Fee,
+                    Commission_Percentage = settings.Ticket_Commission_Percentage
+                };
+
+                return response;
             }
             catch (BaseBusinessException)
             {
@@ -177,9 +190,31 @@ namespace Event.Business.Services
 
         #endregion
 
+        #region CreateCheckoutSessionForBookingAsync
+
+        public async Task<(bool Success, string SessionId, string SessionUrl, string ErrorMessage)> CreateCheckoutSessionForBookingAsync(int bookingId, string successUrl, string cancelUrl)
+        {
+            var booking = await _bookingRepository.GetBookingDetailsAsync(bookingId);
+            if (booking == null)
+                throw new NotFoundException($"Booking with ID {bookingId} not found.");
+
+            if (booking.Booking_Status != "Payment Pending")
+                throw new ValidationException($"Booking payment status is already '{booking.Booking_Status}'.");
+
+            var ledgerTx = await _transactionRepository.GetPendingBookingTransactionAsync(bookingId);
+            if (ledgerTx == null)
+                throw new NotFoundException("Pending escrow ledger transaction not found for this booking.");
+
+            string itemName = booking.Event != null ? $"Tickets for {booking.Event.Title}" : $"Booking #{bookingId}";
+
+            return await _paymentService.CreateCheckoutSessionAsync(ledgerTx.Amount, ledgerTx.Currency, itemName, successUrl, cancelUrl);
+        }
+
+        #endregion
+
         #region ConfirmBookingPaymentAsync
 
-        public async Task<BookingResponse?> ConfirmBookingPaymentAsync(int bookingId, string stripeChargeId, string paymentMethod)
+        public async Task<ConfirmBookingResponse?> ConfirmBookingPaymentAsync(int bookingId, string stripeChargeId, string paymentMethod)
         {
             // 1. Begin database transaction
             await _bookingRepository.BeginTransactionAsync();
@@ -202,11 +237,29 @@ namespace Event.Business.Services
                     throw new NotFoundException("Pending escrow ledger transaction not found for this booking.");
 
                 // 5. Attempt payment processing via Stripe Payment Gateway
-                var chargeResult = await _paymentService.CreateChargeAsync(ledgerTx.Amount, ledgerTx.Currency, stripeChargeId, $"Booking #{bookingId} payment");
-                if (!chargeResult.Success)
+                (bool Success, string TransactionReference, string ErrorMessage) paymentResult;
+                if (paymentMethod == "stripe_checkout")
+                {
+                    var sessionService = new Stripe.Checkout.SessionService();
+                    var session = await sessionService.GetAsync(stripeChargeId);
+                    if (session.PaymentStatus == "paid")
+                    {
+                        paymentResult = (true, session.PaymentIntentId ?? session.Id, string.Empty);
+                    }
+                    else
+                    {
+                        paymentResult = (false, string.Empty, $"Checkout session payment status is {session.PaymentStatus}");
+                    }
+                }
+                else
+                {
+                    paymentResult = await _paymentService.CreateChargeAsync(ledgerTx.Amount, ledgerTx.Currency, stripeChargeId, $"Booking #{bookingId} payment");
+                }
+
+                if (!paymentResult.Success)
                 {
                     ledgerTx.Status = "Failed";
-                    ledgerTx.Remarks = chargeResult.ErrorMessage;
+                    ledgerTx.Remarks = paymentResult.ErrorMessage;
                     await _transactionRepository.UpdateAsync(ledgerTx);
                     await _bookingRepository.CommitTransactionAsync();
 
@@ -219,7 +272,7 @@ namespace Event.Business.Services
                         // Ignore inner exception to propagate the original charge failed validation exception
                     }
 
-                    throw new ValidationException($"Stripe charge failed: {chargeResult.ErrorMessage}");
+                    throw new ValidationException($"Stripe payment failed: {paymentResult.ErrorMessage}");
                 }
 
                 // 6. Confirm the booking and generate QR authentication credentials
@@ -228,35 +281,48 @@ namespace Event.Business.Services
                 booking.Qr_Secret_Hash = secretHash;
                 byte[] qrBytes = Array.Empty<byte>();
 
+                string rootPath = Directory.GetCurrentDirectory().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                string folderName = "Event.Business";
+                if (AppDomain.CurrentDomain.FriendlyName.Contains("Tests") ||
+                    AppDomain.CurrentDomain.BaseDirectory.Contains("Tests") ||
+                    Directory.GetCurrentDirectory().Contains("Tests"))
+                {
+                    folderName = "Event.Business.Tests";
+                }
+
+                if (rootPath.Contains("bin"))
+                {
+                    rootPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                }
+                else if (rootPath.EndsWith("Event.API") || rootPath.EndsWith("Event.Business.Tests") || rootPath.EndsWith("Event.Business") || rootPath.EndsWith("Event.Data.Tests"))
+                {
+                    rootPath = Path.GetFullPath(Path.Combine(rootPath, "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                }
+
                 try
                 {
                     // Encode ONLY the raw secret hash in the QR code
                     qrBytes = await _qrCodeService.GenerateQrCodeAsync(secretHash);
-                    
-                    string rootPath = Directory.GetCurrentDirectory();
-                    if (rootPath.Contains("bin"))
-                    {
-                        rootPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", ".."));
-                    }
 
-                    var ticketsDir = Path.Combine(rootPath, "assets", booking.Attendee_Id.ToString(), "bookings");
+                    int storageUserId = booking.Attendee_Id > 0 ? booking.Attendee_Id : 10001;
+                    var ticketsDir = Path.Combine(rootPath, folderName, "assets", "users", storageUserId.ToString(), "bookings");
                     if (!Directory.Exists(ticketsDir))
                     {
                         Directory.CreateDirectory(ticketsDir);
                     }
                     var filePath = Path.Combine(ticketsDir, $"qr_{bookingId}.png");
                     await File.WriteAllBytesAsync(filePath, qrBytes);
-                    booking.Qr_Code_Path = $"/assets/{booking.Attendee_Id}/bookings/qr_{bookingId}.png";
+                    booking.Qr_Code_Path = filePath;
                 }
                 catch (Exception)
                 {
                     // Fallback to simple path if writing fails, but log/let it complete so booking confirmation isn't blocked by filesystem issues.
-                    booking.Qr_Code_Path = $"/assets/{booking.Attendee_Id}/bookings/qr_{bookingId}.png";
+                    booking.Qr_Code_Path = Path.Combine(rootPath, folderName, "assets", "users", (booking.Attendee_Id > 0 ? booking.Attendee_Id : 10001).ToString(), "bookings", $"qr_{bookingId}.png");
                 }
 
                 // 7. Update transaction status and billing references
                 ledgerTx.Status = "Success";
-                ledgerTx.Transaction_Reference = chargeResult.TransactionReference;
+                ledgerTx.Transaction_Reference = paymentResult.TransactionReference;
                 ledgerTx.Payment_Method_Details = paymentMethod;
 
                 // 8. Calculate platform ticket commissions and fees
@@ -301,7 +367,7 @@ namespace Event.Business.Services
                                     rawPasscode = upfrontTx.Remarks.Substring(idx + marker.Length).Trim();
                                 }
                             }
-                            
+
                             var virtualUrl = booking.Virtual_Url ?? booking.Event?.Virtual_Url;
                             ticketDetailsStr += $"<br/><span class=\"info-label\">Virtual Link:</span> <a href=\"{virtualUrl}\" style=\"color: #ffcccc; text-decoration: underline;\">{virtualUrl}</a><br/><span class=\"info-label\">Passcode:</span> {rawPasscode}";
                         }
@@ -336,7 +402,30 @@ namespace Event.Business.Services
 
                 // 10. Commit database transaction and return the confirmed booking
                 await _bookingRepository.CommitTransactionAsync();
-                return MapToBookingResponse(booking);
+                
+                var response = new ConfirmBookingResponse
+                {
+                    Booking_Id = booking.Booking_Id,
+                    Attendee_Id = booking.Attendee_Id,
+                    Event_Id = booking.Event_Id,
+                    Event_Title = booking.Event?.Title ?? string.Empty,
+                    Event_Type = booking.Event?.Event_Type ?? string.Empty,
+                    Event_Date_Time = booking.Event?.Date_Time ?? DateTime.MinValue,
+                    Qr_Code_Path = !string.IsNullOrEmpty(booking.Qr_Code_Path) && booking.Qr_Code_Path.Contains("assets")
+                        ? "/" + booking.Qr_Code_Path.Substring(booking.Qr_Code_Path.IndexOf("assets", StringComparison.OrdinalIgnoreCase)).Replace('\\', '/')
+                        : (booking.Qr_Code_Path ?? string.Empty),
+                    Virtual_Url = "Disabled",
+                    Event_Image_Url = booking.Event?.Image_Url,
+                    Total_Amount = ledgerTx.Amount,
+                    Details = booking.Details?.Select(d => new ConfirmBookingDetailDto
+                    {
+                        Tier_Name = d.Tier_Name,
+                        Quantity = d.Quantity,
+                        Price = 0
+                    }).ToList() ?? new List<ConfirmBookingDetailDto>()
+                };
+
+                return response;
             }
             catch (BaseBusinessException)
             {
@@ -357,7 +446,7 @@ namespace Event.Business.Services
         public async Task<IEnumerable<BookingResponse>> GetMyBookingsAsync(int attendeeId, string? status = null)
         {
             var bookings = await _bookingRepository.GetBookingsByUserIdAsync(attendeeId);
-            
+
             if (!string.IsNullOrWhiteSpace(status))
             {
                 bookings = bookings.Where(b => b.Booking_Status.Equals(status, StringComparison.OrdinalIgnoreCase));
@@ -525,6 +614,83 @@ namespace Event.Business.Services
 
         #endregion
 
+        #region GetBookingDynamicRefundDetailsAsync
+
+        public async Task<(DateTime EventDateTime, decimal OriginalAmount)> GetBookingRefundDetailsAsync(int bookingId)
+        {
+            var booking = await _bookingRepository.GetBookingDetailsAsync(bookingId);
+            if (booking == null)
+                throw new NotFoundException($"Booking with ID {bookingId} not found.");
+
+            if (booking.Event == null)
+                throw new NotFoundException($"Event details not found for booking ID {bookingId}.");
+
+            var originalPayment = await _bookingPaymentRepository.GetSuccessPaymentByBookingIdAsync(bookingId);
+            if (originalPayment == null)
+                throw new ValidationException($"No successful payment transaction found for booking ID {bookingId}.");
+
+            return (booking.Event.Date_Time, originalPayment.Amount);
+        }
+
+        #endregion
+
+        #region GetActiveVirtualLinksAsync  
+
+        public async Task<IEnumerable<ActiveVirtualLinkResponse>> GetActiveVirtualLinksAsync(int attendeeId)
+        {
+            var bookings = await _bookingRepository.GetBookingsByUserIdAsync(attendeeId);
+            var result = new List<ActiveVirtualLinkResponse>();
+
+            foreach (var booking in bookings)
+            {
+                var ev = booking.Event ?? await _eventRepository.GetEventDetailsAsync(booking.Event_Id);
+                if (ev == null) continue;
+
+                var response = new ActiveVirtualLinkResponse
+                {
+                    Booking_Id = booking.Booking_Id,
+                    Event_Id = booking.Event_Id,
+                    Virtual_Url = "Disabled",
+                    Link_Status = "Disabled"
+                };
+
+                if (ev.Event_Type.Equals("Virtual", StringComparison.OrdinalIgnoreCase) ||
+                    ev.Event_Type.Equals("Hybrid", StringComparison.OrdinalIgnoreCase))
+                {
+                    var now = DateTime.UtcNow;
+                    var start = ev.Date_Time;
+                    var end = ev.Date_Time.AddHours((double)ev.Duration_Hours);
+
+                    if (now < start)
+                    {
+                        response.Virtual_Url = "Disabled";
+                        response.Link_Status = "PendingStart";
+                    }
+                    else if (now >= start && now <= end)
+                    {
+                        response.Virtual_Url = ev.Virtual_Url ?? booking.Virtual_Url ?? "Disabled";
+                        response.Link_Status = "Active";
+                    }
+                    else
+                    {
+                        response.Virtual_Url = "Disabled";
+                        response.Link_Status = "Ended";
+                    }
+                }
+                else
+                {
+                    response.Virtual_Url = null;
+                    response.Link_Status = "NotApplicable";
+                }
+
+                result.Add(response);
+            }
+
+            return result;
+        }
+
+        #endregion
+
         #region Helper Methods
 
         private BookingResponse? MapToBookingResponse(Booking? booking)
@@ -540,11 +706,15 @@ namespace Event.Business.Services
                 Event_Type = booking.Event?.Event_Type ?? string.Empty,
                 Event_Date_Time = booking.Event?.Date_Time ?? DateTime.MinValue,
                 Booking_Status = booking.Booking_Status,
-                Qr_Code_Path = booking.Qr_Code_Path,
+                Qr_Code_Path = !string.IsNullOrEmpty(booking.Qr_Code_Path) && booking.Qr_Code_Path.Contains("assets")
+                    ? "/" + booking.Qr_Code_Path.Substring(booking.Qr_Code_Path.IndexOf("assets", StringComparison.OrdinalIgnoreCase)).Replace('\\', '/')
+                    : booking.Qr_Code_Path,
                 CheckIn_Status = booking.CheckIn_Status,
                 Created_At = booking.Created_At,
-                Virtual_Url = booking.Virtual_Url ?? booking.Event?.Virtual_Url,
-                Virtual_Password_Hash = booking.Event?.Virtual_Password_Hash,
+                Virtual_Url = "Disabled",
+                Event_Status = booking.Event?.Status ?? string.Empty,
+                Amount_Paid = booking.Payments?.Where(p => p.Payment_Status == "Success" || p.Payment_Status == "Refunded").Sum(p => p.Amount) ?? 0m,
+                Event_Image_Url = booking.Event?.Image_Url,
                 Details = booking.Details?.Select(d => new BookingDetailDto
                 {
                     Tier_Name = d.Tier_Name,

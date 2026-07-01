@@ -67,6 +67,12 @@ namespace Event.Business.Services
                 if (existing == null)
                     throw new NotFoundException("No administrator account registered with this email address.");
             }
+            else if (purpose == "close-account")
+            {
+                var existing = await _userRepository.GetByEmailAsync(email);
+                if (existing == null)
+                    throw new NotFoundException("No account registered with this email address.");
+            }
 
             // 3. Generate a secure random 6-digit OTP code
             string otp = Random.Shared.Next(100000, 999999).ToString();
@@ -78,12 +84,14 @@ namespace Event.Business.Services
             // 5. Define the subject lines depending on the authentication purpose
             string subject = purpose == "registration"
                  ? "Your Event Platform Email Verification OTP"
-                 : (purpose == "finance-login" ? "Your Finance Dept Login Verification OTP" : "Your Event Platform Password Reset OTP");
+                 : (purpose == "finance-login" ? "Your Finance Dept Login Verification OTP" : 
+                   (purpose == "close-account" ? "Your Event Platform Close Account Verification OTP" : "Your Event Platform Password Reset OTP"));
 
             // 6. Load/Compile the formatted HTML email body using the generic EmailTemplateDto
             var purposeLabel = purpose == "registration"
                 ? "verify your email address and complete your registration"
-                : (purpose == "finance-login" ? "complete your Finance Dept login" : "reset your account password");
+                : (purpose == "finance-login" ? "complete your Finance Dept login" : 
+                  (purpose == "close-account" ? "confirm and authorize closing your account" : "reset your account password"));
 
             var emailDto = new EmailTemplateDto
             {
@@ -122,6 +130,10 @@ namespace Event.Business.Services
             if (cachedOtp != null && cachedOtp == otp)
             {
                 await _cacheService.RemoveAsync(cacheKey);
+
+                // Store verification marker in Redis for 15 minutes
+                string verifiedKey = $"otp-verified:{purpose}:{email}";
+                await _cacheService.SetAsync(verifiedKey, "true", TimeSpan.FromMinutes(15));
                 return true;
             }
 
@@ -130,6 +142,35 @@ namespace Event.Business.Services
 
         #endregion
 
+        #region IsOtpVerificationExpiredAsync
 
+        public async Task<bool> IsOtpVerificationExpiredAsync(string email, string purpose)
+        {
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(purpose))
+            {
+                return true;
+            }
+
+            string verifiedKey = $"otp-verified:{purpose}:{email}";
+            string? verifiedValue = await _cacheService.GetAsync<string>(verifiedKey);
+            return string.IsNullOrEmpty(verifiedValue);
+        }
+
+        #endregion
+
+        #region ConsumeOtpVerificationAsync
+
+        public async Task ConsumeOtpVerificationAsync(string email, string purpose)
+        {
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(purpose))
+            {
+                return;
+            }
+
+            string verifiedKey = $"otp-verified:{purpose}:{email}";
+            await _cacheService.RemoveAsync(verifiedKey);
+        }
+
+        #endregion
     }
 }

@@ -5,7 +5,7 @@
       @for (item of trendingEvents(); track item.event_Id; let idx = $index) {
         <div class="carousel-slide" [class.active]="idx === currentSlideIndex()">
           <div class="slide-image-container">
-            <img [src]="item.imageUrl" [alt]="item.title" class="slide-bg">
+            <img [src]="item.image_Url" [alt]="item.title" class="slide-bg">
             <div class="slide-overlay"></div>
           </div>
           
@@ -13,7 +13,7 @@
             <div class="slide-content">
               <span class="trending-badge">Trending #{{ idx + 1 }}</span>
               <h1 class="slide-title">{{ item.title }}</h1>
-              <p class="slide-description">{{ item.descriptionUrl }}</p>
+              <p class="slide-description">{{ item.description_Url | resolveDescription | async }}</p>
               
               <div class="slide-meta">
                 <div class="meta-item">
@@ -23,14 +23,14 @@
                     <line x1="8" y1="2" x2="8" y2="6"></line>
                     <line x1="3" y1="10" x2="21" y2="10"></line>
                   </svg>
-                  <span>{{ item.dateTime | date:'EEEE, MMM d, y - h:mm a' }}</span>
+                  <span>{{ item.date_Time | date:'EEEE, MMM d, y - h:mm a' }}</span>
                 </div>
                 <div class="meta-item">
                   <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                     <circle cx="12" cy="10" r="3"></circle>
                   </svg>
-                  <span>{{ item.venue_Name }} ({{ item.region_Name }})</span>
+                  <span>{{ item.venue_Name }} ({{ item.venue_Region_Name }})</span>
                 </div>
                 <div class="meta-item">
                   <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -42,7 +42,7 @@
               </div>
 
               <div class="slide-actions">
-                <button class="btn btn-primary btn-lg" (click)="navigateToBookingFlow(item.event_Id)">
+                <button class="btn btn-primary btn-lg" (click)="navigateToBookingFlow(item)">
                   Book Tickets Now
                 </button>
               </div>
@@ -52,17 +52,7 @@
       }
     </div>
 
-    <!-- Navigation Arrows -->
-    <button class="carousel-nav prev" (click)="prevSlide()" aria-label="Previous Slide">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="15 18 9 12 15 6"></polyline>
-      </svg>
-    </button>
-    <button class="carousel-nav next" (click)="nextSlide()" aria-label="Next Slide">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="9 18 15 12 9 6"></polyline>
-      </svg>
-    </button>
+    <!-- Navigation Arrows Removed per user request -->
 
     <!-- Carousel Indicators -->
     <div class="carousel-indicators">

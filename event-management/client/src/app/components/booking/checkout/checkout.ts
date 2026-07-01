@@ -2,10 +2,11 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { Subscription, Observable } from 'rxjs';
 import { NavbarComponent } from '../../home/navbar/navbar';
 import { FooterComponent } from '../../home/footer/footer';
 import { BookingService } from '../../../services/booking.service';
+import { EventService } from '../../../services/event.service';
 import { TicketTierSelection, BookingModel } from '../../../models/booking.model';
 import { BrowsedEventResponse } from '../../../models/event.model';
 import { mockAllEvents } from '../../../data/event.mock';
@@ -27,21 +28,17 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   public confirmedBooking = signal<BookingModel | null>(null);
   public showQrModal = signal(false);
 
+  // Review Modal & Revert API states
+  public showReviewModal = signal(true);
+  public isInitiatingBooking = signal(false);
+  public pendingBookingId: number | null = null;
+  public isConfirmed = false;
+
   // Success animation state
   public isSuccessTickAnimating = signal(false);
 
-  // Payment form state
-  public cardNumber = '';
-  public cardName = '';
-  public cardExpiry = '';
-  public cardCvv = '';
-  
-  // Specific input validation errors
   public paymentError = signal('');
-  public cardNumberError = signal('');
   public cardNameError = signal('');
-  public cardExpiryError = signal('');
-  public cardCvvError = signal('');
 
   // Ticket Fee states
   public ticketFee = signal(0);
@@ -64,62 +61,103 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private bookingService: BookingService
+    private bookingService: BookingService,
+    private eventService: EventService
   ) {}
+
+  private resolveImageUrl(url: string | null | undefined): string | undefined {
+    if (!url) return undefined;
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+      return url;
+    }
+    const cleanUrl = url.startsWith('/') ? url : '/' + url;
+    return `http://localhost:5106${cleanUrl}`;
+  }
 
   ngOnInit(): void {
     this.subscriptions.add(
       this.route.queryParams.subscribe(params => {
         const eventId = Number(params['eventId']);
         const qtyStr = params['quantities'] || '{}';
+        const sessionId = params['session_id'];
+        const bookingId = Number(params['bookingId']);
         
+        if (this.currentStep() === 'confirmation') {
+          return;
+        }
+
         if (!eventId) {
           this.router.navigate(['/browse']);
           return;
         }
 
-        // Load event from mock data
-        const found = mockAllEvents.find(e => e.event_Id === eventId);
+        // Try history state first, then mock data
+        const stateEvent = history.state?.event as BrowsedEventResponse;
+        let found = stateEvent && Number(stateEvent.event_Id) === eventId ? stateEvent : null;
+
         if (!found) {
-          this.router.navigate(['/browse']);
-          return;
+          found = mockAllEvents.find(e => e.event_Id === eventId) ?? null;
         }
-        this.event.set(found);
 
-        try {
-          const quantities = JSON.parse(qtyStr);
-          const selectedTiers: TicketTierSelection[] = [];
-          
-          Object.keys(quantities).forEach(tierName => {
-            const qty = quantities[tierName];
-            if (qty > 0) {
-              let price = found.minPrice || 250;
-              if (tierName === 'VIP') price = price * 2.5;
-              if (tierName === 'Backstage') price = price * 5;
-              
-              selectedTiers.push({
-                tierName,
-                price,
-                quantity: qty,
-                availableSeats: 50,
-                totalSeats: 50
-              });
-            }
-          });
-
-          this.tiers.set(selectedTiers);
-          
-          if (selectedTiers.length === 0) {
-            this.router.navigate(['/booking'], { queryParams: { eventId } });
-            return;
-          }
-
-          this.calculateFee(eventId, quantities);
-        } catch {
-          this.router.navigate(['/booking'], { queryParams: { eventId } });
+        if (found) {
+          this.handleEventFound(found, sessionId, bookingId, qtyStr, eventId);
+        } else {
+          // If not in state or mock, fetch from API
+          this.subscriptions.add(
+            this.eventService.getEventById(eventId).subscribe({
+              next: (apiEvent) => {
+                this.handleEventFound(apiEvent, sessionId, bookingId, qtyStr, eventId);
+              },
+              error: () => {
+                this.router.navigate(['/browse']);
+              }
+            })
+          );
         }
       })
     );
+  }
+
+  private handleEventFound(found: BrowsedEventResponse, sessionId: string, bookingId: number, qtyStr: string, eventId: number): void {
+    this.event.set(found);
+
+    if (sessionId && bookingId) {
+      this.pendingBookingId = bookingId;
+      this.confirmStripeCheckout(sessionId, found);
+      return;
+    }
+
+    try {
+      const quantities = JSON.parse(qtyStr);
+      const selectedTiers: TicketTierSelection[] = [];
+      
+      Object.keys(quantities).forEach(tierName => {
+        const qty = quantities[tierName];
+        if (qty > 0) {
+          const tierData = found.ticketTiers?.find(t => t.tier_Name === tierName);
+          const price = tierData?.price ?? (found.minPrice ?? 250);
+          
+          selectedTiers.push({
+            tierName,
+            price,
+            quantity: qty,
+            availableSeats: 50,
+            totalSeats: 50
+          });
+        }
+      });
+
+      this.tiers.set(selectedTiers);
+      
+      if (selectedTiers.length === 0) {
+        this.router.navigate(['/booking'], { queryParams: { eventId } });
+        return;
+      }
+
+      this.calculateFee(eventId, quantities);
+    } catch {
+      this.router.navigate(['/booking'], { queryParams: { eventId } });
+    }
   }
 
   private calculateFee(eventId: number, tierQuantities: Record<string, number>): void {
@@ -142,121 +180,41 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     );
   }
 
-  public onCardNumberInput(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const raw = input.value.replace(/\D/g, '').substring(0, 16);
-    this.cardNumber = raw.replace(/(.{4})/g, '$1 ').trim();
-    input.value = this.cardNumber;
-    this.cardNumberError.set('');
-  }
 
-  public onNameInput(): void {
-    this.cardNameError.set('');
-  }
-
-  public onExpiryInput(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    let raw = input.value.replace(/\D/g, '').substring(0, 4);
-    if (raw.length >= 2) {
-      raw = raw.substring(0, 2) + '/' + raw.substring(2);
-    }
-    this.cardExpiry = raw;
-    input.value = this.cardExpiry;
-    this.cardExpiryError.set('');
-  }
-
-  public onCvvInput(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    this.cardCvv = input.value.replace(/\D/g, '').substring(0, 4);
-    input.value = this.cardCvv;
-    this.cardCvvError.set('');
-  }
-
-  public async confirmPayment(): Promise<void> {
-    this.paymentError.set('');
-    this.cardNumberError.set('');
-    this.cardNameError.set('');
-    this.cardExpiryError.set('');
-    this.cardCvvError.set('');
-
-    let hasError = false;
-
-    const cleanCardNum = this.cardNumber.replace(/\s/g, '');
-    if (!cleanCardNum) {
-      this.cardNumberError.set('Card number is required.');
-      hasError = true;
-    } else if (cleanCardNum.length < 16) {
-      this.cardNumberError.set('Card number must be 16 digits.');
-      hasError = true;
-    }
-
-    if (!this.cardName.trim()) {
-      this.cardNameError.set('Cardholder name is required.');
-      hasError = true;
-    }
-
-    if (!this.cardExpiry.trim()) {
-      this.cardExpiryError.set('Expiry date is required.');
-      hasError = true;
-    } else if (this.cardExpiry.length < 5 || !/^\d{2}\/\d{2}$/.test(this.cardExpiry)) {
-      this.cardExpiryError.set('Expiry must be MM/YY.');
-      hasError = true;
-    }
-
-    if (!this.cardCvv.trim()) {
-      this.cardCvvError.set('CVV is required.');
-      hasError = true;
-    } else if (this.cardCvv.length < 3) {
-      this.cardCvvError.set('CVV must be 3 or 4 digits.');
-      hasError = true;
-    }
-
-    if (hasError) return;
-
+  private async confirmStripeCheckout(sessionId: string, event: BrowsedEventResponse): Promise<void> {
     this.isProcessing.set(true);
-    const event = this.event();
-    if (!event) return;
-
-    const tierQuantities: Record<string, number> = {};
-    this.tiers().forEach(t => {
-      tierQuantities[t.tierName] = t.quantity;
-    });
-
+    this.currentStep.set('confirmation');
+    this.isSuccessTickAnimating.set(true); // Show animation while processing
+    
     try {
-      // Step 1: Initiate booking
-      const initiateResult = await new Promise<{ booking_Id: number }>((resolve, reject) => {
-        this.bookingService.initiateBooking({
-          eventId: event.event_Id,
-          tierQuantities
-        }).subscribe({
-          next: resolve,
-          error: reject
-        });
-      });
-
-      // Simulate payment delay
-      await new Promise(r => setTimeout(r, 1200));
-
-      // Step 2: Confirm booking
       const confirmed = await new Promise<BookingModel>((resolve, reject) => {
-        this.bookingService.confirmBooking(initiateResult.booking_Id, {
-          stripeChargeId: `ch_mock_${Date.now()}`,
-          paymentMethod: 'card'
+        this.bookingService.confirmBooking(this.pendingBookingId!, {
+          stripeChargeId: sessionId,
+          paymentMethod: 'stripe_checkout'
         }).subscribe({
-          next: (booking) => {
-            booking.event_Id = event.event_Id;
-            booking.event_Title = event.title;
-            booking.event_Type = event.eventType as any;
-            booking.event_Date_Time = event.dateTime;
-            booking.event_Image_Url = event.imageUrl;
-            booking.event_Venue = event.venue_Name;
-            booking.event_Region = event.region_Name;
-            booking.total_Amount = this.totalAmount();
-            booking.details = this.tiers().map(t => ({
-              tier_Name: t.tierName,
-              quantity: t.quantity,
-              price: t.price
-            }));
+          next: (res) => {
+            const booking: BookingModel = {
+              booking_Id: res.booking_Id,
+              attendee_Id: res.attendee_Id,
+              event_Id: event.event_Id,
+              event_Title: event.title,
+              event_Type: event.event_Type as any,
+              event_Date_Time: event.date_Time,
+              event_Image_Url: this.resolveImageUrl(event.image_Url),
+              event_Venue: event.venue_Name,
+              event_Region: event.venue_Region_Name,
+              booking_Status: 'Confirmed',
+              qr_Code_Path: this.resolveImageUrl(res.qr_Code_Path),
+              checkIn_Status: 'Pending',
+              created_At: new Date().toISOString(),
+              virtual_Url: res.virtual_Url,
+              total_Amount: res.total_Amount ?? 0, // Fallback since totalAmount isn't available from form
+              details: (res.details ?? []).map((d: any) => ({
+                tier_Name: d.tier_Name,
+                quantity: d.quantity,
+                price: d.price ?? event.ticketTiers?.find((t: any) => t.tier_Name === d.tier_Name)?.price ?? (event.minPrice ?? 250)
+              }))
+            };
             resolve(booking);
           },
           error: reject
@@ -264,21 +222,98 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       });
 
       this.confirmedBooking.set(confirmed);
-      this.currentStep.set('confirmation');
+
+      // Clear URL params so refresh doesn't re-trigger confirmation
+      this.router.navigate([], {
+        queryParams: { session_id: null, bookingId: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true
+      });
       
-      // Ensure page scrolls to top for checkmark animation
-      window.scrollTo({ top: 0 });
-      this.isSuccessTickAnimating.set(true);
-      
+      // Stop animation after a brief delay
       setTimeout(() => {
         this.isSuccessTickAnimating.set(false);
       }, 1500);
-
-    } catch {
-      this.paymentError.set('Payment failed. Please verify details or try a different card.');
-    } finally {
+      
+    } catch (err: any) {
       this.isProcessing.set(false);
+      this.isSuccessTickAnimating.set(false);
+      this.currentStep.set('payment'); // Go back if failed
+      
+      const msg = err.error?.Message || err.message || '';
+      if (msg.includes('already') || msg.includes('Confirmed')) {
+        this.router.navigate(['/bookings']);
+      } else {
+        this.paymentError.set(msg || 'Payment confirmation failed.');
+      }
     }
+  }
+
+  /**
+   * Called when confirming the review modal.
+   * Creates the pending booking reservation in the database and shows payment screen.
+   */
+  public onConfirmReview(): void {
+    const event = this.event();
+    if (!event) return;
+
+    this.isInitiatingBooking.set(true);
+
+    const tierQuantities: Record<string, number> = {};
+    this.tiers().forEach(t => {
+      tierQuantities[t.tierName] = t.quantity;
+    });
+
+    this.bookingService.initiateBooking({
+      eventId: event.event_Id,
+      tierQuantities
+    }).subscribe({
+      next: (res) => {
+        this.pendingBookingId = res.booking_Id;
+        // Proper timing transition to payment screen
+        setTimeout(() => {
+          this.isInitiatingBooking.set(false);
+          this.showReviewModal.set(false);
+        }, 800);
+      },
+      error: (err) => {
+        this.isInitiatingBooking.set(false);
+        alert(err?.error?.message || 'Failed to initiate booking reservation. Please try again.');
+      }
+    });
+  }
+
+  /**
+   * Called when cancelling the review modal.
+   * Redirects user back to event page.
+   */
+  public onCancelReview(): void {
+    const event = this.event();
+    const eventId = event ? event.event_Id : 0;
+    this.showReviewModal.set(false);
+    this.router.navigate(['/booking'], { queryParams: { eventId } });
+  }
+
+  /**
+   * Guard trigger to revert pending bookings when navigating away.
+   */
+  public canDeactivate(): Observable<boolean> | boolean {
+    if (this.pendingBookingId && !this.isConfirmed) {
+      return new Observable<boolean>(observer => {
+        this.bookingService.revertBooking(this.pendingBookingId!).subscribe({
+          next: () => {
+            observer.next(true);
+            observer.complete();
+          },
+          error: () => {
+            // Permit navigation even if API fails to revert
+            observer.next(true);
+            observer.complete();
+          }
+        });
+      });
+    }
+    return true;
   }
 
   public openQrModal(): void {

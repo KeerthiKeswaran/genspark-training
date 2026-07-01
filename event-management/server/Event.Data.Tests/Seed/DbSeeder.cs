@@ -19,6 +19,7 @@ namespace Event.Data.Tests.Seed
         {
             var terms = new TermsAndConditions
             {
+                Terms_Id = Guid.NewGuid().ToString(),
                 Version = version,
                 File_Path = $"/docs/policies/terms_{version}.md",
                 Type = type,

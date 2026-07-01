@@ -30,14 +30,14 @@ namespace Event.Business.Helpers
             await notificationRepository.AddAsync(notification);
 
             // 2. Build the JSON filepath relative to the workspace
-            string rootPath = Directory.GetCurrentDirectory();
+            string rootPath = Directory.GetCurrentDirectory().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             if (rootPath.Contains("bin") || rootPath.EndsWith("Tests"))
             {
-                rootPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", ".."));
+                rootPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             }
             else if (rootPath.EndsWith("Event.API"))
             {
-                rootPath = Path.GetFullPath(Path.Combine(rootPath, ".."));
+                rootPath = Path.GetFullPath(Path.Combine(rootPath, "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             }
 
             string notificationDir = Path.Combine(rootPath, "Event.Business", "assets", "notifications");
@@ -58,8 +58,8 @@ namespace Event.Business.Helpers
             await File.WriteAllTextAsync(jsonFilePath, jsonContent);
 
             // 4. Update the MessageUrl
-            notification.MessageUrl = $"Event.Business/assets/notifications/{notification.Notification_Id}.json";
-            
+            notification.MessageUrl = $"/assets/notifications/{notification.Notification_Id}.json";
+
             try
             {
                 // 5. Trigger the email send directly

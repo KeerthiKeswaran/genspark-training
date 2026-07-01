@@ -75,21 +75,21 @@ namespace Event.Business.Tests.ServiceTests
                 Booking_Id = 501,
                 Attendee_Id = 10,
                 Booking_Status = "Pending",
-                Attendee = new User { Email = TestEmail },
+                Attendee = new User { User_Id = 10001, Email = TestEmail },
                 Event = new Event.Models.Event { Date_Time = DateTime.UtcNow.AddDays(3), Title = "Gala" }
             };
             var booking502 = new Booking {
                 Booking_Id = 502,
                 Attendee_Id = 10,
                 Booking_Status = "Pending",
-                Attendee = new User { Email = TestEmail },
+                Attendee = new User { User_Id = 10001, Email = TestEmail },
                 Event = new Event.Models.Event { Date_Time = DateTime.UtcNow.AddDays(3), Title = "Gala" }
             };
             var booking503 = new Booking {
                 Booking_Id = 503,
                 Attendee_Id = 10,
                 Booking_Status = "Pending",
-                Attendee = new User { Email = TestEmail },
+                Attendee = new User { User_Id = 10001, Email = TestEmail },
                 Event = new Event.Models.Event { Date_Time = DateTime.UtcNow.AddDays(3), Title = "Gala" }
             };
 
@@ -122,7 +122,7 @@ namespace Event.Business.Tests.ServiceTests
                 Title = "Organized Gala",
                 Status = "Live",
                 Date_Time = DateTime.UtcNow.AddDays(3),
-                Organizer = new User { Email = TestEmail }
+                Organizer = new User { User_Id = 10001, Email = TestEmail }
             };
             eventRepositoryMock.Setup(r => r.GetEventDetailsAsync(201)).ReturnsAsync(event201);
 
@@ -138,15 +138,16 @@ namespace Event.Business.Tests.ServiceTests
             };
             _transactionRepositoryMock.Setup(r => r.GetTransactionsByUserIdAsync(10)).ReturnsAsync(txs201);
 
-            _financeService = new FinanceService(
-                _adminActionRepositoryMock.Object,
-                _supportTicketRepositoryMock.Object,
-                _userRepositoryMock.Object,
-                _refundService,
-                _emailService,
-                _notificationRepositoryMock.Object,
-                _transactionRepositoryMock.Object
-            );
+             _financeService = new FinanceService(
+                 _adminActionRepositoryMock.Object,
+                 _supportTicketRepositoryMock.Object,
+                 _userRepositoryMock.Object,
+                 _refundService,
+                 _emailService,
+                 _notificationRepositoryMock.Object,
+                 _transactionRepositoryMock.Object,
+                 eventRepositoryMock.Object
+             );
         }
         #endregion
 

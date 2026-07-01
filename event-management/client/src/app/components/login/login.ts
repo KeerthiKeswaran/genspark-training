@@ -1,7 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
@@ -17,13 +17,17 @@ export class LoginComponent implements OnInit {
   public errorMessage = signal<string | null>(null);
   public isSubmitting = signal(false);
   public showPassword = signal(false);
+  public returnUrl = '/';
 
   constructor(
     private authService: AuthService,
+    private route: ActivatedRoute,
     private router: Router
   ) {}
 
-  ngOnInit(): void {}
+  ngOnInit(): void {
+    this.returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
+  }
 
   public togglePassword(): void {
     this.showPassword.update(v => !v);
@@ -42,8 +46,7 @@ export class LoginComponent implements OnInit {
     this.authService.login(this.email, this.password).subscribe({
       next: () => {
         this.isSubmitting.set(false);
-        // Navigate back to home
-        this.router.navigate(['/']);
+        this.router.navigateByUrl(this.returnUrl);
       },
       error: (err) => {
         this.isSubmitting.set(false);

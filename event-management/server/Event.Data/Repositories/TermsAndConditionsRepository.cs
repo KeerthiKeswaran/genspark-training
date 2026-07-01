@@ -14,7 +14,7 @@ namespace Event.Data.Repositories
 
         public async Task<TermsAndConditions?> GetActiveTermsAsync()
         {
-            return await _dbSet.FirstOrDefaultAsync(tc => tc.Is_Active);
+            return await _dbSet.FirstOrDefaultAsync(tc => tc.Is_Active && tc.Type == "General");
         }
 
         public async Task<TermsAndConditions?> GetTermsByVersionAsync(string version)
@@ -24,7 +24,8 @@ namespace Event.Data.Repositories
 
         public async Task<TermsAndConditions?> GetActiveTermsByTypeAsync(string type)
         {
-            return await _dbSet.FirstOrDefaultAsync(tc => tc.Is_Active && tc.Type == type);
+            if (string.IsNullOrEmpty(type)) return null;
+            return await _dbSet.FirstOrDefaultAsync(tc => tc.Is_Active && tc.Type.ToLower() == type.ToLower());
         }
     }
 }

@@ -63,6 +63,22 @@ export function appReducer(state: AppState = initialAppState, action: { type: st
         events: { ...state.events, loading: false, error: action.payload }
       };
 
+    case ActionTypes.LOAD_RECOMMENDED_START:
+      return {
+        ...state,
+        events: { ...state.events, loading: true, error: null }
+      };
+    case ActionTypes.LOAD_RECOMMENDED_SUCCESS:
+      return {
+        ...state,
+        events: { ...state.events, loading: false, recommended: action.payload }
+      };
+    case ActionTypes.LOAD_RECOMMENDED_FAIL:
+      return {
+        ...state,
+        events: { ...state.events, loading: false, error: action.payload }
+      };
+
     case ActionTypes.LOAD_REGIONS_START:
       return {
         ...state,
@@ -82,6 +98,22 @@ export function appReducer(state: AppState = initialAppState, action: { type: st
       return {
         ...state,
         regions: { ...state.regions, currentRegionId: action.payload }
+      };
+
+    case ActionTypes.LOAD_POPULAR_REGIONS_START:
+      return {
+        ...state,
+        regions: { ...state.regions, loading: true, error: null }
+      };
+    case ActionTypes.LOAD_POPULAR_REGIONS_SUCCESS:
+      return {
+        ...state,
+        regions: { ...state.regions, loading: false, popularItems: action.payload }
+      };
+    case ActionTypes.LOAD_POPULAR_REGIONS_FAIL:
+      return {
+        ...state,
+        regions: { ...state.regions, loading: false, error: action.payload }
       };
 
     default:

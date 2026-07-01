@@ -14,6 +14,14 @@ namespace Event.Data.Repositories
         {
         }
 
+        public override async Task<Venue?> GetByIdAsync(object id)
+        {
+            return await _context.Venues
+                .Include(v => v.SeatCapacities)
+                .Include(v => v.Region)
+                .FirstOrDefaultAsync(v => v.Venue_Id == (int)id);
+        }
+
         public async Task<bool> IsVenueOccupiedAsync(int venueId, DateTime dateTime)
         {
             return await _context.Events

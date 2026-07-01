@@ -13,10 +13,12 @@ import { RegionModel } from '../../models/region.model';
 import { LocationModalComponent } from '../home/location-modal/location-modal';
 import { FooterComponent } from '../home/footer/footer';
 
+import { ResolveDescriptionPipe } from '../../pipes/resolve-description.pipe';
+
 @Component({
   selector: 'app-browse-events',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, LocationModalComponent, FooterComponent],
+  imports: [CommonModule, FormsModule, RouterLink, LocationModalComponent, FooterComponent, ResolveDescriptionPipe],
   templateUrl: './browse-events.html',
   styleUrl: './browse-events.css'
 })
@@ -27,6 +29,7 @@ export class BrowseEventsComponent implements OnInit, OnDestroy {
   }
   // Filters binded to inputs
   public filterKeyword = '';
+  public navSearchKeyword = '';
   public filterRegionIds: string[] = [];
   public filterCategory = '';
   public filterFormat = '';
@@ -51,6 +54,7 @@ export class BrowseEventsComponent implements OnInit, OnDestroy {
   public eventsLoading = signal(false);
   public activeUserRegionId = signal('REG01');
   public totalEvents = signal(0);
+  public categories = signal<string[]>([]);
 
   private subscriptions: Subscription = new Subscription();
 
@@ -90,11 +94,13 @@ export class BrowseEventsComponent implements OnInit, OnDestroy {
 
     // Initial loads
     this.regionService.loadRegions().subscribe();
+    this.loadCategories();
 
     // Listen to query parameters
     this.subscriptions.add(
       this.route.queryParams.subscribe(params => {
         this.filterKeyword = params['keyword'] || '';
+        this.navSearchKeyword = this.filterKeyword;
         const regs = params['regions'] || '';
         this.filterRegionIds = regs ? regs.split(',') : [];
         this.filterCategory = params['category'] || '';
@@ -119,15 +125,24 @@ export class BrowseEventsComponent implements OnInit, OnDestroy {
     return found ? found.name : 'Chennai';
   }
 
+  private loadCategories(): void {
+    this.eventService.getCategories().subscribe({
+      next: (cats) => this.categories.set(cats),
+      error: () => {
+        // Fallback to defaults if API fails
+        this.categories.set(['Tech', 'Conference', 'Music', 'Sports', 'Workshop', 'Education', 'Arts', 'Food', 'Wellness']);
+      }
+    });
+  }
+
   public fetchEvents(): void {
+    // When filtering by category, don't lock to a region — search all regions for that category
+    const regionIdParam = this.filterCategory ? undefined : this.activeUserRegionId();
+
     this.eventService.browseEvents({
-      keyword: this.filterKeyword,
-      regionId: this.activeUserRegionId(), // For active sorting
-      regionIds: this.filterRegionIds, // For checkbox filtering
-      category: this.filterCategory,
-      format: this.filterFormat,
-      maxPrice: this.filterMaxPrice !== null ? this.filterMaxPrice : undefined,
-      sortBy: this.filterSortBy,
+      keyword: this.filterKeyword || undefined,
+      category: this.filterCategory || undefined,
+      regionId: regionIdParam,
       page: this.currentPage,
       size: this.pageSize
     }).subscribe(result => {
@@ -136,15 +151,21 @@ export class BrowseEventsComponent implements OnInit, OnDestroy {
     });
   }
 
+
   // Action Apply Filters
   public applyFilters(): void {
+    this.filterKeyword = this.navSearchKeyword;
     this.currentPage = 1;
     this.updateQueryParams();
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
   }
 
   // Clear Filters
   public clearFilters(): void {
     this.filterKeyword = '';
+    this.navSearchKeyword = '';
     this.filterRegionIds = [];
     this.filterCategory = '';
     this.filterFormat = '';
@@ -152,6 +173,9 @@ export class BrowseEventsComponent implements OnInit, OnDestroy {
     this.filterSortBy = '';
     this.currentPage = 1;
     this.updateQueryParams();
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
   }
 
   // Checkbox region filters logic
@@ -171,6 +195,7 @@ export class BrowseEventsComponent implements OnInit, OnDestroy {
   // Chip removers for top filter summary
   public removeKeywordFilter(): void {
     this.filterKeyword = '';
+    this.navSearchKeyword = '';
     this.applyFilters();
   }
 
@@ -285,12 +310,15 @@ export class BrowseEventsComponent implements OnInit, OnDestroy {
     this.router.navigate(['/create-event']);
   }
 
-  public navigateToBookingFlow(eventId: number): void {
+  public navigateToBookingFlow(eventObj: any): void {
     if (!this.isLoggedIn()) {
       this.router.navigate(['/login']);
       return;
     }
-    this.router.navigate(['/booking'], { queryParams: { eventId } });
+    this.router.navigate(['/booking'], { 
+      queryParams: { eventId: eventObj.event_Id },
+      state: { event: eventObj }
+    });
   }
 
   public triggerManageMyEventsAction(): void {
@@ -298,7 +326,8 @@ export class BrowseEventsComponent implements OnInit, OnDestroy {
   }
 
   public triggerAccountSettingsAction(): void {
-    alert('Navigating to account settings...');
+    this.router.navigate(['/settings']);
+    this.isProfileDropdownOpen.set(false);
   }
 
   public triggerGetHelpAction(): void {

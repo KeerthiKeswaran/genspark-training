@@ -10,6 +10,10 @@ namespace Event.Models.DTOs
 
         [Required]
         public DateTime DateTime { get; set; }
+
+        [Required]
+        [Range(1, 168)]
+        public int DurationHours { get; set; }
     }
 
     public class StaffAvailabilityResponse

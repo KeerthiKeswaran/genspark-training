@@ -6,7 +6,7 @@ namespace Event.Models.DTOs
         public string Email { get; set; } = string.Empty;
         public string MobileNumber { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
-        public int ConsentedTermsId { get; set; }
+        public string ConsentedTermsId { get; set; } = string.Empty;
         public bool HasMarketingConsent { get; set; }
         public string Otp { get; set; } = string.Empty;
     }

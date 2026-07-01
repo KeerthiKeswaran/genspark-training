@@ -5,6 +5,7 @@ import { AppStoreService } from '../store/app-store.service';
 import { ActionTypes } from '../store/actions/app.actions';
 import { UserModel, AuthResponse } from '../models/user.model';
 import { mockUser, mockLoginResponse, mockRegisterResponse } from '../data/auth.mock';
+import { ConsentDocument, mockTermsAndConditions, mockDataConsent } from '../data/consent.mock';
 
 @Injectable({
   providedIn: 'root'
@@ -26,8 +27,6 @@ export class AuthService {
   public login(email: string, password: string): Observable<AuthResponse> {
     this.store.dispatch({ type: ActionTypes.LOGIN_START });
     
-    // Commented out server HTTP call:
-    /*
     return this.http.post<AuthResponse>(`${this.baseUrl}/auth/user/login`, { email, password }).pipe(
       tap((res) => {
         if (res.token) {
@@ -45,33 +44,11 @@ export class AuthService {
         return throwError(() => err);
       })
     );
-    */
-
-    // Simulated Mock Login logic:
-    if (email === 'keshwarankeerthi@gmail.com' && password === 'SecurePassword123!') {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('token', mockLoginResponse.token);
-      }
-      this.store.dispatch({
-        type: ActionTypes.LOGIN_SUCCESS,
-        payload: { token: mockLoginResponse.token, user: null }
-      });
-      
-      // Auto-load mock profile
-      this.loadProfile().subscribe();
-      return of(mockLoginResponse);
-    } else {
-      const mockError = { error: { message: 'Invalid email or password. Please check your credentials.' } };
-      this.store.dispatch({ type: ActionTypes.LOGIN_FAIL, payload: mockError.error.message });
-      return throwError(() => mockError);
-    }
   }
 
   public register(payload: any): Observable<AuthResponse> {
     this.store.dispatch({ type: ActionTypes.LOGIN_START });
     
-    // Commented out server HTTP call:
-    /*
     return this.http.post<AuthResponse>(`${this.baseUrl}/auth/user/register`, payload).pipe(
       tap((res) => {
         if (res.token) {
@@ -89,45 +66,23 @@ export class AuthService {
         return throwError(() => err);
       })
     );
-    */
-
-    // Simulated Mock Register logic:
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('token', mockRegisterResponse.token);
-    }
-    this.store.dispatch({
-      type: ActionTypes.LOGIN_SUCCESS,
-      payload: { token: mockRegisterResponse.token, user: null }
-    });
-    this.loadProfile().subscribe();
-    return of(mockRegisterResponse);
   }
 
   public sendOtp(email: string, purpose: string): Observable<any> {
-    // Commented out server HTTP call:
-    /*
     return this.http.post(`${this.baseUrl}/auth/user/send-otp`, { email, purpose });
-    */
+  }
 
-    // Simulated Mock response:
-    return of({ message: 'OTP sent successfully.' });
+  public verifyOtp(email: string, otp: string, purpose: string = 'registration'): Observable<any> {
+    return this.http.post(`${this.baseUrl}/auth/user/verify-otp`, { email, otp, purpose });
   }
 
   public resetPassword(payload: any): Observable<any> {
-    // Commented out server HTTP call:
-    /*
     return this.http.post(`${this.baseUrl}/auth/user/reset-password`, payload);
-    */
-
-    // Simulated Mock response:
-    return of({ message: 'Password reset successfully.' });
   }
 
   public loadProfile(): Observable<UserModel> {
     this.store.dispatch({ type: ActionTypes.LOAD_USER_PROFILE });
     
-    // Commented out server HTTP call:
-    /*
     return this.http.get<UserModel>(`${this.baseUrl}/user/profile`).pipe(
       tap((user) => {
         this.store.dispatch({
@@ -149,52 +104,43 @@ export class AuthService {
         return throwError(() => err);
       })
     );
-    */
-
-    // Simulated Mock profile data:
-    const activeUser: UserModel = {
-      ...mockUser,
-      interested_Region_Id: (typeof window !== 'undefined' ? localStorage.getItem('currentRegionId') : null) || 'REG01'
-    };
-
-    this.store.dispatch({
-      type: ActionTypes.LOAD_USER_PROFILE_SUCCESS,
-      payload: activeUser
-    });
-    
-    return of(activeUser);
   }
 
   public selectRegion(regionId: string): Observable<any> {
-    // Commented out server HTTP call:
-    /*
-    return this.http.post(`${this.baseUrl}/user/select-regions`, { regionId }).pipe(...);
-    */
-
-    // Simulated Mock response:
-    this.store.dispatch({
-      type: ActionTypes.SET_REGION,
-      payload: regionId
-    });
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('currentRegionId', regionId);
-    }
-    
-    const user = this.store.state.auth.user;
-    if (user) {
-      this.store.dispatch({
-        type: ActionTypes.LOAD_USER_PROFILE_SUCCESS,
-        payload: { ...user, interested_Region_Id: regionId }
-      });
-    }
-
-    return of({ message: 'Interested regions updated successfully.' });
+    return this.http.post(`${this.baseUrl}/user/select-regions`, { regionId }).pipe(
+      tap((res: any) => {
+        this.store.dispatch({
+          type: ActionTypes.SET_REGION,
+          payload: regionId
+        });
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('currentRegionId', regionId);
+        }
+        const user = this.store.state.auth.user;
+        if (user) {
+          this.store.dispatch({
+            type: ActionTypes.LOAD_USER_PROFILE_SUCCESS,
+            payload: { ...user, interested_Region_Id: regionId }
+          });
+        }
+      })
+    );
   }
 
   public logout(): void {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token');
+      localStorage.removeItem('mockUserProfile');
     }
     this.store.dispatch({ type: ActionTypes.LOGOUT });
   }
+
+  /**
+   * Retrieves a consent or terms document by type.
+   * API: GET /api/policies/{type}
+   */
+  public getConsentDocument(type: string): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/policies/${type}`);
+  }
 }
+

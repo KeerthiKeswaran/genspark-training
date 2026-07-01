@@ -39,6 +39,7 @@ namespace Event.Business.Services
 
                         await bookingService.ReleaseExpiredEventBookingAsync();
                         await eventService.ReleaseExpiredEventCreationAsync();
+                        await eventService.ReleaseCompletedEventsAsync();
                     }
 
                     _logger.LogInformation("Completed release of expired bookings and events. Sleeping for {Interval} minutes.", _checkInterval.TotalMinutes);

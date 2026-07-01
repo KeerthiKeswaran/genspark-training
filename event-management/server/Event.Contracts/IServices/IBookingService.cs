@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Event.Models;
@@ -7,11 +8,14 @@ namespace Event.Contracts.IServices
 {
     public interface IBookingService
     {
-        Task<BookingResponse?> BookTicketsAsync(int attendeeId, int eventId, Dictionary<string, int> tierQuantities);
-        Task<BookingResponse?> ConfirmBookingPaymentAsync(int bookingId, string stripeChargeId, string paymentMethod);
+        Task<InitiateBookingResponse?> BookTicketsAsync(int attendeeId, int eventId, Dictionary<string, int> tierQuantities);
+        Task<ConfirmBookingResponse?> ConfirmBookingPaymentAsync(int bookingId, string stripeChargeId, string paymentMethod);
         Task<IEnumerable<BookingResponse>> GetMyBookingsAsync(int attendeeId, string? status = null);
         Task<bool> CancelBookingAsync(int bookingId, string refundType = "Dynamic");
         Task ReleaseExpiredEventBookingAsync();
         Task<bool> RevertPendingBookingAsync(int bookingId);
+        Task<(DateTime EventDateTime, decimal OriginalAmount)> GetBookingRefundDetailsAsync(int bookingId);
+        Task<IEnumerable<ActiveVirtualLinkResponse>> GetActiveVirtualLinksAsync(int attendeeId);
+        Task<(bool Success, string SessionId, string SessionUrl, string ErrorMessage)> CreateCheckoutSessionForBookingAsync(int bookingId, string successUrl, string cancelUrl);
     }
 }

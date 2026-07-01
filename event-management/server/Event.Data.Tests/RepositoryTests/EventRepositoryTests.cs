@@ -224,7 +224,7 @@ namespace Event.Data.Tests.RepositoryTests
             {
                 Event_Id = newEvent.Event_Id,
                 Reporter_Id = deps.organizer.User_Id,
-                Reason = "Inappropriate content",
+                ReportUrl = "/assets/events/10001/reports/10002_report.json",
                 Created_At = DateTime.UtcNow
             };
 
@@ -233,7 +233,7 @@ namespace Event.Data.Tests.RepositoryTests
                 await _repository.AddReportAsync(report);
                 var reportInDb = Context.EventReports.FirstOrDefault(r => r.Event_Id == newEvent.Event_Id);
                 Assert.That(reportInDb, Is.Not.Null);
-                Assert.That(reportInDb.Reason, Is.EqualTo("Inappropriate content"));
+                Assert.That(reportInDb.ReportUrl, Is.EqualTo("/assets/events/10001/reports/10002_report.json"));
                 LogTestDetail(Repo, "AddReportAsync", "Submit event report", report, reportInDb, true);
             }
             catch (Exception ex)

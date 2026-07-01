@@ -11,5 +11,7 @@ namespace Event.Models.DTOs
         public decimal Duration_Hours { get; set; }
         public string Status { get; set; } = string.Empty;
         public string? Venue_Name { get; set; }
+        public int Tickets_Sold { get; set; }
+        public decimal Net_Earnings { get; set; }
     }
 }

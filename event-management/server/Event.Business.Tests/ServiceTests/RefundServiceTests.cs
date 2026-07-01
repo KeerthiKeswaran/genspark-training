@@ -93,7 +93,7 @@ namespace Event.Business.Tests.ServiceTests
                 Booking_Id = bookingId,
                 Booking_Status = "Confirmed",
                 Attendee_Id = 10010,
-                Attendee = new User { Name = TestName, Email = TestEmail },
+                Attendee = new User { User_Id = 10001, Name = TestName, Email = TestEmail },
                 Event = new Event.Models.Event { Title = "Concert", Date_Time = DateTime.UtcNow.AddDays(3), Status = "Live" }
             };
 
@@ -136,7 +136,7 @@ namespace Event.Business.Tests.ServiceTests
                 Booking_Id = bookingId,
                 Booking_Status = "Cancelled", // already cancelled
                 Attendee_Id = 10010,
-                Attendee = new User { Name = TestName, Email = TestEmail },
+                Attendee = new User { User_Id = 10001, Name = TestName, Email = TestEmail },
                 Event = new Event.Models.Event { Title = "Concert", Date_Time = DateTime.UtcNow.AddDays(3), Status = "Live" }
             };
 
@@ -176,7 +176,7 @@ namespace Event.Business.Tests.ServiceTests
                 Booking_Id = bookingId,
                 Booking_Status = "Cancelled",
                 Attendee_Id = 10010,
-                Attendee = new User { Name = TestName, Email = TestEmail },
+                Attendee = new User { User_Id = 10001, Name = TestName, Email = TestEmail },
                 Event = new Event.Models.Event { Title = "Concert", Date_Time = DateTime.UtcNow.AddDays(3), Status = "Live" }
             };
 
@@ -216,7 +216,7 @@ namespace Event.Business.Tests.ServiceTests
                 Booking_Id = bookingId,
                 Booking_Status = "Cancelled",
                 Attendee_Id = 10010,
-                Attendee = new User { Name = TestName, Email = TestEmail },
+                Attendee = new User { User_Id = 10001, Name = TestName, Email = TestEmail },
                 Event = new Event.Models.Event { Date_Time = DateTime.UtcNow.AddHours(50) }
             };
 
@@ -256,7 +256,7 @@ namespace Event.Business.Tests.ServiceTests
                 Booking_Id = bookingId,
                 Booking_Status = "Cancelled",
                 Attendee_Id = 10010,
-                Attendee = new User { Name = TestName, Email = TestEmail },
+                Attendee = new User { User_Id = 10001, Name = TestName, Email = TestEmail },
                 Event = new Event.Models.Event { Date_Time = DateTime.UtcNow.AddHours(20) }
             };
 
@@ -296,7 +296,7 @@ namespace Event.Business.Tests.ServiceTests
                 Booking_Id = bookingId,
                 Booking_Status = "Cancelled",
                 Attendee_Id = 10010,
-                Attendee = new User { Name = TestName, Email = TestEmail },
+                Attendee = new User { User_Id = 10001, Name = TestName, Email = TestEmail },
                 Event = new Event.Models.Event { Date_Time = DateTime.UtcNow.AddHours(5) }
             };
 
@@ -336,7 +336,7 @@ namespace Event.Business.Tests.ServiceTests
                 Booking_Id = bookingId,
                 Booking_Status = "Cancelled",
                 Attendee_Id = 10010,
-                Attendee = new User { Name = TestName, Email = TestEmail },
+                Attendee = new User { User_Id = 10001, Name = TestName, Email = TestEmail },
                 Event = new Event.Models.Event { Date_Time = DateTime.UtcNow.AddDays(3) }
             };
 
@@ -402,7 +402,7 @@ namespace Event.Business.Tests.ServiceTests
                 Title = "Gala Night",
                 Status = "Live",
                 Organizer_Id = 10005,
-                Organizer = new User { Name = TestName, Email = TestEmail },
+                Organizer = new User { User_Id = 10001, Name = TestName, Email = TestEmail },
                 Date_Time = DateTime.UtcNow.AddDays(5)
             };
 
@@ -464,7 +464,7 @@ namespace Event.Business.Tests.ServiceTests
                 Title = "Gala Night",
                 Status = "Cancelled",
                 Organizer_Id = 10005,
-                Organizer = new User { Name = TestName, Email = TestEmail },
+                Organizer = new User { User_Id = 10001, Name = TestName, Email = TestEmail },
                 Date_Time = DateTime.UtcNow.AddDays(5)
             };
 
@@ -512,7 +512,7 @@ namespace Event.Business.Tests.ServiceTests
                 Title = "Gala Night",
                 Status = "Cancelled",
                 Organizer_Id = 10005,
-                Organizer = new User { Name = TestName, Email = TestEmail }
+                Organizer = new User { User_Id = 10001, Name = TestName, Email = TestEmail }
             };
 
             var upfrontTx = new Transaction
@@ -558,7 +558,7 @@ namespace Event.Business.Tests.ServiceTests
                 Title = "Gala Night",
                 Status = "Cancelled",
                 Organizer_Id = 10005,
-                Organizer = new User { Name = TestName, Email = TestEmail },
+                Organizer = new User { User_Id = 10001, Name = TestName, Email = TestEmail },
                 Date_Time = DateTime.UtcNow.AddHours(50)
             };
 
@@ -606,7 +606,7 @@ namespace Event.Business.Tests.ServiceTests
                 Title = "Gala Night",
                 Status = "Cancelled",
                 Organizer_Id = 10005,
-                Organizer = new User { Name = TestName, Email = TestEmail },
+                Organizer = new User { User_Id = 10001, Name = TestName, Email = TestEmail },
                 Date_Time = DateTime.UtcNow.AddHours(30)
             };
 
@@ -654,7 +654,7 @@ namespace Event.Business.Tests.ServiceTests
                 Title = "Gala Night",
                 Status = "Cancelled",
                 Organizer_Id = 10005,
-                Organizer = new User { Name = TestName, Email = TestEmail },
+                Organizer = new User { User_Id = 10001, Name = TestName, Email = TestEmail },
                 Date_Time = DateTime.UtcNow.AddHours(10)
             };
 
@@ -702,7 +702,7 @@ namespace Event.Business.Tests.ServiceTests
                 Title = "Gala Night",
                 Status = "Cancelled",
                 Organizer_Id = 10005,
-                Organizer = new User { Name = TestName, Email = TestEmail },
+                Organizer = new User { User_Id = 10001, Name = TestName, Email = TestEmail },
                 Date_Time = DateTime.UtcNow.AddDays(5)
             };
 

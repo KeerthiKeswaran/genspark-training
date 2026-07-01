@@ -1,9 +1,10 @@
-using System;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Event.Contracts.IServices;
 using Event.Models.DTOs;
+using System.IO;
+using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 
 namespace Event.API.Controllers
 {
@@ -14,11 +15,48 @@ namespace Event.API.Controllers
     {
         private readonly IEventService _eventService;
         private readonly IUserService _userService;
+        private readonly IAdminService _adminService;
+        private readonly IConfiguration _configuration;
 
-        public EventController(IEventService eventService, IUserService userService)
+        public EventController(IEventService eventService, IUserService userService, IAdminService adminService, IConfiguration configuration)
         {
             _eventService = eventService;
             _userService = userService;
+            _adminService = adminService;
+            _configuration = configuration;
+        }
+
+        [AllowAnonymous]
+        [HttpGet("categories")]
+        public IActionResult GetCategories()
+        {
+            var relativePath = _configuration["CategorySettings:CategoriesFilePath"];
+            if (string.IsNullOrWhiteSpace(relativePath))
+                return NotFound(new { Message = "Categories file path not configured." });
+
+            // Resolve path relative to the Event.Business assembly location
+            var assemblyDir = Path.GetDirectoryName(typeof(Event.Business.Services.EventService).Assembly.Location);
+            var fullPath = Path.Combine(assemblyDir!, "assets", "events", "categories.json");
+
+            if (!System.IO.File.Exists(fullPath))
+                return NotFound(new { Message = $"Categories file not found at: {fullPath}" });
+
+            var json = System.IO.File.ReadAllText(fullPath);
+            var categories = JsonSerializer.Deserialize<string[]>(json);
+            return Ok(categories);
+        }
+
+        [AllowAnonymous]
+        [HttpGet("age-categories")]
+        public IActionResult GetAgeCategories()
+        {
+            var list = new[]
+            {
+                new { Key = "ALL", Display = "Unrestricted" },
+                new { Key = "KID", Display = "5 years +" },
+                new { Key = "ADL", Display = "18+" }
+            };
+            return Ok(list);
         }
 
         [AllowAnonymous]
@@ -44,6 +82,70 @@ namespace Event.API.Controllers
                 return NotFound(new { Message = "Event not found." });
 
             return Ok(ev);
+        }
+
+        [AllowAnonymous]
+        [HttpGet("{eventId}/seats")]
+        public async Task<IActionResult> GetEventSeats(int eventId)
+        {
+            try
+            {
+                var seats = await _eventService.GetEventTicketTierCapacitiesAsync(eventId);
+                return Ok(seats);
+            }
+            catch (Event.Business.Exceptions.NotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [AllowAnonymous]
+        [HttpGet("venues")]
+        public async Task<IActionResult> GetVenues()
+        {
+            try
+            {
+                var venues = await _adminService.GetAllVenuesAsync();
+                return Ok(venues);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [AllowAnonymous]
+        [HttpGet("trending")]
+        public async Task<IActionResult> GetTrendingEvents([FromQuery] int? count)
+        {
+            try
+            {
+                var events = await _eventService.GetTrendingEventsAsync(count);
+                return Ok(events);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [AllowAnonymous]
+        [HttpGet("popular")]
+        public async Task<IActionResult> GetPopularEvents([FromQuery] int regionsLimit = 4)
+        {
+            try
+            {
+                var events = await _eventService.GetPopularEventsInCommonAsync(regionsLimit);
+                return Ok(events);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
         }
 
         [HttpGet("recommended")]
@@ -160,6 +262,24 @@ namespace Event.API.Controllers
             }
         }
 
+        [HttpPost("{eventId}/create-checkout-session")]
+        public async Task<IActionResult> CreateCheckoutSession(int eventId, [FromBody] CreateCheckoutSessionRequest request)
+        {
+            try
+            {
+                var result = await _eventService.CreateCheckoutSessionForEventCreationAsync(eventId, request.SuccessUrl, request.CancelUrl);
+                if (result.Success)
+                {
+                    return Ok(new { SessionId = result.SessionId, SessionUrl = result.SessionUrl });
+                }
+                return BadRequest(new { Message = result.ErrorMessage });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
         [HttpPost("{eventId}/confirm")]
         public async Task<IActionResult> ConfirmEvent(int eventId, [FromBody] ConfirmBookingRequest request)
         {
@@ -171,6 +291,56 @@ namespace Event.API.Controllers
                     Message = "Event upfront payment confirmed. Event is now Live.",
                     Event = ev
                 });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [AllowAnonymous]
+        [HttpGet("platform-settings")]
+        public async Task<IActionResult> GetPlatformSettings()
+        {
+            try
+            {
+                var settings = await _eventService.GetPlatformSettingsAsync();
+                if (settings == null)
+                    return NotFound(new { Message = "Platform settings not configured." });
+                return Ok(settings);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpPost("upload-description")]
+        public async Task<IActionResult> UploadDescription([FromBody] UploadDescriptionRequest request)
+        {
+            try
+            {
+                var url = await _eventService.SaveDescriptionFileAsync(request.Text);
+                return Ok(new { Url = url });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpPost("upload-image")]
+        public async Task<IActionResult> UploadImage(IFormFile file)
+        {
+            try
+            {
+                if (file == null || file.Length == 0)
+                    return BadRequest(new { Message = "No file provided." });
+
+                using var ms = new MemoryStream();
+                await file.CopyToAsync(ms);
+                var url = await _eventService.SaveImageFileAsync(file.FileName, ms.ToArray());
+                return Ok(new { Url = url });
             }
             catch (Exception ex)
             {

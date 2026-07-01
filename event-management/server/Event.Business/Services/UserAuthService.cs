@@ -36,11 +36,11 @@ namespace Event.Business.Services
 
         #region RegisterUserAsync
 
-        public async Task<string?> RegisterUserAsync(User user, string password, string otp)
+        public async Task<string?> RegisterUserAsync(User user, string password)
         {
-            // 1. Verify the OTP submitted by the user
-            if (!await _otpService.VerifyOtpAsync(user.Email, otp, "registration"))
-                throw new UnauthorizedException("Invalid or expired OTP.");
+            // 1. Check whether the OTP verification has expired (or was never performed)
+            if (await _otpService.IsOtpVerificationExpiredAsync(user.Email, "registration"))
+                throw new UnauthorizedException("OTP verification has expired or was not performed. Please verify your OTP again.");
 
             // 2. Validate that the user is consenting to the active terms and conditions
             var activeTerms = await _termsRepository.GetActiveTermsAsync();
@@ -59,6 +59,9 @@ namespace Event.Business.Services
             user.Password_Hash    = PasswordHasher.Hash(password);
 
             await _userRepository.AddAsync(user);
+
+            // Consume the OTP verification marker
+            await _otpService.ConsumeOtpVerificationAsync(user.Email, "registration");
 
             // 5. Return signed JWT for immediate login session activation
             return _jwtGenerator.GenerateUserToken(user.User_Id, user.Email);

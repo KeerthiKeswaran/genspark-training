@@ -18,6 +18,7 @@ namespace Event.Business.Services
 
         public async Task<PolicyResponse?> GetPolicyByTypeAsync(string type)
         {
+            #region GetPolicyByTypeAsync
             // 1. Fetch the active policy of the specified type from the database
             var policy = await _termsRepository.GetActiveTermsByTypeAsync(type);
             if (policy == null)
@@ -25,24 +26,14 @@ namespace Event.Business.Services
                 return null;
             }
 
-            // 2. Resolve the target file path in the assets directory
-            var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", "policies", $"{policy.Terms_Id}.md");
-            string content = string.Empty;
-
-            // 3. Read the policy markdown content if the file exists
-            if (File.Exists(filePath))
-            {
-                content = await File.ReadAllTextAsync(filePath);
-            }
-
-            // 4. Construct and return the policy response DTO
+            // 2. Construct and return the policy response DTO with only metadata
             return new PolicyResponse
             {
                 TermsId = policy.Terms_Id,
                 Version = policy.Version,
-                Type = policy.Type,
-                Content = content
+                FilePath = policy.File_Path
             };
+            #endregion
         }
     }
 }

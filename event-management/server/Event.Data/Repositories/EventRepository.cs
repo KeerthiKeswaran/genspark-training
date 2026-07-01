@@ -26,13 +26,21 @@ namespace Event.Data.Repositories
 
             if (!string.IsNullOrWhiteSpace(keyword))
             {
-                query = query.Where(e => e.Title.Contains(keyword) || e.Description_Url.Contains(keyword));
+                var kw = keyword.Trim().ToLower();
+                query = query.Where(e => 
+                    e.Title.ToLower().Contains(kw) || 
+                    e.Category.ToLower().Contains(kw) || 
+                    e.Event_Type.ToLower().Contains(kw) || 
+                    (e.Venue != null && e.Venue.Name.ToLower().Contains(kw)) ||
+                    (e.Venue != null && e.Venue.Address.ToLower().Contains(kw)) ||
+                    (e.Venue != null && e.Venue.Region != null && e.Venue.Region.Region_Name.ToLower().Contains(kw))
+                );
             }
 
             if (!string.IsNullOrWhiteSpace(category))
             {
                 var lowerCategory = category.ToLower();
-                query = query.Where(e => e.Event_Type.ToLower() == lowerCategory);
+                query = query.Where(e => e.Category.ToLower() == lowerCategory);
             }
 
             if (minDateTime.HasValue)
@@ -234,7 +242,72 @@ namespace Event.Data.Repositories
         {
             return await _dbSet
                 .Include(e => e.Venue)
+                .Include(e => e.TicketTiers)
                 .Where(e => e.Organizer_Id == organizerId)
+                .ToListAsync();
+        }
+
+        public async Task<System.Collections.Generic.IEnumerable<Region>> GetPopularRegionsAsync(int? limit)
+        {
+            var query = _context.Regions
+                .Select(r => new
+                {
+                    Region = r,
+                    EventCount = r.Venues.SelectMany(v => v.Events).Count(e => e.Status == "Live")
+                })
+                .OrderByDescending(x => x.EventCount)
+                .ThenBy(x => x.Region.Region_Name)
+                .Select(x => x.Region);
+
+            if (limit.HasValue && limit.Value > 0)
+            {
+                return await query.Take(limit.Value).ToListAsync();
+            }
+            return await query.ToListAsync();
+        }
+
+        public async Task<System.Collections.Generic.IEnumerable<Event.Models.Event>> GetTrendingEventsAsync(int? limit)
+        {
+            var query = _dbSet
+                .Include(e => e.Venue)
+                    .ThenInclude(v => v.Region)
+                .Include(e => e.Organizer)
+                .Include(e => e.TicketTiers)
+                .Include(e => e.Reports)
+                .Where(e => e.Status == "Live")
+                .OrderByDescending(e => e.Bookings.Count)
+                .ThenByDescending(e => e.Date_Time);
+
+            if (limit.HasValue && limit.Value > 0)
+            {
+                return await query.Take(limit.Value).ToListAsync();
+            }
+            return await query.ToListAsync();
+        }
+
+        public async Task<System.Collections.Generic.IEnumerable<Event.Models.Event>> GetPopularEventsInCommonAsync(int regionsLimit)
+        {
+            var popularRegionIds = await _context.Regions
+                .Select(r => new
+                {
+                    RegionId = r.Region_Id,
+                    EventCount = r.Venues.SelectMany(v => v.Events).Count(e => e.Status == "Live")
+                })
+                .OrderByDescending(x => x.EventCount)
+                .ThenBy(x => x.RegionId)
+                .Select(x => x.RegionId)
+                .Take(regionsLimit)
+                .ToListAsync();
+
+            return await _dbSet
+                .Include(e => e.Venue)
+                    .ThenInclude(v => v.Region)
+                .Include(e => e.Organizer)
+                .Include(e => e.TicketTiers)
+                .Include(e => e.Reports)
+                .Where(e => e.Status == "Live" && popularRegionIds.Contains(e.Venue.Region_Id))
+                .OrderByDescending(e => e.Bookings.Count)
+                .ThenByDescending(e => e.Date_Time)
                 .ToListAsync();
         }
     }

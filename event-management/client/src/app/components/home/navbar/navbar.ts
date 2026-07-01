@@ -7,9 +7,9 @@ import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 import { AppStoreService } from '../../../store/app-store.service';
 import { AuthService } from '../../../services/auth.service';
 import { RegionService } from '../../../services/region.service';
+import { EventService } from '../../../services/event.service';
 import { RegionModel } from '../../../models/region.model';
 import { BrowsedEventResponse } from '../../../models/event.model';
-import { mockAllEvents } from '../../../data/event.mock';
 
 @Component({
   selector: 'app-navbar',
@@ -44,6 +44,7 @@ export class NavbarComponent implements OnInit, OnDestroy {
     private store: AppStoreService,
     private authService: AuthService,
     private regionService: RegionService,
+    private eventService: EventService,
     private router: Router
   ) { }
 
@@ -63,21 +64,17 @@ export class NavbarComponent implements OnInit, OnDestroy {
       })
     );
 
-    // Search recommendation subscription with RxJS switchMap, distinct, debounceTime
+    // Search recommendation subscription with RxJS switchMap, distinct, debounceTime querying backend
     this.subscriptions.add(
       this.searchSubject.pipe(
         debounceTime(200),
         distinctUntilChanged(),
         switchMap(keyword => {
-          const kw = keyword.toLowerCase().trim();
+          const kw = keyword.trim();
           if (!kw) {
             return of([]);
           }
-          const matches = mockAllEvents.filter(e => 
-            e.title.toLowerCase().includes(kw) || 
-            (e.venue_Name && e.venue_Name.toLowerCase().includes(kw))
-          ).slice(0, 5);
-          return of(matches);
+          return this.eventService.searchEventsQuick(kw);
         })
       ).subscribe(matches => {
         this.recommendations.set(matches);
@@ -113,7 +110,13 @@ export class NavbarComponent implements OnInit, OnDestroy {
   public selectRecommendation(rec: any): void {
     this.searchKeyword.set(rec.title);
     this.showRecommendations.set(false);
-    this.router.navigate(['/booking'], { queryParams: { eventId: rec.event_Id } });
+    
+    if (!this.isLoggedIn()) {
+      const destination = `/booking?eventId=${rec.event_Id}`;
+      this.router.navigate(['/login'], { queryParams: { returnUrl: destination } });
+    } else {
+      this.router.navigate(['/booking'], { queryParams: { eventId: rec.event_Id } });
+    }
   }
 
   public onLocationPickerClick(event: Event): void {
@@ -123,10 +126,15 @@ export class NavbarComponent implements OnInit, OnDestroy {
 
   public onSearchSubmit(event?: Event): void {
     if (event) event.preventDefault();
+    const isAlreadyOnBrowse = this.router.url.startsWith('/browse');
     this.router.navigate(['/browse'], {
       queryParams: {
-        keyword: this.searchKeyword(),
-        regionId: this.selectedRegionId()
+        keyword: this.searchKeyword() || null,
+        regionId: this.selectedRegionId() || null
+      }
+    }).then(() => {
+      if (isAlreadyOnBrowse) {
+        window.location.reload();
       }
     });
   }
@@ -150,15 +158,21 @@ export class NavbarComponent implements OnInit, OnDestroy {
       this.router.navigate(['/login']);
       return;
     }
-    this.router.navigate(['/create-event']);
+    this.router.navigate(['/myevents/create']);
   }
 
   public triggerManageMyEventsAction(): void {
-    alert('Navigating to manage my events...');
+    if (!this.isLoggedIn()) {
+      this.router.navigate(['/login']);
+      return;
+    }
+    this.router.navigate(['/myevents']);
+    this.isProfileDropdownOpen.set(false);
   }
 
   public triggerAccountSettingsAction(): void {
-    alert('Navigating to account settings...');
+    this.router.navigate(['/settings']);
+    this.isProfileDropdownOpen.set(false);
   }
 
   public triggerGetHelpAction(): void {

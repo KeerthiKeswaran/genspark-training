@@ -30,6 +30,17 @@ namespace Event.API.Controllers
         }
 
         [AllowAnonymous]
+        [HttpPost("verify-otp")]
+        public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpRequest request)
+        {
+            var success = await _otpService.VerifyOtpAsync(request.Email, request.Otp, request.Purpose);
+            if (!success)
+                return BadRequest(new { Message = "Invalid or expired OTP." });
+
+            return Ok(new { Message = "OTP verified successfully." });
+        }
+
+        [AllowAnonymous]
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
@@ -42,7 +53,7 @@ namespace Event.API.Controllers
                 Has_Marketing_Consent = request.HasMarketingConsent
             };
 
-            var token = await _userAuthService.RegisterUserAsync(user, request.Password, request.Otp);
+            var token = await _userAuthService.RegisterUserAsync(user, request.Password);
             return Ok(new { Token = token, Message = "User registered successfully." });
         }
 

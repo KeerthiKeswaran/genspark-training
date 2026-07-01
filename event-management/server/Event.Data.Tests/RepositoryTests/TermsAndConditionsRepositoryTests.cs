@@ -24,6 +24,7 @@ namespace Event.Data.Tests.RepositoryTests
         {
             return new TermsAndConditions
             {
+                Terms_Id = Guid.NewGuid().ToString("N"),
                 Version = version,
                 File_Path = $"/docs/policies/terms_{version}.md",
                 Is_Active = isActive,
@@ -42,7 +43,7 @@ namespace Event.Data.Tests.RepositoryTests
             try
             {
                 await _repository.AddAsync(terms);
-                Assert.That(terms.Terms_Id, Is.GreaterThan(0));
+                Assert.That(terms.Terms_Id, Is.Not.Null.And.Not.Empty);
                 LogTestDetail(Repo, "AddAsync", "Create terms and conditions", terms, terms, true);
             }
             catch (Exception ex)

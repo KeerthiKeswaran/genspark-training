@@ -80,13 +80,13 @@ namespace Event.Business.Tests.ServiceTests
         [Test]
         public async Task Test_RegisterUser_InvalidOtp_ThrowsUnauthorizedException()
         {
-            var user = new User { Email = TestEmail, Consented_Terms_Id = 1 };
-            _termsRepositoryMock.Setup(r => r.GetActiveTermsAsync()).ReturnsAsync(new TermsAndConditions { Terms_Id = 1, Is_Active = true });
+            var user = new User { User_Id = 10001, Email = TestEmail, Consented_Terms_Id = "G10001" };
+            _termsRepositoryMock.Setup(r => r.GetActiveTermsAsync()).ReturnsAsync(new TermsAndConditions { Terms_Id = "G10001", Is_Active = true });
 
             try
             {
                 Assert.ThrowsAsync<UnauthorizedException>(async () =>
-                    await _userAuthService.RegisterUserAsync(user, "Password123", "000000")
+                    await _userAuthService.RegisterUserAsync(user, "Password123")
                 );
                 LogTestDetail(Service, "RegisterUserAsync", "Register with invalid OTP throws exception", user, "UnauthorizedException", true);
             }
@@ -104,13 +104,16 @@ namespace Event.Business.Tests.ServiceTests
         {
             await _otpService.SendEmailOtpAsync(TestEmail, "registration");
             
-            var user = new User { Email = TestEmail, Consented_Terms_Id = 99 };
-            _termsRepositoryMock.Setup(r => r.GetActiveTermsAsync()).ReturnsAsync(new TermsAndConditions { Terms_Id = 1, Is_Active = true });
+            var user = new User { User_Id = 10001, Email = TestEmail, Consented_Terms_Id = "99" };
+            _termsRepositoryMock.Setup(r => r.GetActiveTermsAsync()).ReturnsAsync(new TermsAndConditions { Terms_Id = "G10001", Is_Active = true });
 
             try
             {
+                var otp = await GetCapturedOtpAsync(TestEmail, "registration");
+                await _otpService.VerifyOtpAsync(TestEmail, otp, "registration");
+
                 Assert.ThrowsAsync<ValidationException>(async () =>
-                    await _userAuthService.RegisterUserAsync(user, "Password123", await GetCapturedOtpAsync(TestEmail, "registration"))
+                    await _userAuthService.RegisterUserAsync(user, "Password123")
                 );
                 LogTestDetail(Service, "RegisterUserAsync", "Register with terms mismatch throws exception", user, "ValidationException", true);
             }
@@ -128,14 +131,17 @@ namespace Event.Business.Tests.ServiceTests
         {
             await _otpService.SendEmailOtpAsync(TestEmail, "registration");
             
-            var user = new User { Name = TestName, Email = TestEmail, Consented_Terms_Id = 1 };
-            _termsRepositoryMock.Setup(r => r.GetActiveTermsAsync()).ReturnsAsync(new TermsAndConditions { Terms_Id = 1, Is_Active = true });
+            var user = new User { User_Id = 10001, Name = TestName, Email = TestEmail, Consented_Terms_Id = "G10001" };
+            _termsRepositoryMock.Setup(r => r.GetActiveTermsAsync()).ReturnsAsync(new TermsAndConditions { Terms_Id = "G10001", Is_Active = true });
             _userRepositoryMock.Setup(r => r.GetByEmailAsync(TestEmail)).ReturnsAsync((User?)null);
             _userRepositoryMock.Setup(r => r.AddAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
 
             try
             {
-                var token = await _userAuthService.RegisterUserAsync(user, "Password123", await GetCapturedOtpAsync(TestEmail, "registration"));
+                var otp = await GetCapturedOtpAsync(TestEmail, "registration");
+                await _otpService.VerifyOtpAsync(TestEmail, otp, "registration");
+
+                var token = await _userAuthService.RegisterUserAsync(user, "Password123");
                 Assert.That(token, Is.Not.Null);
                 LogTestDetail(Service, "RegisterUserAsync", "Successful registration", user, token, true);
             }
@@ -151,8 +157,7 @@ namespace Event.Business.Tests.ServiceTests
         [Test]
         public async Task Test_LoginUser_Success()
         {
-            var user = new User
-            {
+            var user = new User { User_Id = 10001,
                 Name = TestName,
                 Email = TestEmail,
                 Password_Hash = PasswordHasher.Hash("Password123")
@@ -178,8 +183,7 @@ namespace Event.Business.Tests.ServiceTests
         [Test]
         public async Task Test_LoginUser_InvalidPassword_ThrowsUnauthorizedException()
         {
-            var user = new User
-            {
+            var user = new User { User_Id = 10001,
                 Name = TestName,
                 Email = TestEmail,
                 Password_Hash = PasswordHasher.Hash("Password123")
@@ -206,7 +210,7 @@ namespace Event.Business.Tests.ServiceTests
         [Test]
         public async Task Test_ResetUserPassword_Success()
         {
-            var user = new User { Name = TestName, Email = TestEmail };
+            var user = new User { User_Id = 10001, Name = TestName, Email = TestEmail };
             _userRepositoryMock.Setup(r => r.GetByEmailAsync(TestEmail)).ReturnsAsync(user);
             _userRepositoryMock.Setup(r => r.UpdateAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
 

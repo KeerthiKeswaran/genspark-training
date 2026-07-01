@@ -1,3 +1,5 @@
+using System.IO;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Event.Contracts.IServices;
 using Event.Contracts.IRepositories;
@@ -39,14 +41,14 @@ namespace Event.Business.Services
             {
                 escalationStatus = "Available";
             }
-            else{
+            else
+            {
                 escalationStatus = "Unavailable";
             }
 
-            // 2. Generate and save the support ticket details in a local JSON file
-            string rootPath = System.IO.Directory.GetCurrentDirectory();
+            string rootPath = System.IO.Directory.GetCurrentDirectory().TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
             string folderName = "Event.Business";
-            if (System.AppDomain.CurrentDomain.FriendlyName.Contains("Tests") || 
+            if (System.AppDomain.CurrentDomain.FriendlyName.Contains("Tests") ||
                 System.AppDomain.CurrentDomain.BaseDirectory.Contains("Tests") ||
                 System.IO.Directory.GetCurrentDirectory().Contains("Tests"))
             {
@@ -55,21 +57,30 @@ namespace Event.Business.Services
 
             if (rootPath.Contains("bin"))
             {
-                rootPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(System.AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", ".."));
+                rootPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(System.AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..")).TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
             }
             else if (rootPath.EndsWith("Event.API") || rootPath.EndsWith("Event.Business.Tests") || rootPath.EndsWith("Event.Business"))
             {
-                rootPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(rootPath, ".."));
+                rootPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(rootPath, "..")).TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
             }
 
-            string folderPath = System.IO.Path.Combine(rootPath, folderName, "assets", "support_tickets");
+            string folderPath = System.IO.Path.Combine(rootPath, folderName, "assets", "users", userId.ToString(), "support");
             if (!System.IO.Directory.Exists(folderPath))
             {
                 System.IO.Directory.CreateDirectory(folderPath);
             }
 
-            string fileName = $"ticket_{System.Guid.NewGuid()}.json";
-            string filePath = System.IO.Path.Combine(folderPath, fileName);
+            // 3. Instantiate and persist new support ticket with "Open" status
+            var ticket = new SupportTicket
+            {
+                User_Id = userId,
+                ConcernUrl = $"/assets/users/{userId}/support/ticket_pending.json",
+                RequestType = requestType,
+                Status = "Open",
+                EsclationStatus = escalationStatus,
+                RelatedId = relatedId
+            };
+            await _supportTicketRepository.AddAsync(ticket);
 
             var ticketData = new
             {
@@ -78,20 +89,13 @@ namespace Event.Business.Services
                 Response = (string?)null
             };
 
-            string jsonContent = System.Text.Json.JsonSerializer.Serialize(ticketData, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-            await System.IO.File.WriteAllTextAsync(filePath, jsonContent);
+            string fileName = $"ticket_{ticket.Ticket_Id}.json";
+            string filePath = System.IO.Path.Combine(folderPath, fileName);
+            string jsonContent = JsonSerializer.Serialize(ticketData, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(filePath, jsonContent);
 
-            // 3. Instantiate and persist new support ticket with "Open" status
-            var ticket = new SupportTicket
-            {
-                User_Id = userId,
-                ConcernUrl = $"/assets/support_tickets/{fileName}",
-                RequestType = requestType,
-                Status = "Open",
-                EsclationStatus = escalationStatus,
-                RelatedId = relatedId
-            };
-            await _supportTicketRepository.AddAsync(ticket);
+            ticket.ConcernUrl = $"/assets/users/{userId}/support/{fileName}";
+            await _supportTicketRepository.UpdateAsync(ticket);
             return true;
         }
 

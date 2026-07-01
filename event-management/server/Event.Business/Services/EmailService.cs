@@ -79,14 +79,14 @@ namespace Event.Business.Services
         public async Task<string> BuildEmailHtmlAsync(Event.Models.DTOs.EmailTemplateDto dto)
         {
             // 1. Resolve target filepath for HTML templates in Event.Business/Templates
-            string rootPath = Directory.GetCurrentDirectory();
+            string rootPath = Directory.GetCurrentDirectory().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             if (rootPath.Contains("bin"))
             {
-                rootPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", ".."));
+                rootPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             }
             else if (rootPath.EndsWith("Event.API") || rootPath.EndsWith("Event.Business.Tests") || rootPath.EndsWith("Event.Business"))
             {
-                rootPath = Path.GetFullPath(Path.Combine(rootPath, ".."));
+                rootPath = Path.GetFullPath(Path.Combine(rootPath, "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             }
 
             string templatePath = Path.Combine(rootPath, "Event.Business", "Templates", dto.TemplateName);

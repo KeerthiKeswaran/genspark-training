@@ -65,9 +65,6 @@
                 <img [src]="booking.event_Image_Url" [alt]="booking.event_Title" class="booking-img">
                 <div class="booking-overlay"></div>
               }
-              <span class="event-badge" [class]="'badge-' + booking.event_Type.toLowerCase()">
-                {{ booking.event_Type }}
-              </span>
             </div>
 
             <!-- Content Area -->
@@ -91,6 +88,10 @@
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                   <span>{{ formatTime(booking.event_Date_Time) }}</span>
                 </div>
+                <div class="meta-item">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  <span class="booking-type-badge-inline" [class]="'inline-badge-' + booking.event_Type.toLowerCase()">{{ booking.event_Type }}</span>
+                </div>
                 <div class="meta-item location">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                   <span>{{ booking.event_Venue || 'TBD Venue' }}</span>
@@ -105,30 +106,39 @@
                 
                 <div class="price-summary">
                   <span class="summary-label">Total Paid:</span>
-                  <span class="summary-price">{{ formatCurrency(booking.total_Amount) }}</span>
+                  <span class="summary-price">{{ formatCurrency(booking.amount_Paid !== undefined ? booking.amount_Paid : booking.total_Amount) }}</span>
                 </div>
               </div>
 
               <!-- Action Row -->
               <div class="booking-actions">
                 @if (booking.booking_Status === 'Confirmed') {
-                  <button class="action-btn view-ticket" (click)="openQrModal(booking)">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><polyline points="14 14 14 17 17 17 17 14 20 14 20 20 14 20"/></svg>
-                    View Ticket (QR)
-                  </button>
+                  @if (booking.event_Status === 'Completed') {
+                    <button class="action-btn leave-feedback" (click)="openFeedbackModal(booking)">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                      Leave Feedback
+                    </button>
+                  } @else {
+                    <button class="action-btn view-ticket" (click)="openQrModal(booking)">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><polyline points="14 14 14 17 17 17 17 14 20 14 20 20 14 20"/></svg>
+                      View Ticket (QR)
+                    </button>
 
-                  @if (booking.event_Type === 'Virtual' || booking.event_Type === 'Hybrid') {
-                    <button class="action-btn join-meeting" (click)="joinMeeting(booking.virtual_Url)">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                      Join Meeting
+                    @if (booking.event_Type === 'Virtual' || booking.event_Type === 'Hybrid') {
+                      <button class="action-btn join-meeting" 
+                              [class.disabled-link]="booking.virtual_Url === 'Disabled'"
+                              (click)="joinMeeting(booking.virtual_Url)">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                        Join Meeting
+                      </button>
+                    }
+
+                    <button class="action-btn cancel-booking" (click)="openCancelModal(booking)">
+                      Cancel Booking
                     </button>
                   }
-
-                  <button class="action-btn cancel-booking" (click)="cancelBooking(booking.booking_Id)" [disabled]="isCancelling()">
-                    Cancel Booking
-                  </button>
                 } @else if (booking.booking_Status === 'Pending') {
-                  <button class="action-btn cancel-booking" (click)="cancelBooking(booking.booking_Id)" [disabled]="isCancelling()">
+                  <button class="action-btn cancel-booking" (click)="openCancelModal(booking)">
                     Release Booking
                   </button>
                 } @else {
@@ -157,23 +167,73 @@
       <p class="qr-modal-sub">Present this code at the gates for check-in to <strong>{{ activeQrBooking()!.event_Title }}</strong>.</p>
 
       <div class="qr-code-display">
-        <div class="qr-corner tl"></div>
-        <div class="qr-corner tr"></div>
-        <div class="qr-corner bl"></div>
-        <div class="qr-center-dot"></div>
-        <div class="qr-grid">
-          @for (row of [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14]; track row) {
-            <div class="qr-row">
-              @for (col of [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14]; track col) {
-                <div class="qr-cell" [class.filled]="(row + col + (activeQrBooking()!.booking_Id || 0)) % 3 !== 0"></div>
-              }
-            </div>
+        @if (activeQrBooking()?.qr_Code_Path) {
+          <img [src]="activeQrBooking()?.qr_Code_Path" alt="QR Code" class="qr-real-image" />
+        } @else {
+          <div class="qr-corner tl"></div>
+          <div class="qr-corner tr"></div>
+          <div class="qr-corner bl"></div>
+          <div class="qr-center-dot"></div>
+          <div class="qr-grid">
+            @for (row of [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14]; track row) {
+              <div class="qr-row">
+                @for (col of [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14]; track col) {
+                  <div class="qr-cell" [class.filled]="(row + col + (activeQrBooking()!.booking_Id || 0)) % 3 !== 0"></div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <p class="qr-booking-id">Booking #{{ activeQrBooking()?.booking_Id }}</p>
+    </div>
+  </div>
+}
+
+<!-- Cancellation Confirmation Modal (separate component) -->
+@if (showCancelModal() && bookingToCancel()) {
+  <app-cancel-booking-modal
+    [booking]="bookingToCancel()!"
+    (closed)="closeCancelModal()"
+    (cancelled)="onBookingCancelled($event)">
+  </app-cancel-booking-modal>
+}
+
+<!-- Feedback Modal -->
+@if (showFeedbackModal() && activeFeedbackBooking()) {
+  <div class="modal-backdrop" (click)="closeFeedbackModal()">
+    <div class="feedback-modal" (click)="$event.stopPropagation()">
+      <button class="modal-close" (click)="closeFeedbackModal()">✕</button>
+      <h3 class="feedback-modal-title">Share Your Experience</h3>
+      <p class="feedback-modal-sub">How was your time at <strong>{{ activeFeedbackBooking()!.event_Title }}</strong>?</p>
+
+      <div class="rating-container">
+        <label class="modal-label">Rating:</label>
+        <div class="star-rating">
+          @for (star of [1, 2, 3, 4, 5]; track star) {
+            <span class="star" 
+                  [class.filled]="star <= feedbackRating()"
+                  (click)="setFeedbackRating(star)">★</span>
           }
         </div>
       </div>
 
-      <p class="qr-booking-id">Booking #{{ activeQrBooking()?.booking_Id }}</p>
-      <p class="qr-hash">{{ activeQrBooking()?.qr_Code_Data }}</p>
+      <div class="review-container">
+        <label class="modal-label" for="feedbackReview">Review:</label>
+        <textarea id="feedbackReview" 
+                  class="review-textarea" 
+                  [ngModel]="feedbackReview()" 
+                  (ngModelChange)="feedbackReview.set($event)" 
+                  placeholder="Tell us what you liked or what could be improved..."></textarea>
+      </div>
+
+      <div class="feedback-modal-actions">
+        <button class="modal-btn cancel-btn" (click)="closeFeedbackModal()">Cancel</button>
+        <button class="modal-btn submit-btn" 
+                [disabled]="!feedbackReview().trim() || feedbackRating() === 0" 
+                (click)="submitFeedback()">Submit Feedback</button>
+      </div>
     </div>
   </div>
 }

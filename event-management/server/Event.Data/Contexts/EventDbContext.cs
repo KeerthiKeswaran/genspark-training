@@ -44,7 +44,7 @@ namespace Event.Data.Contexts
             base.OnModelCreating(modelBuilder);
 
             // Configure identity sequence starts for 5-digit unique IDs (10000)
-            modelBuilder.Entity<User>().Property(u => u.User_Id).UseIdentityByDefaultColumn().HasIdentityOptions(startValue: 10000);
+            modelBuilder.Entity<User>().Property(u => u.User_Id).UseIdentityByDefaultColumn().HasIdentityOptions(startValue: 10001);
             modelBuilder.Entity<Event.Models.Event>().Property(e => e.Event_Id).UseIdentityByDefaultColumn().HasIdentityOptions(startValue: 10000);
             modelBuilder.Entity<Booking>().Property(b => b.Booking_Id).UseIdentityByDefaultColumn().HasIdentityOptions(startValue: 10000);
             modelBuilder.Entity<Venue>().Property(v => v.Venue_Id).UseIdentityByDefaultColumn().HasIdentityOptions(startValue: 10000);
@@ -53,7 +53,6 @@ namespace Event.Data.Contexts
             modelBuilder.Entity<AdminAction>().Property(aa => aa.ActionId).UseIdentityByDefaultColumn().HasIdentityOptions(startValue: 10000);
             modelBuilder.Entity<EventFeedback>().Property(ef => ef.Feedback_Id).UseIdentityByDefaultColumn().HasIdentityOptions(startValue: 10000);
             modelBuilder.Entity<EventReport>().Property(er => er.Report_Id).UseIdentityByDefaultColumn().HasIdentityOptions(startValue: 10000);
-            modelBuilder.Entity<TermsAndConditions>().Property(tc => tc.Terms_Id).UseIdentityByDefaultColumn().HasIdentityOptions(startValue: 10000);
             modelBuilder.Entity<Notification>().Property(n => n.Notification_Id).UseIdentityByDefaultColumn().HasIdentityOptions(startValue: 10000);
             modelBuilder.Entity<BookingPayment>().Property(bp => bp.Booking_Payment_Id).UseIdentityByDefaultColumn().HasIdentityOptions(startValue: 10000);
             modelBuilder.Entity<OrganizerUpfrontPayment>().Property(oup => oup.Upfront_Payment_Id).UseIdentityByDefaultColumn().HasIdentityOptions(startValue: 10000);
@@ -115,6 +114,18 @@ namespace Event.Data.Contexts
                 .HasForeignKey(e => e.Venue_Id)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            // Event Category and Age Category column constraints
+            modelBuilder.Entity<Event.Models.Event>()
+                .Property(e => e.Category)
+                .HasMaxLength(100)
+                .HasDefaultValue("")
+                .IsRequired();
+
+            modelBuilder.Entity<Event.Models.Event>()
+                .Property(e => e.Age_Category)
+                .HasMaxLength(3)
+                .HasDefaultValue("ALL")
+                .IsRequired();
 
             // EventTicketTier Composite Key & Relationships
             modelBuilder.Entity<EventTicketTier>()
@@ -273,10 +284,7 @@ namespace Event.Data.Contexts
 
             // User to TermsAndConditions Relationship
             modelBuilder.Entity<User>()
-                .HasOne(u => u.ConsentedTerms)
-                .WithMany(tc => tc.ConsentedUsers)
-                .HasForeignKey(u => u.Consented_Terms_Id)
-                .OnDelete(DeleteBehavior.Restrict);
+                .Ignore(u => u.ConsentedTerms);
 
             modelBuilder.Entity<User>()
                 .Property(u => u.Password_Reset_Token)

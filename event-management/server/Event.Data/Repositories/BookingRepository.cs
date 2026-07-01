@@ -19,6 +19,7 @@ namespace Event.Data.Repositories
             return await _dbSet
                 .Include(b => b.Event)
                 .Include(b => b.Details)
+                .Include(b => b.Payments)
                 .Where(b => b.Attendee_Id == userId)
                 .ToListAsync();
         }

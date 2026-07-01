@@ -208,6 +208,20 @@ namespace Event.Data.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Event_Id"));
                     NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Event_Id"), 10000L, null, null, null, null, null);
 
+                    b.Property<string>("Age_Category")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasDefaultValue("ALL");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasDefaultValue("");
+
                     b.Property<DateTime>("Date_Time")
                         .HasColumnType("timestamp with time zone");
 
@@ -303,7 +317,7 @@ namespace Event.Data.Migrations
                     b.Property<int>("Event_Id")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Reason")
+                    b.Property<string>("ReportUrl")
                         .IsRequired()
                         .HasColumnType("text");
 
@@ -595,12 +609,8 @@ namespace Event.Data.Migrations
 
             modelBuilder.Entity("Event.Models.TermsAndConditions", b =>
                 {
-                    b.Property<int>("Terms_Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Terms_Id"));
-                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Terms_Id"), 10000L, null, null, null, null, null);
+                    b.Property<string>("Terms_Id")
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("Created_At")
                         .HasColumnType("timestamp with time zone");
@@ -687,10 +697,11 @@ namespace Event.Data.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("User_Id"));
-                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("User_Id"), 10000L, null, null, null, null, null);
+                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("User_Id"), 10001L, null, null, null, null, null);
 
-                    b.Property<int>("Consented_Terms_Id")
-                        .HasColumnType("integer");
+                    b.Property<string>("Consented_Terms_Id")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -719,9 +730,12 @@ namespace Event.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("TermsAndConditionsTerms_Id")
+                        .HasColumnType("text");
+
                     b.HasKey("User_Id");
 
-                    b.HasIndex("Consented_Terms_Id");
+                    b.HasIndex("TermsAndConditionsTerms_Id");
 
                     b.ToTable("Users");
                 });
@@ -1016,13 +1030,9 @@ namespace Event.Data.Migrations
 
             modelBuilder.Entity("Event.Models.User", b =>
                 {
-                    b.HasOne("Event.Models.TermsAndConditions", "ConsentedTerms")
+                    b.HasOne("Event.Models.TermsAndConditions", null)
                         .WithMany("ConsentedUsers")
-                        .HasForeignKey("Consented_Terms_Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ConsentedTerms");
+                        .HasForeignKey("TermsAndConditionsTerms_Id");
                 });
 
             modelBuilder.Entity("Event.Models.UserInterestedRegion", b =>

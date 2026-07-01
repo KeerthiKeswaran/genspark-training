@@ -23,6 +23,7 @@ namespace Event.Business.Services
         private readonly IEmailService _emailService;
         private readonly INotificationRepository _notificationRepository;
         private readonly ITransactionRepository _transactionRepository;
+        private readonly IEventRepository _eventRepository;
 
         #endregion
 
@@ -35,7 +36,8 @@ namespace Event.Business.Services
             IRefundService refundService,
             IEmailService emailService,
             INotificationRepository notificationRepository,
-            ITransactionRepository transactionRepository)
+            ITransactionRepository transactionRepository,
+            IEventRepository eventRepository)
         {
             _adminActionRepository = adminActionRepository;
             _supportTicketRepository = supportTicketRepository;
@@ -44,15 +46,71 @@ namespace Event.Business.Services
             _emailService = emailService;
             _notificationRepository = notificationRepository;
             _transactionRepository = transactionRepository;
+            _eventRepository = eventRepository;
         }
 
         #endregion
 
         #region GetAdminActionsAsync
 
-        public async Task<IEnumerable<AdminAction>> GetAdminActionsAsync()
+        public async Task<IEnumerable<object>> GetAdminActionsAsync()
         {
-            return await _adminActionRepository.GetAllAsync();
+            var actions = await _adminActionRepository.GetAllAsync();
+            var result = new List<object>();
+
+            foreach (var action in actions)
+            {
+                object? details = null;
+
+                if (action.TicketId.HasValue)
+                {
+                    // It is a support ticket! Read the support ticket JSON details
+                    var ticket = await _supportTicketRepository.GetByIdAsync(action.TicketId.Value);
+                    if (ticket != null)
+                    {
+                        details = GetSupportTicketDetails(ticket.ConcernUrl);
+                    }
+                }
+                else
+                {
+                    // It is an event report escalation!
+                    // Let's get the event reports for ReferenceId (which is the event ID)
+                    var reports = await _eventRepository.GetAllReportsAsync() ?? new List<EventReport>();
+                    var eventReports = System.Linq.Enumerable.ToList(
+                        System.Linq.Enumerable.Where(reports, r => r.Event_Id == action.ReferenceId)
+                    );
+
+                    var reportList = new List<object>();
+                    foreach (var r in eventReports)
+                    {
+                        reportList.Add(new
+                        {
+                            reportId = r.Report_Id,
+                            reporterId = r.Reporter_Id,
+                            reason = GetReportReason(r.ReportUrl),
+                            createdAt = r.Created_At
+                        });
+                    }
+                    details = new { Reports = reportList };
+                }
+
+                result.Add(new
+                {
+                    actionId = action.ActionId,
+                    adminId = action.AdminId,
+                    actionType = action.ActionType,
+                    targetType = action.TargetType,
+                    targetId = action.TargetId,
+                    referenceId = action.ReferenceId,
+                    ticketId = action.TicketId,
+                    actionStatus = action.ActionStatus,
+                    remarks = action.Remarks,
+                    createdAt = action.CreatedAt,
+                    details = details
+                });
+            }
+
+            return result;
         }
 
         #endregion
@@ -162,7 +220,7 @@ namespace Event.Business.Services
                 throw new ValidationException("Support ticket does not have a concern URL path.");
             }
 
-            string rootPath = Directory.GetCurrentDirectory();
+            string rootPath = Directory.GetCurrentDirectory().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             string folderName = "Event.Business";
             if (AppDomain.CurrentDomain.FriendlyName.Contains("Tests") || 
                 AppDomain.CurrentDomain.BaseDirectory.Contains("Tests") ||
@@ -173,11 +231,11 @@ namespace Event.Business.Services
 
             if (rootPath.Contains("bin"))
             {
-                rootPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", ".."));
+                rootPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             }
             else if (rootPath.EndsWith("Event.API") || rootPath.EndsWith("Event.Business.Tests") || rootPath.EndsWith("Event.Business"))
             {
-                rootPath = Path.GetFullPath(Path.Combine(rootPath, ".."));
+                rootPath = Path.GetFullPath(Path.Combine(rootPath, "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             }
 
             string relativeConcern = ticket.ConcernUrl.TrimStart('/');
@@ -277,6 +335,103 @@ namespace Event.Business.Services
                 page,
                 size
             );
+        }
+
+        private object GetSupportTicketDetails(string? concernUrl)
+        {
+            if (string.IsNullOrEmpty(concernUrl)) return new { Subject = "", Message = "", Response = "" };
+
+            try
+            {
+                string rootPath = Directory.GetCurrentDirectory().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                string folderName = "Event.Business";
+                if (AppDomain.CurrentDomain.FriendlyName.Contains("Tests") || 
+                    AppDomain.CurrentDomain.BaseDirectory.Contains("Tests") ||
+                    Directory.GetCurrentDirectory().Contains("Tests"))
+                {
+                    folderName = "Event.Business.Tests";
+                }
+
+                if (rootPath.Contains("bin"))
+                {
+                    rootPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                }
+                else if (rootPath.EndsWith("Event.API") || rootPath.EndsWith("Event.Business.Tests") || rootPath.EndsWith("Event.Business"))
+                {
+                    rootPath = Path.GetFullPath(Path.Combine(rootPath, "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                }
+
+                string relativePath = concernUrl.TrimStart('/');
+                if (relativePath.StartsWith("assets/"))
+                {
+                    relativePath = relativePath.Substring("assets/".Length);
+                }
+                string filePath = Path.Combine(rootPath, folderName, "assets", relativePath);
+
+                if (File.Exists(filePath))
+                {
+                    string jsonContent = File.ReadAllText(filePath);
+                    var data = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent);
+                    if (data != null)
+                    {
+                        return new
+                        {
+                            Subject = data.ContainsKey("Subject") ? data["Subject"] : "",
+                            Message = data.ContainsKey("Message") ? data["Message"] : "",
+                            Response = data.ContainsKey("Response") ? data["Response"] : ""
+                        };
+                    }
+                }
+            }
+            catch { }
+
+            return new { Subject = "", Message = "Details in JSON file", Response = "" };
+        }
+
+        private string GetReportReason(string? reportUrl)
+        {
+            if (string.IsNullOrEmpty(reportUrl)) return string.Empty;
+
+            try
+            {
+                string rootPath = Directory.GetCurrentDirectory().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                string folderName = "Event.Business";
+                if (AppDomain.CurrentDomain.FriendlyName.Contains("Tests") || 
+                    AppDomain.CurrentDomain.BaseDirectory.Contains("Tests") ||
+                    Directory.GetCurrentDirectory().Contains("Tests"))
+                {
+                    folderName = "Event.Business.Tests";
+                }
+
+                if (rootPath.Contains("bin"))
+                {
+                    rootPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                }
+                else if (rootPath.EndsWith("Event.API") || rootPath.EndsWith("Event.Business.Tests") || rootPath.EndsWith("Event.Business"))
+                {
+                    rootPath = Path.GetFullPath(Path.Combine(rootPath, "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                }
+
+                string relativePath = reportUrl.TrimStart('/');
+                if (relativePath.StartsWith("assets/"))
+                {
+                    relativePath = relativePath.Substring("assets/".Length);
+                }
+                string filePath = Path.Combine(rootPath, folderName, "assets", relativePath);
+
+                if (File.Exists(filePath))
+                {
+                    string jsonContent = File.ReadAllText(filePath);
+                    var data = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent);
+                    if (data != null && data.ContainsKey("Reason"))
+                    {
+                        return data["Reason"];
+                    }
+                }
+            }
+            catch { }
+
+            return "Details in JSON file";
         }
 
         #endregion

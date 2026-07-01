@@ -82,7 +82,7 @@ namespace Event.Business.Tests.ServiceTests
         [Test]
         public async Task Test_SendEmailOtpAsync_Registration_Conflict_ThrowsConflictException()
         {
-            _userRepositoryMock.Setup(r => r.GetByEmailAsync(TestEmail)).ReturnsAsync(new User { Email = TestEmail });
+            _userRepositoryMock.Setup(r => r.GetByEmailAsync(TestEmail)).ReturnsAsync(new User { User_Id = 10001, Email = TestEmail });
 
             try
             {
