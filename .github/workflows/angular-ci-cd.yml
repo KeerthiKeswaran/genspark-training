@@ -39,7 +39,7 @@ jobs:
         run: npm ci
 
       - name: Build Angular Application
-        run: npm run build
+        run: npm run build -- --base-href /genspark-training/
 
       - name: Run Unit Tests
         run: npm test -- --watch=false
