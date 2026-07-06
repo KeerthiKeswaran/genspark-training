@@ -1,0 +1,128 @@
+/* 
+  Sharp, Strong Azure-like UI
+  - 0px border radius (sharp)
+  - High contrast 
+  - Strong structural borders
+*/
+
+.weather-container {
+  min-height: 100vh;
+  background-color: #f3f2f1; /* Classic Azure/Microsoft gray */
+  font-family: 'Segoe UI', 'Inter', sans-serif;
+  color: #323130;
+}
+
+.header {
+  background-color: #0078d4;
+  color: #ffffff;
+  padding: 20px 40px;
+  border-bottom: 4px solid #005a9e; /* Stronger bottom accent */
+}
+
+.header-content h1 {
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  letter-spacing: -0.5px;
+}
+
+.header-content p {
+  font-size: 14px;
+  color: #c7e0f4;
+  margin: 0;
+  font-weight: 400;
+}
+
+.main-content {
+  padding: 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.card {
+  background-color: #ffffff;
+  border: 1px solid #edebe9;
+  box-shadow: 0 1.6px 3.6px 0 rgba(0,0,0,0.132), 0 0.3px 0.9px 0 rgba(0,0,0,0.108);
+  border-radius: 0; /* Sharp corners */
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+.azure-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.azure-table thead {
+  background-color: #faf9f8;
+  border-bottom: 2px solid #e1dfdd;
+}
+
+.azure-table th {
+  padding: 16px 24px;
+  font-weight: 600;
+  color: #323130;
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.azure-table td {
+  padding: 20px 24px;
+  font-size: 14px;
+  color: #201f1e;
+  border-bottom: 1px solid #edebe9;
+  vertical-align: middle;
+}
+
+.azure-table tbody tr {
+  transition: background-color 0.1s ease-in;
+}
+
+.azure-table tbody tr:hover {
+  background-color: #f3f2f1; /* Strong hover state */
+}
+
+.date-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.date-cell strong {
+  font-size: 15px;
+  color: #0078d4;
+  font-weight: 600;
+}
+
+.date-cell .sub-date {
+  font-size: 12px;
+  color: #605e5c;
+}
+
+.temp-cell {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.summary-badge {
+  display: inline-block;
+  width: 110px; /* Fixed equal size div for all summaries */
+  text-align: center;
+  padding: 6px 12px;
+  background-color: #0078d4; 
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 0; /* Sharp badge */
+  letter-spacing: 0.5px;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px !important;
+  color: #605e5c;
+  font-style: italic;
+}

@@ -1,0 +1,44 @@
+<div class="weather-container">
+  <header class="header">
+    <div class="header-content">
+      <h1>Weather Forecast</h1>
+      <p>5-Day Outlook</p>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <div class="card">
+      <div class="table-responsive">
+        <table class="azure-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Temp (&deg;C)</th>
+              <th>Temp (&deg;F)</th>
+              <th>Summary</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (forecast of forecasts(); track forecast.date) {
+              <tr>
+                <td class="date-cell">
+                  <strong>{{ forecast.date | date: 'EEEE' }}</strong>
+                  <span class="sub-date">{{ forecast.date | date: 'MMM d, yyyy' }}</span>
+                </td>
+                <td class="temp-cell">{{ forecast.temperatureC }}</td>
+                <td class="temp-cell">{{ forecast.temperatureF }}</td>
+                <td>
+                  <span class="summary-badge">{{ forecast.summary }}</span>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="4" class="loading">Loading forecast data...</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
