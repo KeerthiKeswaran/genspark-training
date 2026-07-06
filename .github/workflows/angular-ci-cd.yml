@@ -42,7 +42,7 @@ jobs:
         run: npm run build
 
       - name: Run Unit Tests
-        run: npm test -- --watch=false --browsers=ChromeHeadless
+        run: npm test -- --watch=false
 
       - name: Install HTTP Server
         run: npm install -g http-server
