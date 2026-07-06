@@ -4,6 +4,10 @@
       <h1>Weather Forecast</h1>
       <p>5-Day Outlook</p>
     </div>
+    <div class="header-actions">
+      <span class="record-count">Total Forecast Records: {{ forecasts().length }}</span>
+      <button class="azure-btn" (click)="loadForecasts()">Refresh</button>
+    </div>
   </header>
 
   <main class="main-content">
@@ -20,7 +24,7 @@
           </thead>
           <tbody>
             @for (forecast of forecasts(); track forecast.date) {
-              <tr>
+              <tr [class.hot-row]="forecast.temperatureC > 30">
                 <td class="date-cell">
                   <strong>{{ forecast.date | date: 'EEEE' }}</strong>
                   <span class="sub-date">{{ forecast.date | date: 'MMM d, yyyy' }}</span>

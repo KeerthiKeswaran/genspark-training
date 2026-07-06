@@ -13,6 +13,10 @@ export class Weather implements OnInit {
   forecasts = signal<WeatherForecast[]>([]);
 
   ngOnInit(): void {
+    this.loadForecasts();
+  }
+
+  loadForecasts(): void {
     this.weatherService.getWeatherForecast().subscribe(data => {
       this.forecasts.set(data);
     });

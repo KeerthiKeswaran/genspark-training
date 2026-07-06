@@ -17,6 +17,38 @@
   color: #ffffff;
   padding: 20px 40px;
   border-bottom: 4px solid #005a9e; /* Stronger bottom accent */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.record-count {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e1dfdd;
+}
+
+.azure-btn {
+  background-color: transparent;
+  color: #ffffff;
+  border: 2px solid #ffffff;
+  padding: 6px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.1s ease-in;
+  border-radius: 0;
+}
+
+.azure-btn:hover {
+  background-color: #ffffff;
+  color: #0078d4;
 }
 
 .header-content h1 {
@@ -125,4 +157,12 @@
   padding: 40px !important;
   color: #605e5c;
   font-style: italic;
+}
+
+.azure-table tbody tr.hot-row {
+  background-color: #fff4ce; /* Warm yellow/orange to indicate heat */
+}
+
+.azure-table tbody tr.hot-row:hover {
+  background-color: #fde7a9;
 }
