@@ -10,6 +10,7 @@ namespace Event.Models.DTOs
         public int Event_Id { get; set; }
         public string Event_Title { get; set; } = string.Empty;
         public string Event_Type { get; set; } = string.Empty;
+        public string Event_Venue { get; set; } = string.Empty;
         public DateTime Event_Date_Time { get; set; }
         public string Booking_Status { get; set; } = string.Empty;
         public string? Qr_Code_Path { get; set; }
@@ -18,8 +19,12 @@ namespace Event.Models.DTOs
         public string? Virtual_Url { get; set; }
         public string Event_Status { get; set; } = string.Empty;
         public decimal Amount_Paid { get; set; }
+        public decimal Refunded_Amount { get; set; }
         public string? Event_Image_Url { get; set; }
         public List<BookingDetailDto> Details { get; set; } = new List<BookingDetailDto>();
+        public bool? Has_Reported { get; set; }
+        public int? Feedback_Rating { get; set; }
+        public string? Feedback_Review { get; set; }
     }
 
     public class BookingDetailDto
@@ -36,7 +41,10 @@ namespace Event.Models.DTOs
         public string Event_Title { get; set; } = string.Empty;
         public string Event_Type { get; set; } = string.Empty;
         public DateTime Event_Date_Time { get; set; }
-        public decimal Total_Price { get; set; }
+        public decimal Base_Ticket_Amount { get; set; }
+        public decimal Fixed_Fee_Total { get; set; }
+        public decimal Gst_Amount { get; set; }
+        public decimal Total_Payment { get; set; }
         public decimal Fixed_Fee_Rate { get; set; }
         public decimal Commission_Percentage { get; set; }
     }

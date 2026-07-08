@@ -134,11 +134,13 @@ namespace Event.Data.Repositories
             // Filter by date range
             if (startDate.HasValue)
             {
-                query = query.Where(t => t.Created_At >= startDate.Value);
+                var utcStart = DateTime.SpecifyKind(startDate.Value, DateTimeKind.Utc);
+                query = query.Where(t => t.Created_At >= utcStart);
             }
             if (endDate.HasValue)
             {
-                query = query.Where(t => t.Created_At <= endDate.Value);
+                var utcEnd = DateTime.SpecifyKind(endDate.Value, DateTimeKind.Utc);
+                query = query.Where(t => t.Created_At <= utcEnd);
             }
 
             // Sort

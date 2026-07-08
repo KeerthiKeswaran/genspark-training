@@ -19,5 +19,7 @@ namespace Event.Contracts.IServices
             string? sortBy,
             int page,
             int size);
+        Task<Event.Models.DTOs.FinanceDashboardStatsResponse> GetDashboardStatsAsync();
+        Task<PagedResult<Event.Models.DTOs.OrganizerPayoutDto>> GetOrganizerPayoutsPagedAsync(string? status, string? sortBy, int page, int size);
     }
 }

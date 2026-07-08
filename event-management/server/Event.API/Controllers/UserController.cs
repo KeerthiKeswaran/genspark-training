@@ -63,11 +63,27 @@ namespace Event.API.Controllers
             try
             {
                 int userId = _userService.GetCurrentUserId();
-                var success = await _userService.UpdateUserProfileAsync(userId, request.Name, request.MobileNumber);
+                var success = await _userService.UpdateUserProfileAsync(userId, request);
                 if (!success)
                     return BadRequest(new { Message = "Failed to update user profile." });
 
                 return Ok(new { Message = "Profile updated successfully." });
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (ValidationException ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+            catch (ConflictException ex)
+            {
+                return Conflict(new { Message = ex.Message });
+            }
+            catch (UnauthorizedException ex)
+            {
+                return Unauthorized(new { Message = ex.Message });
             }
             catch (UnauthorizedAccessException ex)
             {

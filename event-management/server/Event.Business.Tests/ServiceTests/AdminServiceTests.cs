@@ -100,10 +100,12 @@ namespace Event.Business.Tests.ServiceTests
                 _userRepositoryMock.Object,
                 _eventRepositoryMock.Object,
                 _transactionRepositoryMock.Object,
+                bookingRepositoryMock.Object,
                 _bookingPaymentRepositoryMock.Object,
                 _staffRepositoryMock.Object,
                 _supportTicketRepositoryMock.Object,
                 _adminActionRepositoryMock.Object,
+                new Mock<IAdminRepository>().Object,
                 _emailService,
                 _eventService,
                 _regionRepositoryMock.Object,
@@ -231,8 +233,8 @@ namespace Event.Business.Tests.ServiceTests
 
             try
             {
-                // Act: retrieve all support tickets
-                var result = await _adminService.GetSupportTicketsAsync();
+                // Act
+                var result = await _adminService.GetSupportTicketsAsync(null, null, null, null);
 
                 // Assert: all tickets returned
                 Assert.That(result.Count(), Is.EqualTo(2));
@@ -341,7 +343,7 @@ namespace Event.Business.Tests.ServiceTests
                 ActionType  = "REF",
                 TargetType  = "ATD",
                 TargetId    = 10001,
-                ReferenceId = 10101
+                TicketId = 10101
             };
 
             try
@@ -779,11 +781,11 @@ namespace Event.Business.Tests.ServiceTests
 
             try
             {
-                // Act: retrieve the staff directory
-                var result = await _adminService.GetStaffDirectoryAsync();
+                // Act
+                var result = await _adminService.GetStaffDirectoryAsync(null, null, null, null, 1, 10);
 
                 // Assert: both staff members returned with correct data
-                Assert.That(result.Count(), Is.EqualTo(2));
+                Assert.That(result.Items.Count(), Is.EqualTo(2));
 
                 LogTestDetail(Service, "GetStaffDirectoryAsync", "Retrieve full staff directory", null, result, true);
             }

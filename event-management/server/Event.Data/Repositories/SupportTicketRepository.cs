@@ -27,5 +27,12 @@ namespace Event.Data.Repositories
                 .Where(st => st.Status == "Open")
                 .ToListAsync();
         }
+
+        public async Task<IEnumerable<SupportTicket>> GetAllWithUsersAsync()
+        {
+            return await _dbSet
+                .Include(st => st.User)
+                .ToListAsync();
+        }
     }
 }

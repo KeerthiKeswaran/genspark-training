@@ -18,6 +18,7 @@ export interface SupportTicket {
   details: string;
   status: 'Open' | 'In Progress' | 'Resolved';
   createdAt: string;
+  response?: string;
 }
 
 export interface HelpTopic {
@@ -194,36 +195,9 @@ export class HelpComponent implements OnInit, OnDestroy {
       try {
         this.currentTickets.set(JSON.parse(storedTickets));
       } catch {
-        this.loadDefaultTickets();
+        this.currentTickets.set([]);
       }
-    } else {
-      this.loadDefaultTickets();
     }
-  }
-
-  private loadDefaultTickets(): void {
-    const defaultTickets: SupportTicket[] = [
-      {
-        ticketId: 'TKT-78241',
-        bookingId: '101',
-        category: 'QR Code not downloading',
-        subject: 'QR code display issue on mobile web',
-        details: 'When loading the ticket on Safari, the QR grid cells overlap. Can you confirm if my check-in QR is registered?',
-        status: 'Resolved',
-        createdAt: new Date(Date.now() - 36 * 3600 * 1000).toLocaleString('en-IN')
-      },
-      {
-        ticketId: 'TKT-90142',
-        bookingId: '102',
-        category: 'Payment Issue',
-        subject: 'Double charge confirmation check',
-        details: 'My card was charged twice but I only got one seat confirmation email. Booking reference: #102.',
-        status: 'In Progress',
-        createdAt: new Date(Date.now() - 4 * 3600 * 1000).toLocaleString('en-IN')
-      }
-    ];
-    this.currentTickets.set(defaultTickets);
-    localStorage.setItem('raisedSupportTickets', JSON.stringify(defaultTickets));
   }
 
   private loadUserBookings(): void {

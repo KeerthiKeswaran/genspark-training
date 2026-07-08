@@ -74,10 +74,42 @@ namespace Event.Business.Services
                     throw new NotFoundException("No account registered with this email address.");
             }
 
-            // 3. Generate a secure random 6-digit OTP code
+            // 3. Check OTP Rate Limiting
+            string rateLimitKey = $"otp_rate_limit:{email}";
+            var rateLimitInfo = await _cacheService.GetAsync<OtpRateLimitInfo>(rateLimitKey);
+            
+            if (rateLimitInfo != null)
+            {
+                if (rateLimitInfo.Attempts > 3)
+                {
+                    // Check if 10 minutes have passed since WindowStart
+                    if ((DateTime.UtcNow - rateLimitInfo.WindowStart).TotalMinutes < 10)
+                    {
+                        throw new TooManyRequestsException("Maximum OTP requests exceeded. Please try again after 10 minutes.");
+                    }
+                    else
+                    {
+                        // Reset after cooldown expires
+                        rateLimitInfo = new OtpRateLimitInfo { Attempts = 1, WindowStart = DateTime.UtcNow };
+                    }
+                }
+                else
+                {
+                    rateLimitInfo.Attempts++;
+                }
+            }
+            else
+            {
+                rateLimitInfo = new OtpRateLimitInfo { Attempts = 1, WindowStart = DateTime.UtcNow };
+            }
+            
+            // Save updated rate limit info back to cache with a sliding 10 minute window (or absolute window)
+            await _cacheService.SetAsync(rateLimitKey, rateLimitInfo, TimeSpan.FromMinutes(10));
+
+            // 4. Generate a secure random 6-digit OTP code
             string otp = Random.Shared.Next(100000, 999999).ToString();
             
-            // 4. Cache the OTP in our Redis cache with auto-clearing expiry time
+            // 5. Cache the OTP in our Redis cache with auto-clearing expiry time
             string cacheKey = $"otp:{purpose}:{email}";
             await _cacheService.SetAsync(cacheKey, otp, TimeSpan.FromMinutes(OtpExpiryMinutes));
 
@@ -85,17 +117,21 @@ namespace Event.Business.Services
             string subject = purpose == "registration"
                  ? "Your Event Platform Email Verification OTP"
                  : (purpose == "finance-login" ? "Your Finance Dept Login Verification OTP" : 
-                   (purpose == "close-account" ? "Your Event Platform Close Account Verification OTP" : "Your Event Platform Password Reset OTP"));
+                   (purpose == "close-account" ? "Your Event Platform Close Account Verification OTP" : 
+                   (purpose == "email-change" ? "Verify Your New Email Address" : "Your Event Platform Password Reset OTP")));
 
             // 6. Load/Compile the formatted HTML email body using the generic EmailTemplateDto
             var purposeLabel = purpose == "registration"
                 ? "verify your email address and complete your registration"
                 : (purpose == "finance-login" ? "complete your Finance Dept login" : 
-                  (purpose == "close-account" ? "confirm and authorize closing your account" : "reset your account password"));
+                  (purpose == "close-account" ? "confirm and authorize closing your account" : 
+                  (purpose == "email-change" ? "verify your new email address" : "reset your account password")));
+
+            string templateName = purpose == "email-change" ? "ProfileUpdateOtpTemplate.html" : "OtpEmailTemplate.html";
 
             var emailDto = new EmailTemplateDto
             {
-                TemplateName = "OtpEmailTemplate.html",
+                TemplateName = templateName,
                 Placeholders = new Dictionary<string, string>
                 {
                     { "purposeLabel", purposeLabel },
@@ -172,5 +208,11 @@ namespace Event.Business.Services
         }
 
         #endregion
+    }
+
+    public class OtpRateLimitInfo
+    {
+        public int Attempts { get; set; }
+        public DateTime WindowStart { get; set; }
     }
 }

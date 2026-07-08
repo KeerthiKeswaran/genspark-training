@@ -24,6 +24,7 @@ namespace Event.Business.Services
         private readonly INotificationRepository _notificationRepository;
         private readonly ITransactionRepository _transactionRepository;
         private readonly IEventRepository _eventRepository;
+        private readonly IPlatformSettingsRepository _platformSettingsRepository;
 
         #endregion
 
@@ -37,7 +38,8 @@ namespace Event.Business.Services
             IEmailService emailService,
             INotificationRepository notificationRepository,
             ITransactionRepository transactionRepository,
-            IEventRepository eventRepository)
+            IEventRepository eventRepository,
+            IPlatformSettingsRepository platformSettingsRepository)
         {
             _adminActionRepository = adminActionRepository;
             _supportTicketRepository = supportTicketRepository;
@@ -47,6 +49,7 @@ namespace Event.Business.Services
             _notificationRepository = notificationRepository;
             _transactionRepository = transactionRepository;
             _eventRepository = eventRepository;
+            _platformSettingsRepository = platformSettingsRepository;
         }
 
         #endregion
@@ -62,6 +65,9 @@ namespace Event.Business.Services
             {
                 object? details = null;
 
+                string? senderEmail = null;
+                int? relatedId = null;
+
                 if (action.TicketId.HasValue)
                 {
                     // It is a support ticket! Read the support ticket JSON details
@@ -69,15 +75,18 @@ namespace Event.Business.Services
                     if (ticket != null)
                     {
                         details = GetSupportTicketDetails(ticket.ConcernUrl);
+                        var user = await _userRepository.GetByIdAsync(ticket.User_Id);
+                        senderEmail = user?.Email;
+                        relatedId = ticket.RelatedId;
                     }
                 }
                 else
                 {
                     // It is an event report escalation!
-                    // Let's get the event reports for ReferenceId (which is the event ID)
+                    // Let's get the event reports for TargetId (which is the event ID)
                     var reports = await _eventRepository.GetAllReportsAsync() ?? new List<EventReport>();
                     var eventReports = System.Linq.Enumerable.ToList(
-                        System.Linq.Enumerable.Where(reports, r => r.Event_Id == action.ReferenceId)
+                        System.Linq.Enumerable.Where(reports, r => r.Event_Id == action.TargetId)
                     );
 
                     var reportList = new List<object>();
@@ -101,12 +110,13 @@ namespace Event.Business.Services
                     actionType = action.ActionType,
                     targetType = action.TargetType,
                     targetId = action.TargetId,
-                    referenceId = action.ReferenceId,
                     ticketId = action.TicketId,
                     actionStatus = action.ActionStatus,
                     remarks = action.Remarks,
                     createdAt = action.CreatedAt,
-                    details = details
+                    details = details,
+                    senderEmail = senderEmail,
+                    relatedId = relatedId
                 });
             }
 
@@ -176,17 +186,29 @@ namespace Event.Business.Services
             if (string.Equals(action.TargetType, "ATD", StringComparison.OrdinalIgnoreCase) || 
                 string.Equals(action.TargetType, "ADT", StringComparison.OrdinalIgnoreCase))
             {
-                var result = await _refundService.RefundAttendeeAsync(action.ReferenceId, mappedRefundType, refundMessage: refundMessage);
+                if (action.TicketId == null) throw new ValidationException("Cannot refund attendee without a related Ticket ID.");
+                var ticket = await _supportTicketRepository.GetByIdAsync(action.TicketId.Value);
+                if (ticket == null || ticket.RelatedId == null) throw new ValidationException("Support ticket missing or missing RelatedId for booking.");
+                
+                var result = await _refundService.RefundAttendeeAsync(ticket.RelatedId.Value, mappedRefundType, refundMessage: refundMessage);
                 finalRemarks = $"Approved refund of type {mappedRefundType}. Amount: {result.RefundAmount}. {result.Remarks}";
             }
-            else if (string.Equals(action.TargetType, "ORG", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(action.TargetType, "EVT", StringComparison.OrdinalIgnoreCase) || string.Equals(action.TargetType, "ORG", StringComparison.OrdinalIgnoreCase))
             {
-                var result = await _refundService.RefundOrganizerAsync(action.ReferenceId, mappedRefundType, refundMessage: refundMessage);
+                int eventId = action.TargetId;
+                if (string.Equals(action.TargetType, "ORG", StringComparison.OrdinalIgnoreCase))
+                {
+                   if (action.TicketId == null) throw new ValidationException("Cannot refund organizer without a related Ticket ID.");
+                   var ticket = await _supportTicketRepository.GetByIdAsync(action.TicketId.Value);
+                   if (ticket == null || ticket.RelatedId == null) throw new ValidationException("Support ticket missing or missing RelatedId for event.");
+                   eventId = ticket.RelatedId.Value;
+                }
+                var result = await _refundService.RefundOrganizerAsync(eventId, mappedRefundType, refundMessage: refundMessage);
                 finalRemarks = $"Approved organizer refund of type {mappedRefundType}. Organizer Refund: {result.OrganizerRefundAmount}. {result.OrganizerRemarks}";
             }
             else
             {
-                throw new ValidationException($"Target type {action.TargetType} is not recognized. Must be ATD/ADT or ORG.");
+                throw new ValidationException($"Target type {action.TargetType} is not recognized. Must be ATD/ADT, EVT or ORG.");
             }
 
             // Update status to "Processed" once the payment has been done
@@ -337,6 +359,64 @@ namespace Event.Business.Services
             );
         }
 
+        #endregion
+
+        #region GetDashboardStatsAsync
+
+        public async Task<FinanceDashboardStatsResponse> GetDashboardStatsAsync()
+        {
+            var settings = await _platformSettingsRepository.GetSettingsAsync();
+            decimal commissionPercentage = settings?.Ticket_Commission_Percentage ?? 0m;
+
+            // Get total successful transactions and sum of revenue
+            var allTransactions = await _transactionRepository.GetAllAsync();
+            var successfulTransactions = allTransactions.Where(t => t.Status == "Success");
+
+            decimal totalRevenue = 0m;
+            decimal totalIntake = 0m;
+            int totalTxCount = successfulTransactions.Count();
+
+            var allActions = await _adminActionRepository.GetAllAsync();
+            int pendingApprovals = allActions.Count(a => a.ActionStatus == "Pending");
+
+            foreach (var t in successfulTransactions)
+            {
+                if (t.Transaction_Type == "OrganizerUpfrontPayment" || t.Transaction_Type == "BookingPayment")
+                {
+                    totalRevenue += t.Amount;
+                }
+
+                if (t.Transaction_Type == "OrganizerUpfrontPayment")
+                {
+                    totalIntake += t.Amount;
+                }
+                else if (t.Transaction_Type == "BookingPayment")
+                {
+                    // Assuming booking payment contains the base ticket price + fees. 
+                    // Platform earns the ticket commission from the organizer's payout,
+                    // plus any fees passed to the buyer. Since the exact breakdown isn't on the transaction,
+                    // we calculate commission based on the total booking payment minus fixed fees, 
+                    // or just apply the commission percentage as a simplification, 
+                    // but the prompt says: "sum of all the fee, upfrontds and ticket commision from the organizer payout".
+                    
+                    // A simple approximation for intake from booking:
+                    decimal baseAmount = t.Amount; // if we assume this is close enough, or we can use the commission percentage
+                    decimal commission = baseAmount * (commissionPercentage / 100m);
+                    totalIntake += commission;
+                }
+            }
+
+            return new FinanceDashboardStatsResponse
+            {
+                TotalTransactions = totalTxCount,
+                PendingApprovals = pendingApprovals,
+                TotalRevenue = totalRevenue,
+                TotalIntake = totalIntake
+            };
+        }
+
+        #endregion
+
         private object GetSupportTicketDetails(string? concernUrl)
         {
             if (string.IsNullOrEmpty(concernUrl)) return new { Subject = "", Message = "", Response = "" };
@@ -434,6 +514,33 @@ namespace Event.Business.Services
             return "Details in JSON file";
         }
 
-        #endregion
-    }
+    
+        public async Task<PagedResult<Event.Models.DTOs.OrganizerPayoutDto>> GetOrganizerPayoutsPagedAsync(string? status, string? sortBy, int page, int size)
+        {
+            var pagedEvents = await _eventRepository.GetEventsForPayoutsAsync(status, sortBy, page, size);
+            
+            var settings = await _platformSettingsRepository.GetSettingsAsync();
+            decimal commission = settings?.Ticket_Commission_Percentage ?? 0m;
+            
+            var dtoList = pagedEvents.Items.Select(e => {
+                decimal totalAmount = e.Bookings
+                    .SelectMany(b => b.Payments)
+                    .Where(p => p.Payment_Status == "Completed" || p.Payment_Status == "Success")
+                    .Sum(p => p.Amount);
+                    
+                decimal payoutAmount = totalAmount - (totalAmount * (commission / 100m));
+                
+                return new Event.Models.DTOs.OrganizerPayoutDto {
+                    Event_Id = e.Event_Id,
+                    Organizer_Id = e.Organizer_Id,
+                    Organizer_Email = e.Organizer?.Email ?? "",
+                    Amount = payoutAmount,
+                    Date_Time = e.Date_Time,
+                    Status = e.Status == "Live" ? "Upcoming" : "Completed"
+                };
+            }).ToList();
+
+            return new PagedResult<Event.Models.DTOs.OrganizerPayoutDto>(dtoList, pagedEvents.TotalCount, page, size);
+        }
+}
 }

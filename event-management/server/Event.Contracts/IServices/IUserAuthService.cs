@@ -8,5 +8,6 @@ namespace Event.Contracts.IServices
         Task<string?> RegisterUserAsync(User user, string password);
         Task<string?> LoginUserAsync(string email, string password);
         Task<string> ResetUserPasswordAsync(string email, string otp, string newPassword);
+        Task<bool> CheckEmailExistsAsync(string email);
     }
 }

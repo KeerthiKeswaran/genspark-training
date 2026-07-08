@@ -27,7 +27,7 @@ namespace Event.API.Controllers
             try
             {
                 int userId = _userService.GetCurrentUserId();
-                var success = await _supportService.SubmitSupportTicketAsync(userId, request.Subject, request.Message, request.RequestType, request.RelatedId);
+                var success = await _supportService.SubmitSupportTicketAsync(userId, request.Subject, request.Message, request.RequestType, request.RelatedId, request.TargetType);
                 if (!success)
                     return BadRequest(new { Message = "Failed to submit support ticket." });
 
@@ -36,6 +36,24 @@ namespace Event.API.Controllers
             catch (UnauthorizedAccessException ex)
             {
                 return Unauthorized(new { Message = ex.Message });
+            }
+        }
+        [HttpGet("tickets")]
+        public async Task<IActionResult> GetMyTickets()
+        {
+            try
+            {
+                int userId = _userService.GetCurrentUserId();
+                var tickets = await _supportService.GetMySupportTicketsAsync(userId);
+                return Ok(tickets);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { Message = ex.Message });
+            }
+            catch (Event.Business.Exceptions.NotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
             }
         }
     }

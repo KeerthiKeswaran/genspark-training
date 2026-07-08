@@ -3,7 +3,11 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { Subject, Subscription } from 'rxjs';
+import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
+import { environment } from '../../../environments/environment';
+
 
 // (Component metadata)
 @Component({
@@ -50,8 +54,14 @@ export class RegisterComponent implements OnInit, OnDestroy {
   public passwordError = signal<string | null>(null);
   public consentError = signal<string | null>(null);
 
+  // Email Validation
+  public isCheckingEmail = signal(false);
+  public isEmailAvailable = signal<boolean | null>(null);
+  private emailCheckSubject = new Subject<string>();
+
   // Active Terms ID fetched from backend
   public activeTermsId = signal<string>('10000');
+  private subscriptions = new Subscription();
 
   constructor(
     private authService: AuthService,
@@ -73,6 +83,46 @@ export class RegisterComponent implements OnInit, OnDestroy {
         console.error('Failed to fetch active terms metadata on init', err);
       }
     });
+
+    // Email check debounce
+    this.subscriptions.add(
+      this.emailCheckSubject.pipe(
+        debounceTime(500),
+        distinctUntilChanged()
+      ).subscribe(email => {
+        if (!email) {
+          this.isEmailAvailable.set(null);
+          this.emailError.set(null);
+          this.isCheckingEmail.set(false);
+          return;
+        }
+
+        this.isCheckingEmail.set(true);
+        this.isEmailAvailable.set(null);
+        this.emailError.set(null);
+
+        this.authService.checkEmail(email).subscribe({
+          next: (res) => {
+            this.isCheckingEmail.set(false);
+            if (res.exists) {
+              this.isEmailAvailable.set(false);
+              this.emailError.set('This email is already associated with an account.');
+            } else {
+              this.isEmailAvailable.set(true);
+            }
+          },
+          error: () => {
+            this.isCheckingEmail.set(false);
+            this.emailError.set('Could not verify email availability.');
+          }
+        });
+      })
+    );
+  }
+
+  public onEmailChange(newEmail: string): void {
+    this.email = newEmail;
+    this.emailCheckSubject.next(newEmail);
   }
 
   ngOnDestroy(): void {
@@ -95,6 +145,11 @@ export class RegisterComponent implements OnInit, OnDestroy {
     this.clearErrors();
     if (!this.email) {
       this.emailError.set('Please enter your email to receive an OTP.');
+      return;
+    }
+
+    if (this.isEmailAvailable() === false) {
+      this.emailError.set('Cannot register with this email address.');
       return;
     }
 
@@ -215,7 +270,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
     this.authService.getConsentDocument(backendType).subscribe({
       next: (doc) => {
         // doc.filePath is e.g. "/assets/policies/G10001.md"
-        const fileUrl = doc.filePath.startsWith('http') ? doc.filePath : `http://localhost:5106${doc.filePath}`;
+        const fileUrl = doc.filePath.startsWith('http') ? doc.filePath : `${environment.serverUrl}${doc.filePath}`;
         this.http.get(fileUrl, { responseType: 'text' }).subscribe({
           next: (content) => {
             this.consentModalTitle.set(type === 'terms' ? 'Terms and Conditions' : 'Data Storage & Privacy Consent');

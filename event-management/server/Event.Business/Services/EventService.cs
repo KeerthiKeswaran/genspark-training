@@ -82,7 +82,7 @@ namespace Event.Business.Services
 
         #region BrowseEventsAsync
 
-        public async Task<PagedResult<BrowsedEventResponse>> BrowseEventsAsync(string? keyword, string? category, DateTime? minDateTime, string? regionId, int page, int size)
+        public async Task<PagedResult<BrowsedEventResponse>> BrowseEventsAsync(string? keyword, string? category, DateTime? minDateTime, string? regionId, string? format, decimal? maxPrice, string? sortBy, int page, int size)
         {
             // 1. Calculate the cutoff search time (must be at least 30 minutes in the future)
             var cutoffTime = DateTime.UtcNow.AddMinutes(30);
@@ -91,7 +91,7 @@ namespace Event.Business.Services
                 : cutoffTime;
 
             // 2. Query event repository for paged results matching filters
-            var rawResult = await _eventRepository.SearchEventsAsync(keyword, category, searchMinTime, regionId, page, size);
+            var rawResult = await _eventRepository.SearchEventsAsync(keyword, category, searchMinTime, regionId, format, maxPrice, sortBy, page, size);
 
             // 3. Map to BrowsedEventResponse DTO
             var mappedItems = new List<BrowsedEventResponse>();
@@ -108,7 +108,10 @@ namespace Event.Business.Services
                             {
                                 Tier_Name = tier.Tier_Name,
                                 Price = tier.Price,
-                                Tickets_Sold = tier.Tickets_Sold
+                                Tickets_Sold = tier.Tickets_Sold,
+                                Capacity = ev.Venue != null && ev.Venue.SeatCapacities != null 
+                                            ? ev.Venue.SeatCapacities.FirstOrDefault(sc => sc.Tier_Name == tier.Tier_Name)?.Total_Seats ?? 99999
+                                            : 99999
                             });
                         }
                     }
@@ -134,14 +137,18 @@ namespace Event.Business.Services
                 }
             }
 
-            return new PagedResult<BrowsedEventResponse>(mappedItems, rawResult.TotalCount, rawResult.Page, rawResult.PageSize);
+            var pagedResult = new PagedResult<BrowsedEventResponse>(mappedItems, rawResult.TotalCount, rawResult.Page, rawResult.PageSize)
+            {
+                MaxPrice = rawResult.MaxPrice
+            };
+            return pagedResult;
         }
 
         #endregion
 
         #region GetEventDetailsAsync
 
-        public async Task<EventDetailsResponse?> GetEventDetailsAsync(int eventId)
+        public async Task<EventDetailsResponse?> GetEventDetailsAsync(int eventId, int? currentUserId = null)
         {
             // 1. Fetch details with eager loading of tiers and venue/seat capacities
             var ev = await _eventRepository.GetEventDetailsAsync(eventId);
@@ -149,6 +156,9 @@ namespace Event.Business.Services
             // 2. Validate that event exists
             if (ev == null)
                 throw new NotFoundException($"Event with ID {eventId} not found.");
+
+            if (ev.Status != "Live")
+                throw new NotFoundException($"Event with ID {eventId} not found or is no longer available.");
 
             // 3. Map to DTO
             var ticketTiers = new List<TicketTierDetailsDto>();
@@ -160,7 +170,10 @@ namespace Event.Business.Services
                     {
                         Tier_Name = tier.Tier_Name,
                         Price = tier.Price,
-                        Tickets_Sold = tier.Tickets_Sold
+                        Tickets_Sold = tier.Tickets_Sold,
+                        Capacity = ev.Venue != null && ev.Venue.SeatCapacities != null 
+                                    ? ev.Venue.SeatCapacities.FirstOrDefault(sc => sc.Tier_Name == tier.Tier_Name)?.Total_Seats ?? 99999
+                                    : 99999
                     });
                 }
             }
@@ -198,7 +211,11 @@ namespace Event.Business.Services
                 Date_Time = ev.Date_Time,
                 Duration_Hours = ev.Duration_Hours,
                 Status = ev.Status,
-                TicketTiers = ticketTiers
+                TicketTiers = ticketTiers,
+                Virtual_Url = ev.Virtual_Url,
+                Virtual_Password_Hash = ev.Virtual_Password_Hash,
+                Title_Update_Count = ev.Title_Update_Count,
+                Has_Reported = currentUserId.HasValue ? await _eventRepository.HasUserReportedEventAsync(ev.Event_Id, currentUserId.Value) : (bool?)null
             };
         }
 
@@ -212,6 +229,11 @@ namespace Event.Business.Services
             var evExists = await _eventRepository.ExistsAsync(eventId);
             if (!evExists)
                 throw new NotFoundException($"Event with ID {eventId} not found.");
+
+            // 1.5 Check if user has already reported this event
+            var hasReported = await _eventRepository.HasUserReportedEventAsync(eventId, reporterId);
+            if (hasReported)
+                throw new ValidationException("You have already reported this event.");
 
             // 2. Write report details to a JSON file
             string rootPath = Directory.GetCurrentDirectory().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
@@ -275,13 +297,28 @@ namespace Event.Business.Services
             if (!evExists)
                 throw new NotFoundException($"Event with ID {eventId} not found.");
 
-            // 2. Create and save new attendee feedback
+            // 2. Save feedback to a JSON file
+            string rootPath = Directory.GetCurrentDirectory().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string feedbackDir = Path.Combine(rootPath, "Event.Business", "assets", "users", attendeeId.ToString(), "feedback");
+            if (!Directory.Exists(feedbackDir))
+            {
+                Directory.CreateDirectory(feedbackDir);
+            }
+            string fileName = $"feedback_event_{eventId}_{DateTime.UtcNow.Ticks}.json";
+            string filePath = Path.Combine(feedbackDir, fileName);
+            
+            var feedbackData = new { Rating = rating, Review = review, SubmittedAt = DateTime.UtcNow };
+            await System.IO.File.WriteAllTextAsync(filePath, System.Text.Json.JsonSerializer.Serialize(feedbackData, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+            
+            string reviewUrl = $"/assets/users/{attendeeId}/feedback/{fileName}";
+
+            // 3. Create and save new attendee feedback
             var feedback = new EventFeedback
             {
                 Attendee_Id = attendeeId,
                 Event_Id = eventId,
                 Rating = rating,
-                Review = review
+                Review = reviewUrl // Store the JSON URL here instead of raw text
             };
             await _eventRepository.AddFeedbackAsync(feedback);
             return true;
@@ -479,6 +516,10 @@ namespace Event.Business.Services
                 throw new ValidationException("Invalid event type. Must be Physical, Virtual, or Hybrid.");
             }
 
+            // Apply GST (calculate authoritative total payment amount)
+            decimal gstAmount = upfrontFee * (settings.GST_Percentage / 100m);
+            upfrontFee += gstAmount;
+
             // Begin transaction
             await _bookingRepository.BeginTransactionAsync();
             try
@@ -514,6 +555,55 @@ namespace Event.Business.Services
                 }
 
                 await _eventRepository.AddAsync(newEvent);
+
+                // Move temporary files to permanent event directory
+                bool filesMoved = false;
+                var baseAssetsPath = GetBaseAssetsPath();
+                var eventAssetsDir = Path.Combine(baseAssetsPath, "events", newEvent.Event_Id.ToString());
+
+                if (!string.IsNullOrEmpty(newEvent.Image_Url) && newEvent.Image_Url.Contains("/temp/"))
+                {
+                    // Extract relative path from URL (e.g. "assets/events/temp/guid/image.png")
+                    var relativePath = newEvent.Image_Url.Replace("assets/", "").TrimStart('/');
+                    var tempFilePath = Path.Combine(baseAssetsPath, relativePath);
+                    
+                    if (File.Exists(tempFilePath))
+                    {
+                        Directory.CreateDirectory(eventAssetsDir);
+                        var ext = Path.GetExtension(tempFilePath);
+                        // User specifically requested cover.png
+                        var finalImagePath = Path.Combine(eventAssetsDir, $"cover{ext}");
+                        File.Move(tempFilePath, finalImagePath, true);
+                        newEvent.Image_Url = $"assets/events/{newEvent.Event_Id}/cover{ext}";
+                        filesMoved = true;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(newEvent.Description_Url) && newEvent.Description_Url.Contains("/temp/"))
+                {
+                    var relativePath = newEvent.Description_Url.Replace("assets/", "").TrimStart('/');
+                    var tempFilePath = Path.Combine(baseAssetsPath, relativePath);
+                    
+                    if (File.Exists(tempFilePath))
+                    {
+                        Directory.CreateDirectory(eventAssetsDir);
+                        var finalDescPath = Path.Combine(eventAssetsDir, "description.txt");
+                        File.Move(tempFilePath, finalDescPath, true);
+                        newEvent.Description_Url = $"assets/events/{newEvent.Event_Id}/description.txt";
+                        filesMoved = true;
+                    }
+                }
+
+                if (filesMoved)
+                {
+                    await _eventRepository.UpdateAsync(newEvent);
+                }
+
+                if (venue != null)
+                {
+                    venue.Is_Available = false;
+                    await _venueRepository.UpdateAsync(venue);
+                }
 
                 // Create ledger transaction for upfront payment
                 var transaction = new Transaction
@@ -595,7 +685,7 @@ namespace Event.Business.Services
 
         #region CreateCheckoutSessionForEventCreationAsync
 
-        public async Task<(bool Success, string SessionId, string SessionUrl, string ErrorMessage)> CreateCheckoutSessionForEventCreationAsync(int eventId, string successUrl, string cancelUrl)
+        public async Task<(bool Success, string SessionId, string ClientSecret, System.DateTime CreatedAtUTC, string ErrorMessage)> CreateCheckoutSessionForEventCreationAsync(int eventId, string returnUrl)
         {
             var ev = await _eventRepository.GetEventDetailsAsync(eventId);
             if (ev == null)
@@ -610,7 +700,7 @@ namespace Event.Business.Services
 
             string itemName = $"Event Activation: {ev.Title}";
 
-            return await _paymentService.CreateCheckoutSessionAsync(transaction.Amount, transaction.Currency, itemName, successUrl, cancelUrl);
+            return await _paymentService.CreateCheckoutSessionAsync(transaction.Amount, transaction.Currency, itemName, returnUrl);
         }
 
         #endregion
@@ -736,7 +826,7 @@ namespace Event.Business.Services
                 {
                     var (roomUrl, rawPasscode) = await _virtualMeetingService.GenerateMeetingRoomAsync(ev.Title);
                     ev.Virtual_Url = roomUrl;
-                    ev.Virtual_Password_Hash = BCrypt.Net.BCrypt.HashPassword(rawPasscode);
+                    ev.Virtual_Password_Hash = Event.Business.Helpers.CryptoHelper.Encrypt(rawPasscode);
                     generatedPasscode = rawPasscode;
 
                     transaction.Remarks += $"\n[Virtual Access Passcode]: {rawPasscode}";
@@ -983,7 +1073,6 @@ namespace Event.Business.Services
                                             Placeholders = new Dictionary<string, string>
                                             {
                                                 { "eventName", ev.Title },
-                                                { "feedbackLink", $"http://localhost:4200/bookings?feedbackEventId={ev.Event_Id}" },
                                                 { "year", DateTime.UtcNow.Year.ToString() }
                                             }
                                         };
@@ -1208,6 +1297,21 @@ namespace Event.Business.Services
                 ev.Status = "Failed";
                 await _eventRepository.UpdateAsync(ev);
 
+                // Step 5.5: Update venue availability if it's not occupied by another active event.
+                if (ev.Venue_Id.HasValue)
+                {
+                    bool isOccupied = await _venueRepository.IsVenueOccupiedAsync(ev.Venue_Id.Value, ev.Date_Time);
+                    if (!isOccupied)
+                    {
+                        var venueToRelease = await _venueRepository.GetByIdAsync(ev.Venue_Id.Value);
+                        if (venueToRelease != null)
+                        {
+                            venueToRelease.Is_Available = true;
+                            await _venueRepository.UpdateAsync(venueToRelease);
+                        }
+                    }
+                }
+
                 // Step 6: Commit transaction.
                 await _bookingRepository.CommitTransactionAsync();
                 return true;
@@ -1408,6 +1512,11 @@ namespace Event.Business.Services
                 throw new NotFoundException("Event not found.");
             }
 
+            if (ev.Status != "Live")
+            {
+                throw new NotFoundException("Event not found or is no longer available.");
+            }
+
             var response = new List<TicketTierCapacityResponse>();
             bool isVirtual = ev.Event_Type.Equals("Virtual", StringComparison.OrdinalIgnoreCase);
 
@@ -1508,7 +1617,8 @@ namespace Event.Business.Services
                 Physical_Event_Activation_Fee = settings.Physical_Event_Activation_Fee,
                 Ticket_Commission_Percentage = settings.Ticket_Commission_Percentage,
                 Ticket_Fixed_Fee = settings.Ticket_Fixed_Fee,
-                Max_Tickets_Per_Booking = settings.Max_Tickets_Per_Booking
+                Max_Tickets_Per_Booking = settings.Max_Tickets_Per_Booking,
+                GST_Percentage = settings.GST_Percentage
             };
         }
 
@@ -1543,6 +1653,49 @@ namespace Event.Business.Services
             var filePath = Path.Combine(assetsDir, $"image{ext}");
             await File.WriteAllBytesAsync(filePath, fileBytes);
             return $"assets/events/temp/{tempId}/image{ext}";
+        }
+
+        #endregion
+        #region UpdateEventDetailsAsync
+
+        public async Task<bool> UpdateEventDetailsAsync(int organizerId, int eventId, UpdateEventDetailsRequest request)
+        {
+            var ev = await _eventRepository.GetByIdAsync(eventId);
+            if (ev == null)
+                throw new NotFoundException($"Event with ID {eventId} not found.");
+
+            if (ev.Organizer_Id != organizerId)
+                throw new ValidationException("You are not authorized to update this event.");
+
+            // Update Description without limitation
+            if (request.Description_Url != null)
+            {
+                ev.Description_Url = request.Description_Url;
+            }
+            
+            if (request.DescriptionText != null)
+            {
+                var assetsDir = Path.Combine(GetBaseAssetsPath(), "events", eventId.ToString());
+                Directory.CreateDirectory(assetsDir);
+                var filePath = Path.Combine(assetsDir, "description.txt");
+                await File.WriteAllTextAsync(filePath, request.DescriptionText);
+                ev.Description_Url = $"assets/events/{eventId}/description.txt";
+            }
+
+            // Restrict Title updates to a max of 2
+            if (request.Title != null && request.Title != ev.Title)
+            {
+                if (ev.Title_Update_Count >= 2)
+                {
+                    throw new ValidationException("Event title can only be updated a maximum of 2 times.");
+                }
+                
+                ev.Title = request.Title;
+                ev.Title_Update_Count++;
+            }
+
+            await _eventRepository.UpdateAsync(ev);
+            return true;
         }
 
         #endregion

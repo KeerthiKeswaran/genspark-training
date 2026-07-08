@@ -66,10 +66,13 @@ namespace Event.API.Controllers
             [FromQuery] string? category,
             [FromQuery] DateTime? minDateTime,
             [FromQuery] string? regionId,
+            [FromQuery] string? format,
+            [FromQuery] decimal? maxPrice,
+            [FromQuery] string? sortBy,
             [FromQuery] int page = 1,
             [FromQuery] int size = 10)
         {
-            var result = await _eventService.BrowseEventsAsync(keyword, category, minDateTime, regionId, page, size);
+            var result = await _eventService.BrowseEventsAsync(keyword, category, minDateTime, regionId, format, maxPrice, sortBy, page, size);
             return Ok(result);
         }
 
@@ -77,7 +80,17 @@ namespace Event.API.Controllers
         [HttpGet("{eventId}")]
         public async Task<IActionResult> GetEventDetails(int eventId)
         {
-            var ev = await _eventService.GetEventDetailsAsync(eventId);
+            int? currentUserId = null;
+            if (User.Identity?.IsAuthenticated == true)
+            {
+                var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+                if (idClaim != null && int.TryParse(idClaim.Value, out int id))
+                {
+                    currentUserId = id;
+                }
+            }
+
+            var ev = await _eventService.GetEventDetailsAsync(eventId, currentUserId);
             if (ev == null)
                 return NotFound(new { Message = "Event not found." });
 
@@ -164,6 +177,33 @@ namespace Event.API.Controllers
             catch (Event.Business.Exceptions.NotFoundException ex)
             {
                 return NotFound(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpPut("{eventId}/details")]
+        public async Task<IActionResult> UpdateEventDetails(int eventId, [FromBody] UpdateEventDetailsRequest request)
+        {
+            try
+            {
+                int organizerId = _userService.GetCurrentUserId();
+                bool result = await _eventService.UpdateEventDetailsAsync(organizerId, eventId, request);
+                return Ok(new { Success = result, Message = "Event details updated successfully." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { Message = ex.Message });
+            }
+            catch (Event.Business.Exceptions.NotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (Event.Business.Exceptions.ValidationException ex)
+            {
+                return BadRequest(new { Message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -267,10 +307,14 @@ namespace Event.API.Controllers
         {
             try
             {
-                var result = await _eventService.CreateCheckoutSessionForEventCreationAsync(eventId, request.SuccessUrl, request.CancelUrl);
+                var result = await _eventService.CreateCheckoutSessionForEventCreationAsync(eventId, request.SuccessUrl);
                 if (result.Success)
                 {
-                    return Ok(new { SessionId = result.SessionId, SessionUrl = result.SessionUrl });
+                    return Ok(new { 
+                        SessionId = result.SessionId, 
+                        ClientSecret = result.ClientSecret, 
+                        CreatedAtUTC = result.CreatedAtUTC 
+                    });
                 }
                 return BadRequest(new { Message = result.ErrorMessage });
             }

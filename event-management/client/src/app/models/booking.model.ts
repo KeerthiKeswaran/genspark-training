@@ -32,7 +32,11 @@ export interface BookingModel {
   event_Status?: string;
   total_Amount: number;
   amount_Paid?: number;
+  refunded_Amount?: number;
   details: BookingDetail[];
+  has_Reported?: boolean | null;
+  feedback_Rating?: number | null;
+  feedback_Review?: string | null;
 }
 
 export interface InitiateBookingRequest {

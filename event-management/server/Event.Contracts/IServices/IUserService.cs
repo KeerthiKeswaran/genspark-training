@@ -9,7 +9,7 @@ namespace Event.Contracts.IServices
     {
         int GetCurrentUserId();
         Task<bool> SelectInterestedRegionsAsync(int userId, string regionId);
-        Task<bool> UpdateUserProfileAsync(int userId, string name, string mobileNumber);
+        Task<bool> UpdateUserProfileAsync(int userId, UpdateProfileRequest request);
         Task<UserProfileResponse?> GetUserProfileAsync(int userId);
         Task<IEnumerable<MyEventOverviewResponse>> GetMyEventsAsync(int organizerId);
         Task<MyEventDetailsResponse?> GetMyEventDetailsAsync(int organizerId, int eventId);

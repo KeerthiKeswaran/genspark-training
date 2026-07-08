@@ -1,6 +1,9 @@
 import { Component, signal, inject } from '@angular/core';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 import { filter } from 'rxjs/operators';
+import { environment } from '../environments/environment';
+
 
 @Component({
   selector: 'app-root',
@@ -13,6 +16,8 @@ export class App {
   private router = inject(Router);
   private isInitialNavigation = true;
   private previousPathname = '';
+  private http = inject(HttpClient);
+  private healthCheckInterval: any;
 
   constructor() {
     this.router.events.pipe(
@@ -35,6 +40,32 @@ export class App {
       // Scroll to top only if the user navigated to a different url path (a new page)
       if (pathChanged) {
         window.scrollTo(0, 0);
+      }
+    });
+
+    if (typeof window !== 'undefined') {
+      this.startHealthCheck();
+    }
+  }
+
+  private startHealthCheck() {
+    this.performHealthCheck();
+    // Poll the server every 2 seconds to ensure it's still alive
+    this.healthCheckInterval = setInterval(() => {
+      this.performHealthCheck();
+    }, 5000);
+  }
+
+  private performHealthCheck() {
+    // Don't poll if we are already on the error page
+    if (this.router.url.startsWith('/error')) return;
+    
+    this.http.get(`${environment.apiUrl}/Health`).subscribe({
+      error: (err) => {
+        if (err.status === 0 || err.status >= 500) {
+          const currentUrl = window.location.pathname + window.location.search;
+          this.router.navigate(['/error'], { queryParams: { code: err.status || 500, returnUrl: currentUrl } });
+        }
       }
     });
   }

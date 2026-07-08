@@ -484,8 +484,35 @@ input:disabled + .switch-slider:before {
   justify-content: center;
 }
 
-.btn-refresh-staff:hover {
+.btn-refresh-staff:hover:not(:disabled) {
   color: var(--accent);
+}
+
+.btn-refresh-staff:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-refresh-staff.spinning svg {
+  animation: spin 1s linear infinite;
+}
+
+.staff-skeleton-loading {
+  display: flex;
+  flex-direction: column;
+}
+
+.skeleton-line {
+  background: var(--border);
+  border-radius: 4px;
+  animation: pulse 1.5s infinite ease-in-out;
+  margin-left: 10px;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
 }
 
 .staff-result-row {
@@ -1791,4 +1818,38 @@ input:disabled + .switch-slider:before {
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Azure-style Inline Errors */
+.field-error {
+  display: block;
+  color: #c41e3a; /* Cardinal Red */
+  font-size: 12.5px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+.capacity-alert-inline {
+  color: #c41e3a; /* Cardinal Red */
+  font-size: 12.5px;
+  font-weight: 500;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.capacity-info-inline {
+  color: #0369a1; /* Azure Blue Info */
+  font-size: 12.5px;
+  font-weight: 500;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.readonly-input {
+  background-color: #f1f5f9;
+  color: #64748b;
+  cursor: not-allowed;
+  opacity: 0.8;
 }

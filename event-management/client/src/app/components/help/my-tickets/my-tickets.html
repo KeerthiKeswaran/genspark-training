@@ -54,6 +54,13 @@
           </div>
 
           <p class="ticket-card-description">{{ ticket.details }}</p>
+
+          @if (ticket.status === 'Resolved' && ticket.response) {
+            <div class="ticket-response-box" style="margin-top: 16px; padding: 16px; background: rgba(16, 185, 129, 0.05); border-left: 4px solid #10b981; border-radius: 4px;">
+              <h4 style="margin: 0 0 8px 0; color: #10b981; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Support Response</h4>
+              <p style="margin: 0; color: var(--text-primary); font-size: 14px; line-height: 1.5;">{{ ticket.response }}</p>
+            </div>
+          }
         </div>
 
         <!-- Footer -->
@@ -63,14 +70,18 @@
 
       </div>
     } @empty {
-      <div class="empty-tickets-view">
-        <div class="empty-icon-wrap">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      @if (isLoading()) {
+        <div class="skeleton-loader text-skeleton" style="height: 120px; border-radius: 8px; margin-top: 20px;"></div>
+      } @else {
+        <div class="empty-tickets-view">
+          <div class="empty-icon-wrap">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </div>
+          <h3>No support tickets found</h3>
+          <p>There are no support tickets in your account matching the status "{{ selectedStatusFilter() }}".</p>
+          <button class="create-ticket-now-btn" routerLink="/raise-ticket">Raise a Support Ticket</button>
         </div>
-        <h3>No support tickets found</h3>
-        <p>There are no support tickets in your account matching the status "{{ selectedStatusFilter() }}".</p>
-        <button class="create-ticket-now-btn" routerLink="/raise-ticket">Raise a Support Ticket</button>
-      </div>
+      }
     }
   </div>
 

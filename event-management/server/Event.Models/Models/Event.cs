@@ -47,6 +47,7 @@ namespace Event.Models
 
         public string? Virtual_Password_Hash { get; set; }
 
+        public int Title_Update_Count { get; set; } = 0;
 
         // Navigation properties
         public virtual ICollection<EventTicketTier> TicketTiers { get; set; } = new List<EventTicketTier>();

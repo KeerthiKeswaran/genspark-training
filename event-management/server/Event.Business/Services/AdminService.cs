@@ -20,10 +20,12 @@ namespace Event.Business.Services
         private readonly IUserRepository _userRepository;
         private readonly IEventRepository _eventRepository;
         private readonly ITransactionRepository _transactionRepository;
+        private readonly IBookingRepository _bookingRepository;
         private readonly IBookingPaymentRepository _bookingPaymentRepository;
         private readonly IStaffRepository _staffRepository;
         private readonly ISupportTicketRepository _supportTicketRepository;
         private readonly IAdminActionRepository _adminActionRepository;
+        private readonly IAdminRepository _adminRepository;
         private readonly IEmailService _emailService;
         private readonly IEventService _eventService;
         private readonly IRegionRepository _regionRepository;
@@ -38,10 +40,12 @@ namespace Event.Business.Services
             IUserRepository userRepository,
             IEventRepository eventRepository,
             ITransactionRepository transactionRepository,
+            IBookingRepository bookingRepository,
             IBookingPaymentRepository bookingPaymentRepository,
             IStaffRepository staffRepository,
             ISupportTicketRepository supportTicketRepository,
             IAdminActionRepository adminActionRepository,
+            IAdminRepository adminRepository,
             IEmailService emailService,
             IEventService eventService,
             IRegionRepository regionRepository,
@@ -51,10 +55,12 @@ namespace Event.Business.Services
             _userRepository = userRepository;
             _eventRepository = eventRepository;
             _transactionRepository = transactionRepository;
+            _bookingRepository = bookingRepository;
             _bookingPaymentRepository = bookingPaymentRepository;
             _staffRepository = staffRepository;
             _supportTicketRepository = supportTicketRepository;
             _adminActionRepository = adminActionRepository;
+            _adminRepository = adminRepository;
             _emailService = emailService;
             _eventService = eventService;
             _regionRepository = regionRepository;
@@ -138,6 +144,7 @@ namespace Event.Business.Services
                     DateTime = e.Date_Time,
                     VenueName = e.Venue?.Name ?? "N/A (Virtual)",
                     OrganizerName = e.Organizer?.Name ?? "N/A",
+                    OrganizerEmail = e.Organizer?.Email ?? "N/A",
                     AllocatedStaffCount = e.StaffAllocations?.Count ?? 0,
                     Status = e.Status,
                     AllocatedStaffPercentage = Math.Round(allocatedStaffPercentage, 2),
@@ -151,11 +158,147 @@ namespace Event.Business.Services
 
         #endregion
 
+        #region GetRelatedEntityAsync
+        public async Task<object?> GetRelatedEntityAsync(string type, int id)
+        {
+            // The user explicitly requested to only return Booking or Event details, 
+            // as the ID could belong to either regardless of the 'type' parameter.
+            
+            var booking = await _bookingRepository.GetBookingDetailsAsync(id);
+            if (booking != null)
+            {
+                var successTx = await _transactionRepository.GetSuccessBookingTransactionAsync(id);
+                return new {
+                    Type = "Booking",
+                    Id = booking.Booking_Id,
+                    EventName = booking.Event?.Title ?? "Unknown Event",
+                    TicketTiers = booking.Details?.Select(d => new { Tier = d.Tier_Name, Quantity = d.Quantity }),
+                    AmountPaid = successTx?.Amount ?? 0,
+                    AmountRefunded = successTx?.Refunded_Amount ?? 0
+                };
+            }
+
+            var ev = await _eventRepository.GetEventDetailsAsync(id);
+            if (ev != null)
+            {
+                var upfrontTx = await _transactionRepository.GetSuccessOrganizerUpfrontTransactionAsync(id);
+                return new {
+                    Type = "Event",
+                    Id = ev.Event_Id,
+                    EventName = ev.Title,
+                    UpfrontPaid = upfrontTx?.Amount ?? 0,
+                    UpfrontRefunded = upfrontTx?.Refunded_Amount ?? 0
+                };
+            }
+
+            return null;
+        }
+        #endregion
+
         #region GetSupportTicketsAsync
 
-        public async Task<IEnumerable<SupportTicket>> GetSupportTicketsAsync()
+        public async Task<EventDetailEto?> GetEventByIdAsync(int id)
         {
-            return await _supportTicketRepository.GetAllAsync();
+            var e = await _eventRepository.GetEventDetailsAsync(id);
+            if (e == null) return null;
+
+            return new EventDetailEto
+            {
+                EventId = e.Event_Id,
+                Title = e.Title,
+                EventType = e.Event_Type,
+                Status = e.Status,
+                DateTime = e.Date_Time,
+                VenueName = e.Venue?.Name ?? string.Empty,
+                OrganizerName = e.Organizer?.Name ?? e.Organizer?.Email ?? string.Empty,
+                OrganizerEmail = e.Organizer?.Email ?? string.Empty,
+                AllocatedStaffCount = e.StaffAllocations?.Count ?? 0,
+                ImageUrl = e.Image_Url,
+                DescriptionUrl = e.Description_Url
+            };
+        }
+
+        public async Task<IEnumerable<SupportTicketResponse>> GetSupportTicketsAsync(string? status, string? keyword, DateTime? dateFrom, DateTime? dateTo)
+        {
+            var tickets = await _supportTicketRepository.GetAllWithUsersAsync();
+
+            if (!string.IsNullOrWhiteSpace(status))
+                tickets = tickets.Where(t => string.Equals(t.Status, status, StringComparison.OrdinalIgnoreCase));
+
+            if (!string.IsNullOrWhiteSpace(keyword))
+                tickets = tickets.Where(t =>
+                    t.Ticket_Id.ToString().Contains(keyword) ||
+                    (t.User?.Name?.Contains(keyword, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (t.User?.Email?.Contains(keyword, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (t.RequestType?.Contains(keyword, StringComparison.OrdinalIgnoreCase) ?? false));
+
+            var response = new List<SupportTicketResponse>();
+            string rootPath = AppDomain.CurrentDomain.BaseDirectory;
+            string folderName = "Event.Business";
+            if (!System.IO.Directory.Exists(System.IO.Path.Combine(rootPath, folderName)))
+            {
+                rootPath = System.IO.Directory.GetCurrentDirectory();
+            }
+
+            var actions = await _adminActionRepository.GetAllAsync();
+
+            foreach (var t in tickets)
+            {
+                var currentEscStatus = t.EsclationStatus;
+                if (currentEscStatus == "Escalated")
+                {
+                    var relatedAction = actions.FirstOrDefault(a => a.TicketId == t.Ticket_Id);
+                    if (relatedAction != null && (relatedAction.ActionStatus == "Processed" || relatedAction.ActionStatus == "Declined"))
+                    {
+                        currentEscStatus = relatedAction.ActionStatus;
+                    }
+                }
+
+                var dto = new SupportTicketResponse
+                {
+                    Ticket_Id = t.Ticket_Id,
+                    User_Id = t.User_Id,
+                    SenderName = t.User?.Name ?? "Unknown",
+                    SenderEmail = t.User?.Email ?? "Unknown",
+                    RequestType = t.RequestType,
+                    ConcernUrl = t.ConcernUrl,
+                    Status = t.Status,
+                    EsclationStatus = currentEscStatus,
+                    RelatedId = t.RelatedId,
+                    TargetType = t.TargetType,
+                    Created_At = t.CreatedAt
+                };
+
+                if (!string.IsNullOrEmpty(t.ConcernUrl))
+                {
+                    string relativeConcern = t.ConcernUrl.TrimStart('/');
+                    if (relativeConcern.StartsWith("assets/"))
+                        relativeConcern = relativeConcern.Substring("assets/".Length);
+
+                    string filePath = System.IO.Path.Combine(rootPath, folderName, "assets", relativeConcern);
+                    if (System.IO.File.Exists(filePath))
+                    {
+                        try
+                        {
+                            string json = await System.IO.File.ReadAllTextAsync(filePath);
+                            var content = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(json);
+                            if (content.TryGetProperty("Subject", out var subjectProp))
+                            {
+                                dto.Subject = subjectProp.GetString();
+                            }
+                            if (content.TryGetProperty("Message", out var messageProp))
+                            {
+                                dto.Message = messageProp.GetString();
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                response.Add(dto);
+            }
+
+            return response;
         }
 
         #endregion
@@ -297,7 +440,6 @@ namespace Event.Business.Services
                 ActionType = request.ActionType,
                 TargetType = request.TargetType,
                 TargetId = request.TargetId,
-                ReferenceId = request.ReferenceId,
                 TicketId = ticketId,
                 ActionStatus = "Pending",
                 Remarks = $"Ticket #{ticketId} escalated.",
@@ -310,6 +452,18 @@ namespace Event.Business.Services
             await _supportTicketRepository.UpdateAsync(ticket);
 
             return true;
+        }
+
+        #endregion
+
+        #region GetEscalationStatusAsync
+
+        public async Task<AdminAction?> GetEscalationStatusAsync(int ticketId)
+        {
+            var actions = await _adminActionRepository.GetAllAsync();
+            return actions.Where(a => a.TicketId == ticketId)
+                          .OrderByDescending(a => a.CreatedAt)
+                          .FirstOrDefault();
         }
 
         #endregion
@@ -484,9 +638,8 @@ namespace Event.Business.Services
             {
                 AdminId = adminId,
                 ActionType = "REF",
-                TargetType = "ORG",
-                TargetId = ev.Organizer_Id,
-                ReferenceId = ev.Event_Id,
+                TargetType = "EVT",
+                TargetId = ev.Event_Id,
                 TicketId = null,
                 ActionStatus = "Pending",
                 Remarks = $"Event #{ev.Event_Id} flagged and report upheld. Escalated for refund.",
@@ -548,12 +701,8 @@ namespace Event.Business.Services
 
         public async Task<VenueResponse> CreateVenueAsync(CreateVenueRequest request)
         {
-            // 1. Validate seat tiers — must include all three required tiers
-            var validTiers = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Elite", "Gold", "Silver" };
-            var submittedTiers = request.SeatTiers.Select(t => t.Tier_Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            if (!validTiers.SetEquals(submittedTiers))
-                throw new ValidationException("Venue must include all three seat tiers: Elite, Gold, and Silver.");
+            if (request.SeatTiers == null || !request.SeatTiers.Any())
+                throw new ValidationException("At least one seat tier is required.");
 
             // 2. Ensure the Region exists; create it if not
             var region = await _regionRepository.GetByRegionIdAsync(request.Region_Id);
@@ -614,17 +763,125 @@ namespace Event.Business.Services
 
         #region GetStaffDirectoryAsync
         
-        public async Task<IEnumerable<StaffResponse>> GetStaffDirectoryAsync()
+        public async Task<PagedResult<StaffResponse>> GetStaffDirectoryAsync(string? regionId, bool? isAllocated, string? keyword, string? sortBy, int page = 1, int size = 10)
         {
             var staffs = await _staffRepository.GetAllAsync();
-            return staffs.Select(s => new StaffResponse
+
+            if (!string.IsNullOrWhiteSpace(regionId))
+                staffs = staffs.Where(s => string.Equals(s.Region_Id, regionId, StringComparison.OrdinalIgnoreCase));
+
+            if (isAllocated.HasValue)
+                staffs = staffs.Where(s => s.IsAllocated == isAllocated.Value);
+
+            if (!string.IsNullOrWhiteSpace(keyword))
             {
-                Employee_ID = s.Employee_ID,
-                Name = s.Name,
-                Email = s.Email,
-                Region_Id = s.Region_Id,
-                IsAllocated = s.IsAllocated
-            });
+                var lowerKeyword = keyword.ToLower();
+                staffs = staffs.Where(s => 
+                    s.Employee_ID.ToString().Contains(lowerKeyword) ||
+                    (s.Name?.ToLower().Contains(lowerKeyword) ?? false) ||
+                    (s.Email?.ToLower().Contains(lowerKeyword) ?? false)
+                );
+            }
+
+            // Backend-driven sorting
+            if (!string.IsNullOrWhiteSpace(sortBy))
+            {
+                var isDesc = sortBy.EndsWith("_desc", StringComparison.OrdinalIgnoreCase);
+                var sortCol = sortBy.Replace("_desc", "", StringComparison.OrdinalIgnoreCase).Replace("_asc", "", StringComparison.OrdinalIgnoreCase).ToLower();
+
+                staffs = sortCol switch
+                {
+                    "employee_id" => isDesc ? staffs.OrderByDescending(s => s.Employee_ID) : staffs.OrderBy(s => s.Employee_ID),
+                    "name" => isDesc ? staffs.OrderByDescending(s => s.Name) : staffs.OrderBy(s => s.Name),
+                    "email" => isDesc ? staffs.OrderByDescending(s => s.Email) : staffs.OrderBy(s => s.Email),
+                    "regionid" => isDesc ? staffs.OrderByDescending(s => s.Region?.Region_Name) : staffs.OrderBy(s => s.Region?.Region_Name),
+                    "isallocated" => isDesc ? staffs.OrderByDescending(s => s.IsAllocated) : staffs.OrderBy(s => s.IsAllocated),
+                    _ => staffs.OrderBy(s => s.Employee_ID)
+                };
+            }
+            else
+            {
+                staffs = staffs.OrderBy(s => s.Employee_ID);
+            }
+
+            int totalCount = staffs.Count();
+            int totalPages = (int)Math.Ceiling(totalCount / (double)size);
+
+            var pagedStaffs = staffs
+                .Skip((page - 1) * size)
+                .Take(size)
+                .Select(s => new StaffResponse
+                {
+                    Employee_ID = s.Employee_ID,
+                    Name = s.Name,
+                    Email = s.Email,
+                    Region_Id = s.Region_Id,
+                    Region_Name = s.Region?.Region_Name ?? s.Region_Id,
+                    IsAllocated = s.IsAllocated
+                }).ToList();
+
+            return new PagedResult<StaffResponse>
+            {
+                Items = pagedStaffs,
+                TotalCount = totalCount,
+                Page = page,
+                PageSize = size
+            };
+        }
+
+        #endregion
+
+        #region GetStaffByRegionAsync
+
+        public async Task<IEnumerable<StaffResponse>> GetStaffByRegionAsync(string regionId)
+        {
+            var staffs = await _staffRepository.GetAllAsync();
+            return staffs
+                .Where(s => string.Equals(s.Region_Id, regionId, StringComparison.OrdinalIgnoreCase) && !s.IsAllocated)
+                .Select(s => new StaffResponse
+                {
+                    Employee_ID = s.Employee_ID,
+                    Name = s.Name,
+                    Email = s.Email,
+                    Region_Id = s.Region_Id,
+                    IsAllocated = s.IsAllocated
+                });
+        }
+
+        #endregion
+
+        #region GetEventsByRegionAsync
+
+        public async Task<IEnumerable<EventDetailEto>> GetEventsByRegionAsync(string regionId)
+        {
+            var events = await _eventRepository.GetEventsByRegionsAsync(new[] { regionId });
+
+            return events.Select(e =>
+            {
+                int totalSeats = e.Venue?.SeatCapacities?.Sum(c => c.Total_Seats) ?? 0;
+                int requiredStaff = e.Requires_Staff && e.Venue != null ? Math.Max(1, (int)Math.Ceiling(totalSeats / 100.0)) : 0;
+                double allocatedStaffPercentage = 100.0;
+                if (e.Requires_Staff && requiredStaff > 0)
+                {
+                    int allocatedStaffCount = e.StaffAllocations?.Count ?? 0;
+                    allocatedStaffPercentage = ((double)allocatedStaffCount / requiredStaff) * 100.0;
+                }
+
+                return new EventDetailEto
+                {
+                    EventId = e.Event_Id,
+                    Title = e.Title,
+                    EventType = e.Event_Type,
+                    DateTime = e.Date_Time,
+                    VenueName = e.Venue?.Name ?? "N/A",
+                    OrganizerName = e.Organizer?.Name ?? "N/A",
+                    AllocatedStaffCount = e.StaffAllocations?.Count ?? 0,
+                    Status = e.Status,
+                    AllocatedStaffPercentage = Math.Round(allocatedStaffPercentage, 2),
+                    DescriptionUrl = e.Description_Url,
+                    ImageUrl = e.Image_Url
+                };
+            }).ToList();
         }
 
         #endregion
@@ -685,6 +942,214 @@ namespace Event.Business.Services
             await _staffRepository.UpdateAsync(staff);
 
             return true;
+        }
+
+        #endregion
+
+        #region UpdateVenueAsync
+
+        public async Task<VenueResponse> UpdateVenueAsync(int venueId, CreateVenueRequest request)
+        {
+            var venue = await _venueRepository.GetByIdAsync(venueId);
+            if (venue == null)
+                throw new NotFoundException($"Venue with ID {venueId} not found.");
+
+            venue.Name = request.Name;
+            venue.Address = request.Address;
+            venue.Hourly_Price = request.Hourly_Price;
+            venue.Region_Id = request.Region_Id;
+            venue.Is_Available = request.Is_Available;
+
+            await _venueRepository.UpdateAsync(venue);
+
+            var updated = (await _venueRepository.GetAllWithDetailsAsync())
+                .First(v => v.Venue_Id == venue.Venue_Id);
+
+            return new VenueResponse
+            {
+                Venue_Id = updated.Venue_Id,
+                Region_Id = updated.Region_Id,
+                Name = updated.Name,
+                Address = updated.Address,
+                Hourly_Price = updated.Hourly_Price,
+                Is_Available = updated.Is_Available,
+                SeatTiers = updated.SeatCapacities.Select(sc => new SeatTierResponse
+                {
+                    Tier_Name = sc.Tier_Name,
+                    Total_Seats = sc.Total_Seats
+                }).ToList()
+            };
+        }
+
+        #endregion
+
+        #region AdminProfile
+
+        public async Task<AdminProfileResponse> GetAdminProfileAsync(string adminId)
+        {
+            var admin = await _adminRepository.GetByAdminIdAsync(adminId);
+            if (admin == null)
+                throw new NotFoundException($"Admin with ID {adminId} not found.");
+
+            return new AdminProfileResponse
+            {
+                Admin_Id = admin.Admin_Id,
+                Name = admin.Name,
+                Email = admin.Email
+            };
+        }
+
+        public async Task<AdminProfileResponse> UpdateAdminProfileAsync(string adminId, UpdateAdminProfileRequest request)
+        {
+            var admin = await _adminRepository.GetByAdminIdAsync(adminId);
+            if (admin == null)
+                throw new NotFoundException($"Admin with ID {adminId} not found.");
+
+            admin.Name = request.Name;
+            await _adminRepository.UpdateAsync(admin);
+
+            return new AdminProfileResponse
+            {
+                Admin_Id = admin.Admin_Id,
+                Name = admin.Name,
+                Email = admin.Email
+            };
+        }
+
+        #endregion
+
+        #region GetHelpdeskMetadataAsync
+
+        public async Task<HelpdeskMetadataResponse> GetHelpdeskMetadataAsync()
+        {
+            string filePath = ResolveHelpdeskFilePath();
+
+            if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
+            {
+                var json = await File.ReadAllTextAsync(filePath);
+                var result = JsonSerializer.Deserialize<HelpdeskMetadataResponse>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (result != null && (result.Actions?.Count > 0 || result.TargetTypes?.Count > 0))
+                    return result;
+            }
+
+            return new HelpdeskMetadataResponse
+            {
+                Actions = new List<HelpdeskAction>
+                {
+                    new() { Key = "REF", Label = "Refund" },
+                    new() { Key = "EVT", Label = "Event" },
+                    new() { Key = "ACC", Label = "Account" },
+                    new() { Key = "GEN", Label = "General" }
+                },
+                TargetTypes = new List<HelpdeskTargetType>
+                {
+                    new() { Key = "ATD", Label = "Attendee" },
+                    new() { Key = "ORG", Label = "Organizer" }
+                }
+            };
+        }
+
+        private static string ResolveHelpdeskFilePath()
+        {
+            string rootPath = Directory.GetCurrentDirectory().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+            if (rootPath.Contains("bin"))
+            {
+                rootPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            }
+            else if (rootPath.EndsWith("Event.API") || rootPath.EndsWith("Event.Business.Tests") || rootPath.EndsWith("Event.Business"))
+            {
+                rootPath = Path.GetFullPath(Path.Combine(rootPath, "..")).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            }
+
+            string primary = Path.Combine(rootPath, "Event.Business", "assets", "admin", "helpdesk-types.json");
+            if (File.Exists(primary)) return primary;
+
+            string binFallback = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", "admin", "helpdesk-types.json");
+            return binFallback;
+        }
+
+        #endregion
+
+        #region GetAllVenuesIncludingInactiveAsync
+
+        public async Task<IEnumerable<VenueResponse>> GetAllVenuesIncludingInactiveAsync()
+        {
+            var venues = await _venueRepository.GetAllWithDetailsAsync();
+            return venues.Select(v => new VenueResponse
+            {
+                Venue_Id     = v.Venue_Id,
+                Region_Id    = v.Region_Id,
+                Name         = v.Name,
+                Address      = v.Address,
+                Hourly_Price = v.Hourly_Price,
+                Is_Available = v.Is_Available,
+                SeatTiers    = v.SeatCapacities.Select(sc => new SeatTierResponse
+                {
+                    Tier_Name   = sc.Tier_Name,
+                    Total_Seats = sc.Total_Seats
+                }).ToList()
+            }).ToList();
+        }
+
+        #endregion
+
+        #region UpdateEventVenueAsync
+
+        public async Task<bool> UpdateEventVenueAsync(int eventId, int venueId)
+        {
+            var ev = await _eventRepository.GetEventDetailsAsync(eventId);
+            if (ev == null)
+                throw new NotFoundException($"Event with ID {eventId} not found.");
+
+            var venue = await _venueRepository.GetByIdAsync(venueId);
+            if (venue == null)
+                throw new NotFoundException($"Venue with ID {venueId} not found.");
+
+            ev.Venue_Id = venueId;
+            await _eventRepository.UpdateAsync(ev);
+            return true;
+        }
+
+        #endregion
+
+        #region SearchGlobalAsync
+
+        public async Task<object> SearchGlobalAsync(string keyword)
+        {
+            if (string.IsNullOrWhiteSpace(keyword))
+                return new { Events = new List<object>(), Bookings = new List<object>() };
+
+            var kw = keyword.ToLower();
+            
+            var allEvents = await _eventRepository.GetAllAsync();
+            var matchedEvents = allEvents.Where(e => 
+                e.Event_Id.ToString().Contains(kw) || 
+                (e.Title != null && e.Title.ToLower().Contains(kw)) || 
+                (e.Venue != null && e.Venue.Name != null && e.Venue.Name.ToLower().Contains(kw))
+            ).Select(e => new {
+                EventId = e.Event_Id,
+                Title = e.Title,
+                VenueName = e.Venue?.Name,
+                Status = e.Status,
+                Date = e.Date_Time
+            }).Take(20).ToList();
+
+            var allBookings = await _bookingRepository.GetAllAsync();
+            var matchedBookings = allBookings.Where(b => 
+                b.Booking_Id.ToString().Contains(kw) ||
+                b.Event_Id.ToString().Contains(kw)
+            ).Select(b => new {
+                BookingId = b.Booking_Id,
+                EventId = b.Event_Id,
+                Status = b.Booking_Status,
+                Date = b.Created_At
+            }).Take(20).ToList();
+
+            return new {
+                Events = matchedEvents,
+                Bookings = matchedBookings
+            };
         }
 
         #endregion

@@ -146,7 +146,8 @@ namespace Event.Business.Tests.ServiceTests
                  _emailService,
                  _notificationRepositoryMock.Object,
                  _transactionRepositoryMock.Object,
-                 eventRepositoryMock.Object
+                 eventRepositoryMock.Object,
+                 new Moq.Mock<Event.Contracts.IRepositories.IPlatformSettingsRepository>().Object
              );
         }
         #endregion
@@ -256,7 +257,7 @@ namespace Event.Business.Tests.ServiceTests
                 ActionType   = "REF",
                 TargetType   = "ATD",
                 TargetId     = 10,
-                ReferenceId  = 501,
+                TicketId = 501,
                 ActionStatus = "Pending"
             };
 
@@ -295,7 +296,7 @@ namespace Event.Business.Tests.ServiceTests
                 ActionType   = "REF",
                 TargetType   = "ORG",
                 TargetId     = 5,
-                ReferenceId  = 201,
+                TicketId = 201,
                 ActionStatus = "Pending"
             };
 
@@ -532,7 +533,7 @@ namespace Event.Business.Tests.ServiceTests
                 ActionId = actionId,
                 ActionType = "REF",
                 TargetType = "ATD",
-                ReferenceId = 502,
+                TicketId = 502,
                 ActionStatus = "Pending"
             };
 
@@ -555,7 +556,7 @@ namespace Event.Business.Tests.ServiceTests
                 ActionId = actionId,
                 ActionType = "REF",
                 TargetType = "ATD",
-                ReferenceId = 503,
+                TicketId = 503,
                 ActionStatus = "Pending"
             };
 
@@ -578,7 +579,7 @@ namespace Event.Business.Tests.ServiceTests
                 ActionId = actionId,
                 ActionType = "REF",
                 TargetType = "INVALID_TYPE",
-                ReferenceId = 504,
+                TicketId = 504,
                 ActionStatus = "Pending"
             };
 

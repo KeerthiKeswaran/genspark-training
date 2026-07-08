@@ -13,5 +13,10 @@ namespace Event.Models.DTOs
         public string? Venue_Name { get; set; }
         public int Tickets_Sold { get; set; }
         public decimal Net_Earnings { get; set; }
+        public string? Category { get; set; }
+        public string? Description_Url { get; set; }
+        public int Title_Update_Count { get; set; }
+        public string? Virtual_Url { get; set; }
+        public string? Virtual_Password_Hash { get; set; }
     }
 }

@@ -1,5 +1,7 @@
 import { Component, Output, EventEmitter, OnInit, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../../environments/environment';
+
 
 @Component({
   selector: 'app-cancellation-policy-doc',
@@ -51,14 +53,17 @@ export class CancellationPolicyDocComponent implements OnInit {
     // Parse Bold text (**text**)
     parsedText = parsedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     
-    // Parse Bullet Lists (* item)
-    parsedText = parsedText.replace(/^\* (.*?)$/gm, '<li>$1</li>');
+    // Parse Bullet Lists (* item or - item)
+    parsedText = parsedText.replace(/^[\*-]\s+(.*?)$/gm, '<li>$1</li>');
+    
+    // Wrap adjacent <li> tags in <ul>
+    parsedText = parsedText.replace(/(<li>.*?<\/li>[\r\n]*)+/g, '<ul>$&</ul>\n');
     
     // Convert double line breaks into paragraphs
     parsedText = parsedText.split('\n\n').map(p => {
       p = p.trim();
       if (!p) return '';
-      if (p.startsWith('<h') || p.startsWith('<hr') || p.startsWith('<li')) {
+      if (p.startsWith('<h') || p.startsWith('<hr') || p.startsWith('<ul') || p.startsWith('<li')) {
         return p;
       }
       return `<p>${p}</p>`;
@@ -74,9 +79,9 @@ export class CancellationPolicyDocComponent implements OnInit {
     this.isLoadingPolicy.set(true);
     this.policyError.set('');
 
-    this.http.get<any>('http://localhost:5106/api/policies/cancellation').subscribe({
+    this.http.get<any>(`${environment.apiUrl}/policies/cancellation`).subscribe({
       next: (res) => {
-        const fileUrl = res.filePath.startsWith('http') ? res.filePath : `http://localhost:5106${res.filePath}`;
+        const fileUrl = res.filePath.startsWith('http') ? res.filePath : `${environment.serverUrl}${res.filePath}`;
         this.http.get(fileUrl, { responseType: 'text' }).subscribe({
           next: (content) => {
             const formatted = this.parseMarkdown(content);

@@ -23,9 +23,6 @@ namespace Event.Models
         [Required]
         public int TargetId { get; set; }
 
-        [Required]
-        public int ReferenceId { get; set; } // Event or Booking ID
-
         public int? TicketId { get; set; }
 
         [System.Text.Json.Serialization.JsonIgnore]

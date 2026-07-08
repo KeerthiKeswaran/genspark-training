@@ -32,6 +32,7 @@ namespace Event.Models.DTOs
         public DateTime DateTime { get; set; }
         public string VenueName { get; set; } = string.Empty;
         public string OrganizerName { get; set; } = string.Empty;
+        public string OrganizerEmail { get; set; } = string.Empty;
         public int AllocatedStaffCount { get; set; }
         public string Status { get; set; } = string.Empty;
         public double AllocatedStaffPercentage { get; set; }

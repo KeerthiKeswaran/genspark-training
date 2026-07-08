@@ -8,6 +8,8 @@ namespace Event.Business.Services
 {
     public class StripePaymentService : IPaymentService
     {
+        private readonly string? _testChargeId;
+
         #region Constructor
 
         public StripePaymentService(IConfiguration configuration)
@@ -16,6 +18,7 @@ namespace Event.Business.Services
             var apiKey = configuration["Stripe:ApiKey"] 
                 ?? throw new InvalidOperationException("Stripe:ApiKey is not configured in settings.");
             StripeConfiguration.ApiKey = apiKey;
+            _testChargeId = configuration["Stripe:TestChargeId"];
         }
 
         #endregion
@@ -59,6 +62,14 @@ namespace Event.Business.Services
 
         public async Task<(bool Success, string RefundReference, string ErrorMessage)> CreateRefundAsync(string transactionReference, decimal amount)
         {
+            // In test mode (TestChargeId configured), simulate a successful refund
+            // to avoid "refund amount > charge amount" errors against the static test charge.
+            if (!string.IsNullOrEmpty(_testChargeId))
+            {
+                await Task.CompletedTask;
+                return (true, $"test_refund_{Guid.NewGuid():N}", string.Empty);
+            }
+
             try
             {
                 // 1. Build refund options with referenced charge ID and amount in cents
@@ -120,8 +131,8 @@ namespace Event.Business.Services
 
         #region CreateCheckoutSessionAsync
 
-        public async Task<(bool Success, string SessionId, string SessionUrl, string ErrorMessage)> CreateCheckoutSessionAsync(
-            decimal amount, string currency, string itemName, string successUrl, string cancelUrl)
+        public async Task<(bool Success, string SessionId, string ClientSecret, System.DateTime CreatedAtUTC, string ErrorMessage)> CreateCheckoutSessionAsync(
+            decimal amount, string currency, string itemName, string returnUrl)
         {
             try
             {
@@ -145,18 +156,18 @@ namespace Event.Business.Services
                         },
                     },
                     Mode = "payment",
-                    SuccessUrl = successUrl,
-                    CancelUrl = cancelUrl,
+                    UiMode = "embedded_page",
+                    ReturnUrl = returnUrl,
                 };
 
                 var service = new Stripe.Checkout.SessionService();
                 var session = await service.CreateAsync(options);
 
-                return (true, session.Id, session.Url, string.Empty);
+                return (true, session.Id, session.ClientSecret, session.Created, string.Empty);
             }
             catch (StripeException ex)
             {
-                return (false, string.Empty, string.Empty, ex.Message);
+                return (false, string.Empty, string.Empty, System.DateTime.UtcNow, ex.Message);
             }
         }
 

@@ -68,9 +68,21 @@
         <div class="review-modal-section">
           <h4>Payment Summary</h4>
           <table class="review-modal-table">
+            <tr>
+              <td class="lbl">Tickets Subtotal:</td>
+              <td class="val">{{ formatCurrency(subtotalAmount()) }}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Fee <i class="fa fa-info-circle" title="Platform fee per ticket"></i>:</td>
+              <td class="val">{{ formatCurrency(fixedFeeTotal()) }}</td>
+            </tr>
+            <tr>
+              <td class="lbl">GST ({{ gstPercentage() }}%):</td>
+              <td class="val">{{ formatCurrency(gstAmount()) }}</td>
+            </tr>
             <tr style="border-top: 2px solid #e1e7f0; font-weight: 600; font-size: 1.1rem; color: #1e293b;">
-              <td class="lbl" style="padding-top: 12px;">Total Amount:</td>
-              <td class="val" style="padding-top: 12px;">{{ formatCurrency(subtotalAmount()) }}</td>
+              <td class="lbl" style="padding-top: 12px;">Total Payment:</td>
+              <td class="val" style="padding-top: 12px;">{{ formatCurrency(totalAmount()) }}</td>
             </tr>
           </table>
         </div>
@@ -127,14 +139,32 @@
             <img [src]="event()!.image_Url" [alt]="event()!.title" class="event-banner-img">
             <div class="event-banner-overlay"></div>
           }
-          <div class="event-type-badge" [class]="'badge-' + event()!.event_Type.toLowerCase()">
-            {{ event()!.event_Type }}
+          <div class="event-type-badge" [class]="'badge-' + (event()!.event_Type ? event()!.event_Type.toLowerCase() : 'physical')">
+            {{ event()!.event_Type || 'Physical' }}
           </div>
+          @if (event()!.category) {
+            <div class="event-type-badge category-badge" style="top: 16px; left: auto; right: 16px; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(4px); color: white;">
+              {{ event()!.category }}
+            </div>
+          }
         </div>
 
         <!-- Title & Basic Meta Capsule info -->
         <div class="event-headline-section">
-          <h1 class="event-main-title">{{ event()!.title }}</h1>
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <h1 class="event-main-title" style="margin-bottom: 0;">{{ event()!.title }}</h1>
+            <button class="review-btn-secondary" 
+              (click)="hasReported() ? null : openReportModal()" 
+              [disabled]="hasReported()"
+              [attr.title]="hasReported() ? 'This event has been reported already.' : 'Report this event'"
+              [style.background]="hasReported() ? '#e5e7eb' : '#dc2626'" 
+              [style.color]="hasReported() ? '#9ca3af' : 'white'" 
+              [style.cursor]="hasReported() ? 'not-allowed' : 'pointer'"
+              style="border: none; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 12px; margin-top: 4px; width: 90px; border-radius: 6px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              {{ hasReported() ? 'Reported' : 'Report' }}
+            </button>
+          </div>
           
           <div class="event-metadata-row">
             <div class="meta-capsule">
@@ -149,6 +179,16 @@
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
               <span>Age Limit: 18+ Only</span>
             </div>
+            <div class="meta-capsule">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+              <span>{{ event()!.event_Type || 'Physical' }} Event</span>
+            </div>
+            @if (event()!.category) {
+              <div class="meta-capsule">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                <span>{{ event()!.category }}</span>
+              </div>
+            }
             @if (event()!.venue_Name) {
               <div class="meta-capsule location">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -170,28 +210,41 @@
           </div>
         </div>
 
-        <!-- Location with Mock Map -->
-        <div class="info-section">
-          <h3 class="section-title-bar">Location & Venue</h3>
-          <p class="venue-address-text">
-            <strong>{{ event()!.venue_Name || 'Main Conference Center' }}</strong><br>
-            {{ event()!.venue_Region_Name || 'Chennai Region' }} Venue District, India.
-          </p>
-          
-          <!-- Interactive-looking map placeholder -->
-          <div class="map-placeholder-container">
-            <div class="map-grid-lines"></div>
-            <div class="map-marker-pin">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="marker-icon"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-              <span class="marker-label">{{ event()!.venue_Name }}</span>
+        <!-- Location with Dynamic Map -->
+        @if (event()?.event_Type !== 'Virtual') {
+          <div class="info-section">
+            <h3 class="section-title-bar">Location & Venue</h3>
+            <p class="venue-address-text">
+              <strong>{{ event()!.venue_Name || 'Venue TBD' }}</strong><br>
+              {{ event()!.address ? event()!.address + ', ' : '' }}{{ event()!.venue_Region_Name || '' }}
+            </p>
+            
+            <!-- Interactive-looking map container -->
+            <div class="map-placeholder-container" (click)="openGoogleMaps()" style="cursor: pointer; position: relative; overflow: hidden; border-radius: 12px; background: #f1f5f9; min-height: 250px; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+              @if (mapEmbedUrl()) {
+                <iframe 
+                  [src]="mapEmbedUrl()" 
+                  width="100%" 
+                  height="250" 
+                  style="border:0; pointer-events: none;" 
+                  allowfullscreen="" 
+                  loading="lazy" 
+                  referrerpolicy="no-referrer-when-downgrade">
+                </iframe>
+                <div style="position: absolute; inset: 0; z-index: 10;" title="Click to open in Google Maps"></div>
+              } @else {
+                <div class="map-grid-lines"></div>
+                <div class="map-marker-pin">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="marker-icon"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                  <span class="marker-label">Location Pending</span>
+                </div>
+              }
             </div>
-            <div class="map-controls">
-              <button class="map-zoom-btn">+</button>
-              <button class="map-zoom-btn">−</button>
-            </div>
-            <div class="map-attribution">Map data © OpenStreetMap contributors</div>
+            @if (mapEmbedUrl()) {
+              <div class="map-attribution" style="margin-top: 8px; text-align: right;">Click map to open in Google Maps</div>
+            }
           </div>
-        </div>
+        }
 
         <!-- Organizer Details -->
         <div class="info-section">
@@ -273,9 +326,14 @@
 
           <!-- Total subtotal box -->
           @if (totalTickets() > 0) {
-            <div class="sidebar-total-box">
-              <span class="total-label">Total Amount:</span>
-              <span class="total-value">{{ formatCurrency(subtotalAmount()) }}</span>
+            <div class="sidebar-total-box" style="border-top: none; padding-top: 4px; margin-bottom: 8px;">
+              <div class="fee-row" style="font-weight: 600; font-size: 1.1rem; color: #1e293b;">
+                <span>Tickets Subtotal:</span>
+                <span>{{ formatCurrency(subtotalAmount()) }}</span>
+              </div>
+              <p style="font-size: 11px; color: #64748b; margin-top: 4px; line-height: 1.4;">
+                * Subject to Platform Fee and GST during checkout.
+              </p>
             </div>
           }
 
@@ -292,6 +350,12 @@
 
 </div>
 
+<app-report-event-modal
+  [show]="showReportModal"
+  [eventId]="activeReportEventId()"
+  [eventTitle]="activeReportEventTitle()"
+  (closeEvent)="showReportModal.set(false)">
+</app-report-event-modal>
+
 <!-- Global Footer -->
 <app-footer></app-footer>
-

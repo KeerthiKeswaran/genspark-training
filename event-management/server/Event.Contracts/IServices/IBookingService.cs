@@ -16,6 +16,7 @@ namespace Event.Contracts.IServices
         Task<bool> RevertPendingBookingAsync(int bookingId);
         Task<(DateTime EventDateTime, decimal OriginalAmount)> GetBookingRefundDetailsAsync(int bookingId);
         Task<IEnumerable<ActiveVirtualLinkResponse>> GetActiveVirtualLinksAsync(int attendeeId);
-        Task<(bool Success, string SessionId, string SessionUrl, string ErrorMessage)> CreateCheckoutSessionForBookingAsync(int bookingId, string successUrl, string cancelUrl);
+        Task<(bool Success, string SessionId, string ClientSecret, System.DateTime CreatedAtUTC, string ErrorMessage)> CreateCheckoutSessionForBookingAsync(int bookingId, string returnUrl);
+        Task<BookingResponse?> CheckInAsync(string qrHash);
     }
 }

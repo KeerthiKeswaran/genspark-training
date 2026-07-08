@@ -1,4 +1,6 @@
 import { BookingModel } from '../models/booking.model';
+import { environment } from '../../environments/environment';
+
 
 export const mockBookings: BookingModel[] = [
   {
@@ -13,7 +15,7 @@ export const mockBookings: BookingModel[] = [
     event_Region: 'Chennai',
     booking_Status: 'Confirmed',
     event_Status: 'Live',
-    qr_Code_Path: 'http://localhost:5106/assets/dummy-qr.png',
+    qr_Code_Path: `${environment.serverUrl}/assets/dummy-qr.png`,
     checkIn_Status: 'Pending',
     created_At: '2026-06-15T14:30:00Z',
     total_Amount: 2997.00,
@@ -34,7 +36,7 @@ export const mockBookings: BookingModel[] = [
     event_Region: 'Madurai',
     booking_Status: 'Confirmed',
     event_Status: 'Completed',
-    qr_Code_Path: 'http://localhost:5106/assets/dummy-qr.png',
+    qr_Code_Path: `${environment.serverUrl}/assets/dummy-qr.png`,
     checkIn_Status: 'Pending',
     created_At: '2026-06-20T09:15:00Z',
     virtual_Url: 'https://meet.jit.si/madurai-startup-pitch-2026',
@@ -72,7 +74,7 @@ export const mockBookings: BookingModel[] = [
     event_Venue: 'Trichy Arts Auditorium',
     event_Region: 'Trichy',
     booking_Status: 'Confirmed',
-    qr_Code_Path: 'http://localhost:5106/assets/dummy-qr.png',
+    qr_Code_Path: `${environment.serverUrl}/assets/dummy-qr.png`,
     checkIn_Status: 'Pending',
     created_At: '2026-06-22T08:45:00Z',
     total_Amount: 400.00,

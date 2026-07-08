@@ -60,7 +60,12 @@ export class LocationGeoService {
           
           this.regionService.setLocalRegion(nearestRegionId);
 
-          const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+          let tokenKey = 'user_token';
+          if (typeof window !== 'undefined') {
+            if (window.location.pathname.startsWith('/admin')) tokenKey = 'admin_token';
+            else if (window.location.pathname.startsWith('/finance')) tokenKey = 'finance_token';
+          }
+          const token = typeof window !== 'undefined' ? localStorage.getItem(tokenKey) : null;
           if (token) {
             this.authService.selectRegion(nearestRegionId).subscribe({
               next: () => resolve(nearestRegionId),

@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, ActivatedRoute, RouterLink } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AppStoreService } from '../../store/app-store.service';
 import { AuthService } from '../../services/auth.service';
@@ -12,13 +12,14 @@ import { BrowsedEventResponse } from '../../models/event.model';
 import { RegionModel } from '../../models/region.model';
 import { LocationModalComponent } from '../home/location-modal/location-modal';
 import { FooterComponent } from '../home/footer/footer';
+import { NavbarComponent } from '../home/navbar/navbar';
 
 import { ResolveDescriptionPipe } from '../../pipes/resolve-description.pipe';
 
 @Component({
   selector: 'app-browse-events',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, LocationModalComponent, FooterComponent, ResolveDescriptionPipe],
+  imports: [CommonModule, FormsModule, LocationModalComponent, FooterComponent, NavbarComponent, ResolveDescriptionPipe],
   templateUrl: './browse-events.html',
   styleUrl: './browse-events.css'
 })
@@ -33,11 +34,14 @@ export class BrowseEventsComponent implements OnInit, OnDestroy {
   public filterRegionIds: string[] = [];
   public filterCategory = '';
   public filterFormat = '';
-  public filterMaxPrice: number | null = null;
+  public filterMinPrice: number = 0;
+  public filterMaxPrice: number = 25000;
   public filterSortBy = '';
   public currentPage = 1;
   public pageSize = 6;
   public totalPages = 1;
+  private previousPage = 1;
+  public maxAvailablePrice = 25000;
 
   // Local signals
   public isProfileDropdownOpen = signal(false);
@@ -105,8 +109,13 @@ export class BrowseEventsComponent implements OnInit, OnDestroy {
         this.filterRegionIds = regs ? regs.split(',') : [];
         this.filterCategory = params['category'] || '';
         this.filterFormat = params['format'] || '';
+        
         const maxP = params['maxPrice'];
-        this.filterMaxPrice = maxP ? +maxP : null;
+        this.filterMaxPrice = maxP ? parseInt(maxP, 10) : 25000;
+
+        const minP = params['minPrice'];
+        this.filterMinPrice = minP ? parseInt(minP, 10) : 0;
+        
         this.filterSortBy = params['sortBy'] || '';
         this.currentPage = +(params['page'] || 1);
         this.fetchEvents();
@@ -136,13 +145,22 @@ export class BrowseEventsComponent implements OnInit, OnDestroy {
   }
 
   public fetchEvents(): void {
-    // When filtering by category, don't lock to a region — search all regions for that category
-    const regionIdParam = this.filterCategory ? undefined : this.activeUserRegionId();
+    // Only filter by region if explicitly selected in the UI sidebar
+    const regionIdParam = this.filterRegionIds.length > 0 ? this.filterRegionIds.join(',') : undefined;
+
+    // Jump to top when page changes (no animation per user request)
+    if (this.previousPage !== this.currentPage) {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      this.previousPage = this.currentPage;
+    }
 
     this.eventService.browseEvents({
       keyword: this.filterKeyword || undefined,
       category: this.filterCategory || undefined,
       regionId: regionIdParam,
+      format: this.filterFormat || undefined,
+      maxPrice: this.filterMaxPrice || undefined,
+      sortBy: this.filterSortBy || undefined,
       page: this.currentPage,
       size: this.pageSize
     }).subscribe(result => {
@@ -157,9 +175,6 @@ export class BrowseEventsComponent implements OnInit, OnDestroy {
     this.filterKeyword = this.navSearchKeyword;
     this.currentPage = 1;
     this.updateQueryParams();
-    setTimeout(() => {
-      window.location.reload();
-    }, 100);
   }
 
   // Clear Filters
@@ -169,13 +184,11 @@ export class BrowseEventsComponent implements OnInit, OnDestroy {
     this.filterRegionIds = [];
     this.filterCategory = '';
     this.filterFormat = '';
-    this.filterMaxPrice = null;
+    this.filterMaxPrice = 25000;
+    this.filterMinPrice = 0;
     this.filterSortBy = '';
     this.currentPage = 1;
     this.updateQueryParams();
-    setTimeout(() => {
-      window.location.reload();
-    }, 100);
   }
 
   // Checkbox region filters logic
@@ -210,7 +223,8 @@ export class BrowseEventsComponent implements OnInit, OnDestroy {
   }
 
   public removeMaxPriceFilter(): void {
-    this.filterMaxPrice = null;
+    this.filterMaxPrice = 25000;
+    this.filterMinPrice = 0;
     this.applyFilters();
   }
 
@@ -235,7 +249,8 @@ export class BrowseEventsComponent implements OnInit, OnDestroy {
         regions: this.filterRegionIds.length > 0 ? this.filterRegionIds.join(',') : null,
         category: this.filterCategory || null,
         format: this.filterFormat || null,
-        maxPrice: this.filterMaxPrice || null,
+        minPrice: (this.filterMinPrice !== 0) ? this.filterMinPrice : null,
+        maxPrice: (this.filterMaxPrice !== 25000) ? this.filterMaxPrice : null,
         sortBy: this.filterSortBy || null,
         page: this.currentPage
       },
@@ -333,5 +348,19 @@ export class BrowseEventsComponent implements OnInit, OnDestroy {
   public triggerGetHelpAction(): void {
     this.router.navigate(['/help']);
     this.isProfileDropdownOpen.set(false);
+  }
+
+  public onMinPriceChange(): void {
+    if (this.filterMinPrice > this.filterMaxPrice) {
+      this.filterMinPrice = this.filterMaxPrice;
+    }
+    this.applyFilters();
+  }
+
+  public onMaxPriceChange(): void {
+    if (this.filterMaxPrice < this.filterMinPrice) {
+      this.filterMaxPrice = this.filterMinPrice;
+    }
+    this.applyFilters();
   }
 }

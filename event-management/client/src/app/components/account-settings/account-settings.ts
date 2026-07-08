@@ -1,15 +1,17 @@
-import { Component, OnInit, OnDestroy, signal, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
-import { Subscription, of } from 'rxjs';
-import { delay } from 'rxjs/operators';
+import { Subscription, of, Subject } from 'rxjs';
+import { delay, debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { AppStoreService } from '../../store/app-store.service';
 import { ActionTypes } from '../../store/actions/app.actions';
 import { UserModel } from '../../models/user.model';
 import { NavbarComponent } from '../home/navbar/navbar';
 import { FooterComponent } from '../home/footer/footer';
+import { AuthService } from '../../services/auth.service';
+import { AdminService } from '../../services/admin.service';
 
 @Component({
   selector: 'app-account-settings',
@@ -22,7 +24,13 @@ export class AccountSettingsComponent implements OnInit, OnDestroy {
   private store = inject(AppStoreService);
   private router = inject(Router);
   private http = inject(HttpClient);
+  private adminService = inject(AdminService);
+  private authService = inject(AuthService);
+  private cdr = inject(ChangeDetectorRef);
   private subscriptions = new Subscription();
+
+  public isAdmin = signal(false);
+  public isFinance = signal(false);
 
   // Active Tab
   public activeTab = signal<'profile' | 'password' | 'close'>('profile');
@@ -38,6 +46,18 @@ export class AccountSettingsComponent implements OnInit, OnDestroy {
   public isSavingProfile = signal(false);
   public profileSuccessMessage = signal<string | null>(null);
   public profileErrorMessage = signal<string | null>(null);
+
+  // Email Validation
+  public emailCheckError = signal<string | null>(null);
+
+  public showProfileOtpModal = signal(false);
+  public profileOtpCode = '';
+  public isVerifyingProfileOtp = signal(false);
+  public profileOtpError = signal<string | null>(null);
+
+  public profileOtpCountdown = signal(0);
+  private profileCountdownInterval: any = null;
+
 
   // Password reset flow states
   public showPasswordOtpModal = signal(false);
@@ -55,6 +75,9 @@ export class AccountSettingsComponent implements OnInit, OnDestroy {
   public passwordErrorMessage = signal<string | null>(null);
   public passwordOtpError = signal<string | null>(null);
   public passwordResetError = signal<string | null>(null);
+
+  public passwordOtpCountdown = signal(0);
+  private passwordCountdownInterval: any = null;
 
   // Close Account States
   public selectedReason = '';
@@ -79,33 +102,86 @@ export class AccountSettingsComponent implements OnInit, OnDestroy {
   ];
 
   ngOnInit(): void {
+    this.isAdmin.set(this.router.url.includes('/admin'));
+    this.isFinance.set(this.router.url.includes('/finance'));
+
     // Redirect if not logged in
-    this.subscriptions.add(
-      this.store.select(state => !!state.auth.token).subscribe(isLoggedIn => {
-        if (!isLoggedIn && !this.isAccountClosed()) {
-          this.router.navigate(['/login']);
-        }
-      })
-    );
+    const tokenKey = this.isAdmin() ? 'admin_token' : this.isFinance() ? 'finance_token' : 'user_token';
+    const token = typeof window !== 'undefined' ? localStorage.getItem(tokenKey) : null;
+    
+    if (!token && !this.isAccountClosed()) {
+      if (this.isAdmin()) {
+        this.router.navigate(['/admin/login']);
+      } else if (this.isFinance()) {
+        this.router.navigate(['/finance/login']);
+      } else {
+        this.router.navigate(['/login']);
+      }
+      return;
+    }
 
     // Watch user profile
     this.subscriptions.add(
       this.store.select(state => state.auth.user).subscribe(user => {
         if (user) {
           this.currentUser = user;
-          this.profileName = user.name;
-          this.profileEmail = user.email;
-          this.profilePhone = user.mobile_Number || '';
+          this.profileName = user.name || (user as any).Name || '';
+          this.profileEmail = user.email || (user as any).Email || '';
+          this.profilePhone = user.mobile_Number || (user as any).Mobile_Number || '';
+        } else if (this.isAdmin() || this.isFinance()) {
+          if (this.isAdmin()) {
+            this.adminService.getAdminProfile().subscribe({
+              next: (profile) => {
+                this.profileName = profile.name || profile.Name || '';
+                this.profileEmail = profile.email || profile.Email || '';
+                this.profilePhone = profile.mobile_Number || profile.Mobile_Number || '';
+                this.currentUser = { id: 0, name: this.profileName, email: this.profileEmail, mobile_Number: this.profilePhone };
+                this.cdr.detectChanges();
+              },
+              error: () => {}
+            });
+          } else {
+            let tokenKey = 'user_token';
+            if (typeof window !== 'undefined') {
+              if (window.location.pathname.startsWith('/admin')) tokenKey = 'admin_token';
+              else if (window.location.pathname.startsWith('/finance')) tokenKey = 'finance_token';
+            }
+            const token = typeof window !== 'undefined' ? localStorage.getItem(tokenKey) : null;
+            if (token) {
+              try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                const name = payload.name || payload.unique_name || payload.nameid || payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'] || '';
+                const email = payload.email || payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'] || '';
+                this.profileName = name;
+                this.profileEmail = email;
+                this.currentUser = { id: 0, name: name, email: email };
+              } catch(e) {}
+            }
+          }
         }
+        this.cdr.detectChanges();
       })
     );
   }
 
   ngOnDestroy(): void {
     this.subscriptions.unsubscribe();
+    if (this.passwordCountdownInterval) {
+      clearInterval(this.passwordCountdownInterval);
+    }
+    if (this.profileCountdownInterval) {
+      clearInterval(this.profileCountdownInterval);
+    }
   }
 
   // 1. Update Profile - Enable/Disable Editing Mode
+  public setTab(tab: 'profile' | 'password' | 'close'): void {
+    if (this.activeTab() === 'profile' && tab !== 'profile') {
+      this.cancelEditProfile();
+    }
+    this.activeTab.set(tab);
+  }
+
   public enableEditProfile(): void {
     this.isEditingProfile.set(true);
     this.profileSuccessMessage.set(null);
@@ -120,6 +196,12 @@ export class AccountSettingsComponent implements OnInit, OnDestroy {
       this.profilePhone = this.currentUser.mobile_Number || '';
     }
     this.profileErrorMessage.set(null);
+    this.emailCheckError.set(null);
+  }
+
+  public onEmailChange(newEmail: string): void {
+    this.profileEmail = newEmail;
+    this.emailCheckError.set(null);
   }
 
   public updateProfile(): void {
@@ -128,19 +210,110 @@ export class AccountSettingsComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (this.profileEmail !== this.currentUser?.email) {
+      // First check if new email is available
+      this.isSavingProfile.set(true);
+      this.profileSuccessMessage.set(null);
+      this.profileErrorMessage.set(null);
+      this.emailCheckError.set(null);
+
+      this.authService.checkEmail(this.profileEmail).subscribe({
+        next: (res) => {
+          if (res.exists) {
+            this.isSavingProfile.set(false);
+            this.emailCheckError.set('This email is already associated with another account.');
+          } else {
+            // Email is available, proceed to OTP
+            this.authService.sendOtp(this.profileEmail, 'email-change').subscribe({
+              next: () => {
+                this.isSavingProfile.set(false);
+                this.showProfileOtpModal.set(true);
+                this.profileOtpCode = '';
+                this.startProfileOtpCountdown(30);
+              },
+              error: (err) => {
+                this.isSavingProfile.set(false);
+                this.profileErrorMessage.set(err.error?.message || 'Failed to send verification code. Please try again.');
+              }
+            });
+          }
+        },
+        error: () => {
+          this.isSavingProfile.set(false);
+          this.emailCheckError.set('Could not verify email availability. Please try again.');
+        }
+      });
+    } else {
+      // Just name/phone change, no OTP needed
+      this.submitProfileUpdate();
+    }
+  }
+
+  public resendProfileOtp(): void {
+    this.profileOtpError.set(null);
+    this.authService.sendOtp(this.profileEmail, 'email-change').subscribe({
+      next: () => {
+        this.startProfileOtpCountdown(30);
+      },
+      error: (err) => {
+        this.profileOtpError.set(err.error?.message || 'Failed to resend verification code.');
+      }
+    });
+  }
+
+  private startProfileOtpCountdown(seconds: number): void {
+    this.profileOtpCountdown.set(seconds);
+    if (this.profileCountdownInterval) {
+      clearInterval(this.profileCountdownInterval);
+    }
+    this.profileCountdownInterval = setInterval(() => {
+      const current = this.profileOtpCountdown();
+      if (current <= 1) {
+        this.profileOtpCountdown.set(0);
+        clearInterval(this.profileCountdownInterval);
+      } else {
+        this.profileOtpCountdown.set(current - 1);
+      }
+    }, 1000);
+  }
+
+  public verifyProfileOtp(): void {
+    if (!this.profileOtpCode || this.profileOtpCode.length !== 6) {
+      this.profileOtpError.set('Please enter a valid 6-digit verification code.');
+      return;
+    }
+    
+    this.isVerifyingProfileOtp.set(true);
+    this.profileOtpError.set(null);
+    this.submitProfileUpdate(this.profileOtpCode);
+  }
+
+  public closeProfileOtpModal(): void {
+    this.showProfileOtpModal.set(false);
+    this.profileOtpCode = '';
+    this.profileOtpError.set(null);
+  }
+
+  private submitProfileUpdate(otp?: string): void {
     this.isSavingProfile.set(true);
     this.profileSuccessMessage.set(null);
     this.profileErrorMessage.set(null);
 
-    // Commented out server HTTP call:
-    /*
-    this.http.put('http://localhost:5106/api/user/profile', {
+    const payload = {
       name: this.profileName,
-      mobileNumber: this.profilePhone
-    }).subscribe({
+      mobileNumber: this.profilePhone,
+      email: this.profileEmail,
+      otp: otp
+    };
+
+    this.authService.updateProfile(payload).subscribe({
       next: () => {
         this.isSavingProfile.set(false);
         this.isEditingProfile.set(false);
+        if (otp) {
+          this.closeProfileOtpModal();
+          this.isVerifyingProfileOtp.set(false);
+        }
         this.profileSuccessMessage.set('Profile details updated successfully.');
         
         // Dispatch to update global state
@@ -149,7 +322,8 @@ export class AccountSettingsComponent implements OnInit, OnDestroy {
           name: this.profileName,
           email: this.profileEmail,
           mobile_Number: this.profilePhone
-        };
+        } as UserModel;
+
         this.store.dispatch({
           type: ActionTypes.LOAD_USER_PROFILE_SUCCESS,
           payload: updatedUser
@@ -157,36 +331,14 @@ export class AccountSettingsComponent implements OnInit, OnDestroy {
 
         setTimeout(() => this.profileSuccessMessage.set(null), 4000);
       },
-      error: () => {
+      error: (err) => {
         this.isSavingProfile.set(false);
-        this.profileErrorMessage.set('Failed to save profile. Please try again.');
-      }
-    });
-    */
-
-    // MOCK Profile API call
-    of({
-      ...this.currentUser,
-      name: this.profileName,
-      email: this.profileEmail,
-      mobile_Number: this.profilePhone
-    }).pipe(delay(800)).subscribe({
-      next: (updatedUser) => {
-        this.isSavingProfile.set(false);
-        this.isEditingProfile.set(false);
-        this.profileSuccessMessage.set('Profile details updated successfully.');
-        
-        // Dispatch to update global state
-        this.store.dispatch({
-          type: ActionTypes.LOAD_USER_PROFILE_SUCCESS,
-          payload: updatedUser
-        });
-
-        setTimeout(() => this.profileSuccessMessage.set(null), 4000);
-      },
-      error: () => {
-        this.isSavingProfile.set(false);
-        this.profileErrorMessage.set('Failed to save profile. Please try again.');
+        if (otp) {
+          this.isVerifyingProfileOtp.set(false);
+          this.profileOtpError.set(err.error?.message || 'Invalid or expired OTP.');
+        } else {
+          this.profileErrorMessage.set(err.error?.message || 'Failed to save profile. Please try again.');
+        }
       }
     });
   }
@@ -198,26 +350,62 @@ export class AccountSettingsComponent implements OnInit, OnDestroy {
     this.passwordErrorMessage.set(null);
     this.passwordOtpError.set(null);
     
-    // COMMENTED OUT: Actual API Call to request Password Reset OTP code:
-    /*
-    this.http.post('/api/auth/password-reset-otp', { email: this.currentUser?.email }).subscribe({
+    const email = this.currentUser?.email;
+    if (!email) return;
+
+    const request$ = this.isAdmin() 
+      ? this.authService.sendAdminOtp(email) 
+      : this.authService.sendOtp(email, 'password-reset');
+
+    request$.subscribe({
       next: () => {
         this.isRequestingPasswordOtp.set(false);
         this.showPasswordOtpModal.set(true);
+        this.startPasswordOtpCountdown(30);
       },
       error: (err) => {
         this.isRequestingPasswordOtp.set(false);
-        this.passwordErrorMessage.set('Failed to request verification code. Please try again.');
+        this.passwordErrorMessage.set(err.error?.message || 'Failed to request verification code. Please try again.');
       }
     });
-    */
+  }
 
-    // Simulate requesting OTP success
-    of({ success: true }).pipe(delay(800)).subscribe(() => {
-      this.isRequestingPasswordOtp.set(false);
-      this.showPasswordOtpModal.set(true);
-      this.passwordOtpCode = '';
+  public resendPasswordOtp(): void {
+    this.passwordOtpError.set(null);
+    const email = this.currentUser?.email;
+    if (!email) return;
+
+    this.isRequestingPasswordOtp.set(true);
+    const request$ = this.isAdmin() 
+      ? this.authService.sendAdminOtp(email) 
+      : this.authService.sendOtp(email, 'password-reset');
+
+    request$.subscribe({
+      next: () => {
+        this.isRequestingPasswordOtp.set(false);
+        this.startPasswordOtpCountdown(30);
+      },
+      error: (err) => {
+        this.isRequestingPasswordOtp.set(false);
+        this.passwordOtpError.set(err.error?.message || 'Failed to resend verification code.');
+      }
     });
+  }
+
+  private startPasswordOtpCountdown(seconds: number): void {
+    this.passwordOtpCountdown.set(seconds);
+    if (this.passwordCountdownInterval) {
+      clearInterval(this.passwordCountdownInterval);
+    }
+    this.passwordCountdownInterval = setInterval(() => {
+      const current = this.passwordOtpCountdown();
+      if (current <= 1) {
+        this.passwordOtpCountdown.set(0);
+        clearInterval(this.passwordCountdownInterval);
+      } else {
+        this.passwordOtpCountdown.set(current - 1);
+      }
+    }, 1000);
   }
 
   // Step B: Verify the verification OTP
@@ -230,30 +418,25 @@ export class AccountSettingsComponent implements OnInit, OnDestroy {
     this.isVerifyingPasswordOtp.set(true);
     this.passwordOtpError.set(null);
 
-    // COMMENTED OUT: Actual API Call to verify Password Reset OTP code:
-    /*
-    this.http.post('/api/auth/verify-password-otp', { email: this.currentUser?.email, otp: this.passwordOtpCode }).subscribe({
+    const email = this.currentUser?.email;
+    if (!email) return;
+
+    const purpose = this.isAdmin() ? 'admin-password-reset' : 'password-reset';
+    
+    this.authService.verifyOtp(email, this.passwordOtpCode, purpose).subscribe({
       next: () => {
         this.isVerifyingPasswordOtp.set(false);
         this.showPasswordOtpModal.set(false);
         this.showNewPasswordModal.set(true);
+        
+        this.newPassword = '';
+        this.confirmPassword = '';
+        this.passwordResetError.set(null);
       },
       error: (err) => {
         this.isVerifyingPasswordOtp.set(false);
-        this.passwordOtpError.set('Invalid OTP code. Verification failed.');
+        this.passwordOtpError.set(err.error?.message || 'Invalid OTP code. Verification failed.');
       }
-    });
-    */
-
-    // Simulate OTP validation success
-    of({ success: true }).pipe(delay(900)).subscribe(() => {
-      this.isVerifyingPasswordOtp.set(false);
-      this.showPasswordOtpModal.set(false);
-      this.showNewPasswordModal.set(true);
-      
-      this.newPassword = '';
-      this.confirmPassword = '';
-      this.passwordResetError.set(null);
     });
   }
 
@@ -277,28 +460,31 @@ export class AccountSettingsComponent implements OnInit, OnDestroy {
     this.isSubmittingNewPassword.set(true);
     this.passwordResetError.set(null);
 
-    // COMMENTED OUT: Actual API Call to change password:
-    /*
-    this.http.post('/api/auth/change-password', { newPassword: this.newPassword }).subscribe({
+    const email = this.currentUser?.email;
+    if (!email) return;
+
+    const payload = {
+      email,
+      otp: this.passwordOtpCode,
+      newPassword: this.newPassword
+    };
+
+    const request$ = this.isAdmin()
+      ? this.authService.resetAdminPassword(payload)
+      : this.authService.resetPassword(payload);
+
+    request$.subscribe({
       next: () => {
         this.isSubmittingNewPassword.set(false);
         this.showNewPasswordModal.set(false);
-        this.passwordSuccessMessage.set('Your password has been changed successfully.');
-        setTimeout(() => this.passwordSuccessMessage.set(null), 4000);
+        this.passwordSuccessMessage.set('Password successfully updated.');
+        
+        setTimeout(() => this.passwordSuccessMessage.set(null), 5000);
       },
-      error: () => {
+      error: (err) => {
         this.isSubmittingNewPassword.set(false);
-        this.passwordResetError.set('Failed to update password. Please try again.');
+        this.passwordResetError.set(err.error?.message || 'Failed to update password. Please try again.');
       }
-    });
-    */
-
-    // Simulate successful password update
-    of({ success: true }).pipe(delay(1000)).subscribe(() => {
-      this.isSubmittingNewPassword.set(false);
-      this.showNewPasswordModal.set(false);
-      this.passwordSuccessMessage.set('Your password has been changed successfully.');
-      setTimeout(() => this.passwordSuccessMessage.set(null), 4000);
     });
   }
 

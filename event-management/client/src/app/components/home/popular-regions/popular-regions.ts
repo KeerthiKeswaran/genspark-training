@@ -1,11 +1,11 @@
 import { Component, OnInit, OnDestroy, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { Subscription, firstValueFrom } from 'rxjs';
+import { Subscription } from 'rxjs';
 import { AppStoreService } from '../../../store/app-store.service';
 import { RegionService } from '../../../services/region.service';
 import { AuthService } from '../../../services/auth.service';
-import { PixabayService } from '../../../services/pixabay.service';
+import { WikipediaImageService } from '../../../services/wikipedia-image.service';
 import { RegionPopularResponse } from '../../../models/event.model';
 
 @Component({
@@ -20,6 +20,7 @@ export class PopularRegionsComponent implements OnInit, OnDestroy {
   public homeRegions = signal<RegionPopularResponse[]>([]);
   public regionImages = signal<Map<string, string | null>>(new Map());
   public imageErrors = signal<Map<string, boolean>>(new Map());
+  public isLoadingRegions = signal(true);
   private subscriptions: Subscription = new Subscription();
   private currentLoadingRegionsString = '';
   private currentLimit = 4;
@@ -28,7 +29,7 @@ export class PopularRegionsComponent implements OnInit, OnDestroy {
     private store: AppStoreService,
     private regionService: RegionService,
     private authService: AuthService,
-    private pixabayService: PixabayService,
+    private wikiService: WikipediaImageService,
     private router: Router
   ) {}
 
@@ -39,7 +40,7 @@ export class PopularRegionsComponent implements OnInit, OnDestroy {
 
   private calculateRegionsLimit(): number {
     if (typeof window === 'undefined') return 4;
-    return window.innerWidth > 1024 ? 4 : 2; // minimum is 2
+    return window.innerWidth > 1024 ? 4 : 2;
   }
 
   private updateRegionsLimit(): void {
@@ -55,48 +56,34 @@ export class PopularRegionsComponent implements OnInit, OnDestroy {
       this.store.select(state => !!state.auth.token).subscribe(logged => this.isLoggedIn.set(logged))
     );
 
-    // Initial load based on current window width
     this.currentLimit = this.calculateRegionsLimit();
-    this.regionService.getPopularRegions(this.currentLimit).subscribe();
+    this.regionService.getPopularRegions(this.currentLimit).subscribe({
+      next: () => this.isLoadingRegions.set(false),
+      error: () => this.isLoadingRegions.set(false)
+    });
 
-    // Read popular regions from the dedicated popularItems slice of the store
     this.subscriptions.add(
       this.store.select(state => state.regions.popularItems).subscribe(popular => {
-        const regionsKey = (popular || []).map(r => r.region_Id).join(',');
-        if (regionsKey && regionsKey === this.currentLoadingRegionsString) {
-          return;
-        }
+        if (!popular) return; // Wait until populated
+        
+        const regionsKey = popular.map(r => r.region_Id).join(',');
+        if (regionsKey && regionsKey === this.currentLoadingRegionsString) return;
+        
         this.currentLoadingRegionsString = regionsKey;
-        this.homeRegions.set(popular || []);
-        this.loadImages(popular || []);
+        this.homeRegions.set(popular);
+        this.loadImages(popular);
       })
     );
   }
 
-  private async loadImages(regions: RegionPopularResponse[]): Promise<void> {
-    const currentImages = this.regionImages();
-    const images = new Map<string, string | null>(currentImages);
-    
-    // Load images sequentially with a delay to prevent rate-limiting and stagger rendering
-    for (const region of regions) {
-      // Only fetch if we don't already have it loaded in memory
-      if (images.has(region.region_Id)) {
-        continue;
-      }
+  private loadImages(regions: RegionPopularResponse[]): void {
+    const inputRegions = regions.map(r => ({ id: r.region_Id, name: r.region_Name }));
 
-      try {
-        const imageObj = await firstValueFrom(this.pixabayService.searchRegionImage(region.region_Id, region.region_Name));
-        const url = imageObj ? (imageObj.data || imageObj.webformatURL || imageObj.url) : null;
-        images.set(region.region_Id, url);
-        // Update the signal incrementally so each image displays as soon as it resolves
-        this.regionImages.set(new Map(images));
-        
-        // Add a 450ms delay between image displays to stagger browser requests and avoid CDN rate-limiting
-        await new Promise(resolve => setTimeout(resolve, 450));
-      } catch (err) {
-        console.error(`Error loading image for region ${region.region_Name}:`, err);
-      }
-    }
+    this.wikiService.preloadImages(inputRegions, (regionId, url) => {
+      const current = new Map(this.regionImages());
+      current.set(regionId, url);
+      this.regionImages.set(current);
+    });
   }
 
   ngOnDestroy(): void {
@@ -123,11 +110,7 @@ export class PopularRegionsComponent implements OnInit, OnDestroy {
       this.authService.selectRegion(regionId).subscribe();
     }
     setTimeout(() => {
-      this.router.navigate(['/browse'], {
-        queryParams: {
-          regionId: regionId
-        }
-      });
+      this.router.navigate(['/browse'], { queryParams: { regionId } });
     }, 100);
   }
 }

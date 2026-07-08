@@ -97,6 +97,9 @@ namespace Event.Business.Services
                 decimal totalAmount = 0;
 
                 // 7. Iterate through each requested ticket tier to reserve seats and calculate costs
+                int totalTickets = 0;
+                decimal baseTotalAmount = 0;
+
                 foreach (var item in tierQuantities)
                 {
                     var tierName = item.Key;
@@ -118,7 +121,8 @@ namespace Event.Business.Services
                     }
 
                     eventTier.Tickets_Sold += quantity;
-                    totalAmount += eventTier.Price * quantity;
+                    baseTotalAmount += eventTier.Price * quantity;
+                    totalTickets += quantity;
 
                     bookingDetails.Add(new BookingDetail
                     {
@@ -126,6 +130,11 @@ namespace Event.Business.Services
                         Quantity = quantity
                     });
                 }
+
+                // Calculate additional fees
+                decimal fixedFeeTotal = settings.Ticket_Fixed_Fee * totalTickets;
+                decimal gstAmount = baseTotalAmount * (settings.GST_Percentage / 100m);
+                decimal finalTotalAmount = baseTotalAmount + fixedFeeTotal + gstAmount;
 
                 // 8. Construct the new Booking entity with "Payment Pending" status
                 var booking = new Booking
@@ -150,7 +159,7 @@ namespace Event.Business.Services
                     Receiver_Id = "Platform_Escrow",
                     Transaction_Type = "BookingPayment",
                     Related_Id = booking.Booking_Id,
-                    Amount = totalAmount,
+                    Amount = finalTotalAmount,
                     Currency = "INR",
                     Status = "Pending",
                     Created_At = DateTime.UtcNow
@@ -169,7 +178,10 @@ namespace Event.Business.Services
                     Event_Title = ev.Title,
                     Event_Type = ev.Event_Type,
                     Event_Date_Time = ev.Date_Time,
-                    Total_Price = totalAmount,
+                    Base_Ticket_Amount = baseTotalAmount,
+                    Fixed_Fee_Total = fixedFeeTotal,
+                    Gst_Amount = gstAmount,
+                    Total_Payment = finalTotalAmount,
                     Fixed_Fee_Rate = settings.Ticket_Fixed_Fee,
                     Commission_Percentage = settings.Ticket_Commission_Percentage
                 };
@@ -192,7 +204,7 @@ namespace Event.Business.Services
 
         #region CreateCheckoutSessionForBookingAsync
 
-        public async Task<(bool Success, string SessionId, string SessionUrl, string ErrorMessage)> CreateCheckoutSessionForBookingAsync(int bookingId, string successUrl, string cancelUrl)
+        public async Task<(bool Success, string SessionId, string ClientSecret, System.DateTime CreatedAtUTC, string ErrorMessage)> CreateCheckoutSessionForBookingAsync(int bookingId, string returnUrl)
         {
             var booking = await _bookingRepository.GetBookingDetailsAsync(bookingId);
             if (booking == null)
@@ -207,7 +219,7 @@ namespace Event.Business.Services
 
             string itemName = booking.Event != null ? $"Tickets for {booking.Event.Title}" : $"Booking #{bookingId}";
 
-            return await _paymentService.CreateCheckoutSessionAsync(ledgerTx.Amount, ledgerTx.Currency, itemName, successUrl, cancelUrl);
+            return await _paymentService.CreateCheckoutSessionAsync(ledgerTx.Amount, ledgerTx.Currency, itemName, returnUrl);
         }
 
         #endregion
@@ -452,7 +464,20 @@ namespace Event.Business.Services
                 bookings = bookings.Where(b => b.Booking_Status.Equals(status, StringComparison.OrdinalIgnoreCase));
             }
 
-            return bookings.Select(MapToBookingResponse).Where(x => x != null).Cast<BookingResponse>().ToList();
+            var reportedEventIds = new HashSet<int>(await _eventRepository.GetReportedEventIdsAsync(attendeeId));
+            var feedbacks = (await _eventRepository.GetFeedbacksByAttendeeAsync(attendeeId)).ToList();
+
+            var responses = new List<BookingResponse>();
+            foreach (var b in bookings)
+            {
+                var feedback = feedbacks.FirstOrDefault(f => f.Event_Id == b.Event_Id);
+                var response = MapToBookingResponse(b, reportedEventIds, feedback);
+                if (response != null)
+                {
+                    responses.Add(response);
+                }
+            }
+            return responses;
         }
 
         #endregion
@@ -693,9 +718,50 @@ namespace Event.Business.Services
 
         #region Helper Methods
 
-        private BookingResponse? MapToBookingResponse(Booking? booking)
+        private BookingResponse? MapToBookingResponse(Booking? booking, HashSet<int>? reportedEventIds = null, EventFeedback? feedback = null)
         {
             if (booking == null) return null;
+
+            string? reviewText = null;
+            int? feedbackRating = null;
+
+            if (feedback != null)
+            {
+                feedbackRating = feedback.Rating;
+                if (!string.IsNullOrEmpty(feedback.Review) && feedback.Review.StartsWith("/assets/"))
+                {
+                    try
+                    {
+                        string rootPath = System.IO.Directory.GetCurrentDirectory().TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
+                        string folderName = "Event.Business";
+                        if (System.AppDomain.CurrentDomain.FriendlyName.Contains("Tests") || System.IO.Directory.GetCurrentDirectory().Contains("Tests"))
+                            folderName = "Event.Business.Tests";
+                            
+                        if (rootPath.Contains("bin"))
+                            rootPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(System.AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..")).TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
+                        else if (rootPath.EndsWith("Event.API") || rootPath.EndsWith("Event.Business.Tests") || rootPath.EndsWith("Event.Business"))
+                            rootPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(rootPath, "..")).TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
+
+                        string relativeUrl = feedback.Review.Substring("/assets/".Length);
+                        string filePath = System.IO.Path.Combine(rootPath, folderName, "assets", relativeUrl.Replace('/', System.IO.Path.DirectorySeparatorChar));
+
+                        if (System.IO.File.Exists(filePath))
+                        {
+                            string json = System.IO.File.ReadAllText(filePath);
+                            using var doc = System.Text.Json.JsonDocument.Parse(json);
+                            if (doc.RootElement.TryGetProperty("Review", out var revProp) && revProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                            {
+                                reviewText = revProp.GetString();
+                            }
+                        }
+                    }
+                    catch { /* Ignore IO/parse errors */ }
+                }
+                else
+                {
+                    reviewText = feedback.Review;
+                }
+            }
 
             return new BookingResponse
             {
@@ -704,6 +770,7 @@ namespace Event.Business.Services
                 Event_Id = booking.Event_Id,
                 Event_Title = booking.Event?.Title ?? string.Empty,
                 Event_Type = booking.Event?.Event_Type ?? string.Empty,
+                Event_Venue = booking.Event?.Venue?.Name ?? "TBD Venue",
                 Event_Date_Time = booking.Event?.Date_Time ?? DateTime.MinValue,
                 Booking_Status = booking.Booking_Status,
                 Qr_Code_Path = !string.IsNullOrEmpty(booking.Qr_Code_Path) && booking.Qr_Code_Path.Contains("assets")
@@ -714,13 +781,61 @@ namespace Event.Business.Services
                 Virtual_Url = "Disabled",
                 Event_Status = booking.Event?.Status ?? string.Empty,
                 Amount_Paid = booking.Payments?.Where(p => p.Payment_Status == "Success" || p.Payment_Status == "Refunded").Sum(p => p.Amount) ?? 0m,
+                Refunded_Amount = booking.Payments?
+                    .Where(p => p.Payment_Status == "Refunded" || p.Payment_Status == "Success")
+                    .Select(p => p.Transaction)
+                    .Where(t => t != null)
+                    .Sum(t => t.Refunded_Amount) ?? 0m,
                 Event_Image_Url = booking.Event?.Image_Url,
                 Details = booking.Details?.Select(d => new BookingDetailDto
                 {
                     Tier_Name = d.Tier_Name,
                     Quantity = d.Quantity
-                }).ToList() ?? new List<BookingDetailDto>()
+                }).ToList() ?? new List<BookingDetailDto>(),
+                Has_Reported = reportedEventIds != null ? reportedEventIds.Contains(booking.Event_Id) : (bool?)null,
+                Feedback_Rating = feedbackRating,
+                Feedback_Review = reviewText
             };
+        }
+
+        public async Task<BookingResponse?> CheckInAsync(string qrHash)
+        {
+            var bookings = await _bookingRepository.GetAllAsync();
+            var booking = bookings.FirstOrDefault(b => b.Qr_Secret_Hash == qrHash);
+            if (booking == null)
+            {
+                throw new NotFoundException("Booking not found or invalid QR code.");
+            }
+
+            var evt = await _eventRepository.GetByIdAsync(booking.Event_Id);
+            if (evt == null)
+            {
+                throw new NotFoundException("Event not found.");
+            }
+
+            // Important Note: There must be a critical validation that this must not happen before 1 hour of the event start time. 
+            // Currently for testing purpose add that particular validation in the backend and comment it out.
+            /*
+            if (DateTime.UtcNow < evt.Date_Time.AddHours(-1))
+            {
+                throw new ValidationException("Check-in is only allowed within 1 hour of the event start time.");
+            }
+            */
+
+            if (booking.CheckIn_Status == "CheckedIn")
+            {
+                throw new ValidationException("Attendee is already checked in.");
+            }
+
+            if (booking.Booking_Status != "Confirmed")
+            {
+                throw new ValidationException("Booking is not confirmed.");
+            }
+
+            booking.CheckIn_Status = "CheckedIn";
+            await _bookingRepository.UpdateAsync(booking);
+
+            return MapToBookingResponse(booking);
         }
 
         #endregion

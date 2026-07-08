@@ -70,7 +70,7 @@ namespace Event.API.Controllers
         [HttpPost("{bookingId}/create-checkout-session")]
         public async Task<IActionResult> CreateCheckoutSession(int bookingId, [FromBody] CreateCheckoutSessionRequest request)
         {
-            var result = await _bookingService.CreateCheckoutSessionForBookingAsync(bookingId, request.SuccessUrl, request.CancelUrl);
+            var result = await _bookingService.CreateCheckoutSessionForBookingAsync(bookingId, request.SuccessUrl);
             if (!result.Success)
             {
                 return BadRequest(new { Message = result.ErrorMessage });
@@ -79,7 +79,8 @@ namespace Event.API.Controllers
             return Ok(new
             {
                 SessionId = result.SessionId,
-                SessionUrl = result.SessionUrl
+                ClientSecret = result.ClientSecret,
+                CreatedAtUTC = result.CreatedAtUTC
             });
         }
 
@@ -151,5 +152,31 @@ namespace Event.API.Controllers
                 return BadRequest(new { Message = ex.Message });
             }
         }
+        [HttpPost("checkin")]
+        public async Task<IActionResult> CheckIn([FromBody] CheckInRequest request)
+        {
+            try
+            {
+                var booking = await _bookingService.CheckInAsync(request.QrHash);
+                return Ok(booking);
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (ValidationException ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+    }
+
+    public class CheckInRequest
+    {
+        public string QrHash { get; set; } = string.Empty;
     }
 }

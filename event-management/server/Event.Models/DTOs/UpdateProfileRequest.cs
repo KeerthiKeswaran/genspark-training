@@ -6,5 +6,7 @@ namespace Event.Models.DTOs
     {
         public string Name { get; set; } = string.Empty;
         public string MobileNumber { get; set; } = string.Empty;
+        public string? Email { get; set; }
+        public string? Otp { get; set; }
     }
 }

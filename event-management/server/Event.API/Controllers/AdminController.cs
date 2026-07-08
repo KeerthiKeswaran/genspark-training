@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
@@ -18,6 +19,20 @@ namespace Event.API.Controllers
         public AdminController(IAdminService adminService)
         {
             _adminService = adminService;
+        }
+
+        [HttpGet("search")]
+        public async Task<IActionResult> SearchGlobal([FromQuery] string keyword)
+        {
+            try
+            {
+                var result = await _adminService.SearchGlobalAsync(keyword);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
         }
 
         [HttpGet("stats")]
@@ -64,12 +79,46 @@ namespace Event.API.Controllers
             }
         }
 
-        [HttpGet("support/tickets")]
-        public async Task<IActionResult> GetSupportTickets()
+        [HttpGet("events/{id:int}")]
+        public async Task<IActionResult> GetEventById(int id)
         {
             try
             {
-                var tickets = await _adminService.GetSupportTicketsAsync();
+                var ev = await _adminService.GetEventByIdAsync(id);
+                if (ev == null) return NotFound(new { Message = "Event not found." });
+                return Ok(ev);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpGet("related-entity/{type}/{id:int}")]
+        public async Task<IActionResult> GetRelatedEntity(string type, int id)
+        {
+            try
+            {
+                var entity = await _adminService.GetRelatedEntityAsync(type, id);
+                if (entity == null) return NotFound(new { Message = "Related entity not found." });
+                return Ok(entity);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpGet("support/tickets")]
+        public async Task<IActionResult> GetSupportTickets(
+            [FromQuery] string? status,
+            [FromQuery] string? keyword,
+            [FromQuery] DateTime? dateFrom,
+            [FromQuery] DateTime? dateTo)
+        {
+            try
+            {
+                var tickets = await _adminService.GetSupportTicketsAsync(status, keyword, dateFrom, dateTo);
                 return Ok(tickets);
             }
             catch (Exception ex)
@@ -154,6 +203,30 @@ namespace Event.API.Controllers
             catch (Exception ex)
             {
                 return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpGet("support/tickets/{id}/escalation-status")]
+        public async Task<IActionResult> GetEscalationStatus(int id)
+        {
+            try
+            {
+                var action = await _adminService.GetEscalationStatusAsync(id);
+                if (action == null)
+                {
+                    return NotFound(new { Message = "No escalation record found for this ticket." });
+                }
+                return Ok(new { 
+                    ActionId = action.ActionId,
+                    ActionStatus = action.ActionStatus,
+                    ActionType = action.ActionType,
+                    TargetType = action.TargetType,
+                    CreatedAt = action.CreatedAt
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "An error occurred while retrieving escalation status.", Details = ex.Message });
             }
         }
 
@@ -271,6 +344,31 @@ namespace Event.API.Controllers
             }
         }
 
+        [HttpPut("venues/{venueId}")]
+        public async Task<IActionResult> UpdateVenue(int venueId, [FromBody] CreateVenueRequest request)
+        {
+            try
+            {
+                if (request == null)
+                    return BadRequest(new { Message = "Request payload cannot be null." });
+
+                var venue = await _adminService.UpdateVenueAsync(venueId, request);
+                return Ok(venue);
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (ValidationException ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
         [HttpPost("venues")]
         public async Task<IActionResult> CreateVenue([FromBody] CreateVenueRequest request)
         {
@@ -293,12 +391,46 @@ namespace Event.API.Controllers
         }
 
         [HttpGet("staff")]
-        public async Task<IActionResult> GetStaff()
+        public async Task<IActionResult> GetStaff(
+            [FromQuery] string? regionId,
+            [FromQuery] bool? isAllocated,
+            [FromQuery] string? keyword,
+            [FromQuery] string? sortBy,
+            [FromQuery] int page = 1,
+            [FromQuery] int size = 10)
         {
             try
             {
-                var directory = await _adminService.GetStaffDirectoryAsync();
+                var directory = await _adminService.GetStaffDirectoryAsync(regionId, isAllocated, keyword, sortBy, page, size);
                 return Ok(directory);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpGet("staff/by-region/{regionId}")]
+        public async Task<IActionResult> GetStaffByRegion(string regionId)
+        {
+            try
+            {
+                var staff = await _adminService.GetStaffByRegionAsync(regionId);
+                return Ok(staff);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpGet("events/by-region/{regionId}")]
+        public async Task<IActionResult> GetEventsByRegion(string regionId)
+        {
+            try
+            {
+                var events = await _adminService.GetEventsByRegionAsync(regionId);
+                return Ok(events);
             }
             catch (Exception ex)
             {
@@ -324,6 +456,112 @@ namespace Event.API.Controllers
             catch (ValidationException ex)
             {
                 return BadRequest(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpGet("profile")]
+        public async Task<IActionResult> GetProfile()
+        {
+            try
+            {
+                string adminId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                                 ?? User.FindFirst("sub")?.Value
+                                 ?? string.Empty;
+
+                if (string.IsNullOrEmpty(adminId))
+                    return Unauthorized(new { Message = "Admin identification not found." });
+
+                var profile = await _adminService.GetAdminProfileAsync(adminId);
+                return Ok(profile);
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpPut("profile")]
+        public async Task<IActionResult> UpdateProfile([FromBody] UpdateAdminProfileRequest request)
+        {
+            try
+            {
+                if (request == null || string.IsNullOrWhiteSpace(request.Name))
+                    return BadRequest(new { Message = "Name cannot be empty." });
+
+                string adminId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                                 ?? User.FindFirst("sub")?.Value
+                                 ?? string.Empty;
+
+                if (string.IsNullOrEmpty(adminId))
+                    return Unauthorized(new { Message = "Admin identification not found." });
+
+                var profile = await _adminService.UpdateAdminProfileAsync(adminId, request);
+                return Ok(profile);
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpGet("venues/all")]
+        public async Task<IActionResult> GetAllVenuesIncludingInactive()
+        {
+            try
+            {
+                var venues = await _adminService.GetAllVenuesIncludingInactiveAsync();
+                return Ok(venues);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpPut("events/{eventId}/venue")]
+        public async Task<IActionResult> UpdateEventVenue(int eventId, [FromBody] JsonElement body)
+        {
+            try
+            {
+                if (!body.TryGetProperty("venueId", out var venueIdProp))
+                    return BadRequest(new { Message = "venueId is required." });
+
+                int venueId = venueIdProp.GetInt32();
+                var success = await _adminService.UpdateEventVenueAsync(eventId, venueId);
+                if (!success)
+                    return BadRequest(new { Message = "Failed to update event venue." });
+
+                return Ok(new { Message = "Event venue updated successfully." });
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpGet("support/metadata")]
+        public async Task<IActionResult> GetHelpdeskMetadata()
+        {
+            try
+            {
+                var metadata = await _adminService.GetHelpdeskMetadataAsync();
+                return Ok(metadata);
             }
             catch (Exception ex)
             {

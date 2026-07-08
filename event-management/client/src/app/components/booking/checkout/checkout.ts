@@ -10,6 +10,8 @@ import { EventService } from '../../../services/event.service';
 import { TicketTierSelection, BookingModel } from '../../../models/booking.model';
 import { BrowsedEventResponse } from '../../../models/event.model';
 import { mockAllEvents } from '../../../data/event.mock';
+import { environment } from '../../../../environments/environment';
+
 
 type CheckoutStep = 'payment' | 'confirmation';
 
@@ -50,13 +52,39 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     this.tiers().reduce((sum, t) => sum + t.price * t.quantity, 0)
   );
 
+  public gstPercentage = signal(18);
+
+  public gstAmount = computed(() => Math.round((this.subtotalAmount() + this.ticketFee()) * (this.gstPercentage() / 100)));
+
   public totalAmount = computed(() =>
-    this.subtotalAmount() + this.ticketFee()
+    this.subtotalAmount() + this.ticketFee() + this.gstAmount()
   );
 
   public totalTickets = computed(() =>
     this.tiers().reduce((sum, t) => sum + t.quantity, 0)
   );
+
+  // Invoice calculations for confirmation page
+  public invoiceSubtotal = computed(() => {
+    const booking = this.confirmedBooking();
+    if (!booking) return 0;
+    return booking.details.reduce((sum, d) => sum + (d.price * d.quantity), 0);
+  });
+
+  public invoiceFee = computed(() => {
+    const booking = this.confirmedBooking();
+    if (!booking) return 0;
+    const subtotal = this.invoiceSubtotal();
+    const total = booking.total_Amount;
+    const subPlusFee = total / (1 + this.gstPercentage() / 100);
+    return Math.max(0, Math.round(subPlusFee - subtotal));
+  });
+
+  public invoiceGst = computed(() => {
+    const booking = this.confirmedBooking();
+    if (!booking) return 0;
+    return booking.total_Amount - this.invoiceSubtotal() - this.invoiceFee();
+  });
 
   constructor(
     private route: ActivatedRoute,
@@ -71,10 +99,18 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       return url;
     }
     const cleanUrl = url.startsWith('/') ? url : '/' + url;
-    return `http://localhost:5106${cleanUrl}`;
+    return `${environment.serverUrl}${cleanUrl}`;
   }
 
   ngOnInit(): void {
+    this.subscriptions.add(
+      this.eventService.getPlatformSettings().subscribe({
+        next: (res) => {
+          if (res) this.gstPercentage.set(res.gsT_Percentage ?? res.GST_Percentage ?? 18);
+        }
+      })
+    );
+
     this.subscriptions.add(
       this.route.queryParams.subscribe(params => {
         const eventId = Number(params['eventId']);
@@ -212,7 +248,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
               details: (res.details ?? []).map((d: any) => ({
                 tier_Name: d.tier_Name,
                 quantity: d.quantity,
-                price: d.price ?? event.ticketTiers?.find((t: any) => t.tier_Name === d.tier_Name)?.price ?? (event.minPrice ?? 250)
+                price: d.price || event.ticketTiers?.find((t: any) => t.tier_Name === d.tier_Name)?.price || (event.minPrice || 250)
               }))
             };
             resolve(booking);
@@ -322,6 +358,25 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 
   public closeQrModal(): void {
     this.showQrModal.set(false);
+  }
+
+  public downloadQrCode(url: string, bookingId: number | undefined): void {
+    if (!url) return;
+    const bid = bookingId || 'ticket';
+    fetch(url)
+      .then(response => response.blob())
+      .then(blob => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `Booking_${bid}_QR.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      })
+      .catch(err => {
+        console.error('Error downloading QR code', err);
+        window.open(url, '_blank');
+      });
   }
 
   public formatDate(dateStr: string): string {

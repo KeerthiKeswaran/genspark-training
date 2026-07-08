@@ -18,8 +18,10 @@ namespace Event.Data.Repositories
         {
             return await _dbSet
                 .Include(b => b.Event)
+                    .ThenInclude(e => e.Venue)
                 .Include(b => b.Details)
                 .Include(b => b.Payments)
+                    .ThenInclude(p => p.Transaction)
                 .Where(b => b.Attendee_Id == userId)
                 .ToListAsync();
         }
@@ -29,6 +31,8 @@ namespace Event.Data.Repositories
             return await _dbSet
                 .Include(b => b.Event)
                     .ThenInclude(e => e.TicketTiers)
+                .Include(b => b.Event)
+                    .ThenInclude(e => e.Venue)
                 .Include(b => b.Attendee)
                 .Include(b => b.Details)
                 .Include(b => b.Payments)
@@ -50,6 +54,7 @@ namespace Event.Data.Repositories
         {
             return await _dbSet
                 .Include(b => b.Event)
+                    .ThenInclude(e => e.Venue)
                 .Include(b => b.Details)
                 .Include(b => b.Payments)
                 .FirstOrDefaultAsync(b => b.Qr_Secret_Hash == secretHash);

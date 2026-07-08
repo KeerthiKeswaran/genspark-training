@@ -41,6 +41,7 @@ export class CancelBookingModalComponent implements OnInit, OnDestroy {
   // Cancellation action state
   public isCancelling = signal(false);
   public cancelError = signal('');
+  public showSuccessAnimation = signal(false);
 
   private bookingService = inject(BookingService);
   private subscriptions = new Subscription();
@@ -49,53 +50,18 @@ export class CancelBookingModalComponent implements OnInit, OnDestroy {
     this.loadRefundEstimate();
   }
 
-  /**
-   * Loads the estimated refund amount for this booking.
-   *
-   * TODO: Replace the mock below with a real API call when the endpoint is ready:
-   *   POST /api/booking/{bookingId}/refund-estimate  (no body needed)
-   *   Returns: { estimatedRefund: number }
-   *
-   * Example implementation:
-   *   this.subscriptions.add(
-   *     this.http.post<{ estimatedRefund: number }>(
-   *       `${environment.apiUrl}/api/booking/${this.booking.booking_Id}/refund-estimate`, {}
-   *     ).subscribe({
-   *       next: (res) => {
-   *         this.estimatedRefundAmount.set(res.estimatedRefund);
-   *         this.isLoadingRefund.set(false);
-   *       },
-   *       error: () => {
-   *         this.estimatedRefundAmount.set(null);
-   *         this.isLoadingRefund.set(false);
-   *       }
-   *     })
-   *   );
-   */
   private loadRefundEstimate(): void {
     this.isLoadingRefund.set(true);
-
-    // ── MOCK REFUND CALCULATION (matches server-side policy) ──────────────────
-    const now = new Date();
-    const eventDate = new Date(this.booking.event_Date_Time);
-    const hoursUntil = (eventDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-    const totalPaid = this.booking.total_Amount ?? 0;
-
-    let refundAmount: number;
-    if (hoursUntil > 48) {
-      refundAmount = totalPaid * 0.90;
-    } else if (hoursUntil >= 12) {
-      refundAmount = totalPaid * 0.50;
-    } else {
-      refundAmount = 0;
-    }
-    // ─────────────────────────────────────────────────────────────────────────
-
-    // Simulate a 1.2-second API round-trip so the skeleton is visible
     this.subscriptions.add(
-      of(refundAmount).pipe(delay(1200)).subscribe(amount => {
-        this.estimatedRefundAmount.set(amount);
-        this.isLoadingRefund.set(false);
+      this.bookingService.getRefundEstimate(this.booking.booking_Id).subscribe({
+        next: (res) => {
+          this.estimatedRefundAmount.set(res.estimatedRefund || res.EstimatedRefund || 0);
+          this.isLoadingRefund.set(false);
+        },
+        error: () => {
+          this.estimatedRefundAmount.set(0);
+          this.isLoadingRefund.set(false);
+        }
       })
     );
   }
@@ -105,7 +71,7 @@ export class CancelBookingModalComponent implements OnInit, OnDestroy {
     const amount = this.estimatedRefundAmount();
     if (amount === null) return '#9ca3af';
     if (amount > 0) {
-      const totalPaid = this.booking.total_Amount ?? 1;
+      const totalPaid = (this.booking.amount_Paid !== undefined ? this.booking.amount_Paid : this.booking.total_Amount) ?? 1;
       const pct = (amount / totalPaid) * 100;
       return pct >= 80 ? '#10b981' : '#f59e0b';
     }
@@ -117,7 +83,7 @@ export class CancelBookingModalComponent implements OnInit, OnDestroy {
     const amount = this.estimatedRefundAmount();
     if (amount === null) return '—';
     if (amount <= 0) return 'Non-Refundable';
-    const totalPaid = this.booking.total_Amount ?? 1;
+    const totalPaid = (this.booking.amount_Paid !== undefined ? this.booking.amount_Paid : this.booking.total_Amount) ?? 1;
     const pct = Math.round((amount / totalPaid) * 100);
     return `${pct}% Refund Eligible`;
   }
@@ -137,24 +103,25 @@ export class CancelBookingModalComponent implements OnInit, OnDestroy {
   }
 
   public confirmCancellation(): void {
+    if (this.isCancelling()) return;
     this.isCancelling.set(true);
     this.cancelError.set('');
 
     this.subscriptions.add(
       this.bookingService.cancelBooking(this.booking.booking_Id).subscribe({
         next: () => {
-          const updatedBooking: BookingModel = {
-            ...this.booking,
-            booking_Status: 'Cancelled' as const,
-            checkIn_Status: 'Missed' as const
-          };
           this.isCancelling.set(false);
-          this.cancelled.emit(updatedBooking);
-          this.closed.emit();
+          this.showSuccessAnimation.set(true);
+
+          setTimeout(() => {
+            this.showSuccessAnimation.set(false);
+            this.cancelled.emit(this.booking);
+            this.close();
+          }, 1800); // Wait for the animation to play
         },
         error: () => {
-          this.cancelError.set('Cancellation failed. Please try again or contact support.');
           this.isCancelling.set(false);
+          this.cancelError.set('Cancellation failed. Please try again or contact support.');
         }
       })
     );

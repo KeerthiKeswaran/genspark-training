@@ -17,8 +17,12 @@ namespace Event.Models.DTOs
         public string? Image_Url { get; set; }
         public DateTime Date_Time { get; set; }
         public decimal Duration_Hours { get; set; }
+        public bool? Has_Reported { get; set; }
         public string Status { get; set; } = string.Empty;
         public List<TicketTierDetailsDto> TicketTiers { get; set; } = new List<TicketTierDetailsDto>();
+        public string? Virtual_Url { get; set; }
+        public string? Virtual_Password_Hash { get; set; }
+        public int Title_Update_Count { get; set; }
     }
 
     public class OrganizerDetailsDto
@@ -40,5 +44,6 @@ namespace Event.Models.DTOs
         public string Tier_Name { get; set; } = string.Empty;
         public decimal Price { get; set; }
         public int Tickets_Sold { get; set; }
+        public int Capacity { get; set; }
     }
 }

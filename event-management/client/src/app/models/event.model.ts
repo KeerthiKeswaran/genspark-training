@@ -2,6 +2,7 @@ export interface TicketTierDetail {
   tier_Name: string;
   price: number;
   tickets_Sold: number;
+  capacity?: number;
 }
 
 export interface TicketTier {
@@ -45,6 +46,7 @@ export interface BrowsedEventResponse {
   organizer_Name?: string;  // server: Organizer_Name
   organizer_Email?: string; // server: Organizer_Email
   ticketTiers?: TicketTierDetail[]; // server: TicketTiers
+  has_Reported?: boolean | null;
   // Computed client-side
   minPrice?: number;
 }
@@ -63,4 +65,5 @@ export interface PagedResult<T> {
   page: number;
   pageSize: number;    // server uses PageSize not size
   totalPages: number;
+  maxPrice?: number;
 }

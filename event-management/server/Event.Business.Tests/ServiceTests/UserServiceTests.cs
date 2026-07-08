@@ -53,7 +53,8 @@ namespace Event.Business.Tests.ServiceTests
                 _userRepositoryMock.Object, 
                 _eventRepositoryMock.Object,
                 _otpService,
-                _emailService
+                _emailService,
+                _adminRepositoryMock.Object
             );
         }
         #endregion
@@ -171,7 +172,7 @@ namespace Event.Business.Tests.ServiceTests
 
             try
             {
-                var result = await _userService.UpdateUserProfileAsync(1, "Updated Name", "9876");
+                var result = await _userService.UpdateUserProfileAsync(1, new UpdateProfileRequest { Name = "Updated Name", MobileNumber = "9876" });
                 Assert.That(result, Is.True);
                 Assert.That(user.Name, Is.EqualTo("Updated Name"));
                 LogTestDetail(Service, "UpdateUserProfileAsync", "Update user profile", new { UserId = 1, Name = "Updated Name" }, result, true);

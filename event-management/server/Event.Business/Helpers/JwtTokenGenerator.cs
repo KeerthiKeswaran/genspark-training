@@ -24,25 +24,27 @@ namespace Event.Business.Helpers
             _expiryHours = int.Parse(section["ExpiryHours"] ?? "24");
         }
 
-        public string GenerateUserToken(int userId, string email)
+        public string GenerateUserToken(int userId, string email, string name)
         {
             var claims = new List<Claim>
             {
                 new Claim(JwtRegisteredClaimNames.Sub,   userId.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, email),
+                new Claim(JwtRegisteredClaimNames.Name,  name),
                 new Claim(JwtRegisteredClaimNames.Jti,   Guid.NewGuid().ToString()),
                 new Claim(ClaimTypes.Role, "User")
             };
             return BuildToken(claims);
         }
 
-        public string GenerateAdminToken(string adminId, string email)
+        public string GenerateAdminToken(string adminId, string email, string name)
         {
             string role = adminId.StartsWith("FIN", StringComparison.OrdinalIgnoreCase) ? "finance" : "admin";
             var claims = new List<Claim>
             {
                 new Claim(JwtRegisteredClaimNames.Sub,   adminId),
                 new Claim(JwtRegisteredClaimNames.Email, email),
+                new Claim(JwtRegisteredClaimNames.Name,  name),
                 new Claim(JwtRegisteredClaimNames.Jti,   Guid.NewGuid().ToString()),
                 new Claim(ClaimTypes.Role, role)
             };

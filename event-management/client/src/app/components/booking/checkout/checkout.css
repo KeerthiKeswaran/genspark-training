@@ -578,28 +578,50 @@
 }
 
 .confirm-details {
-  padding: 20px;
+  padding: 24px;
+  background-color: #fafafa;
 }
 
-.confirm-detail-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 13.5px;
+.confirm-details.invoice-style {
+  font-family: 'Courier New', Courier, monospace;
 }
 
-.confirm-detail-row:last-child {
-  border-bottom: none;
-}
-
-.confirm-detail-row .label {
+.confirm-details.invoice-style .label,
+.confirm-details.invoice-style .item-desc {
   color: var(--text-secondary);
+  font-family: inherit;
 }
 
-.confirm-detail-row .value {
+.confirm-details.invoice-style .value,
+.confirm-details.invoice-style .item-amount {
   font-weight: 600;
   color: var(--text-primary);
+  font-family: inherit;
+}
+
+.invoice-header-row,
+.invoice-item-row,
+.invoice-sub-row,
+.invoice-total-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 14px;
+}
+
+.invoice-total-row {
+  padding-top: 12px;
+}
+
+.invoice-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 12px 0;
+}
+
+.invoice-divider.dashed {
+  background: transparent;
+  border-top: 1px dashed var(--text-muted);
 }
 
 .status-confirmed {
@@ -748,6 +770,29 @@
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 4px;
+}
+
+.qr-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border);
+  color: var(--text-primary);
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-top: 12px;
+}
+
+.qr-download-btn:hover {
+  background: var(--accent-light);
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 .qr-hash {

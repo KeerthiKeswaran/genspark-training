@@ -21,6 +21,7 @@ namespace Event.Business.Services
         private readonly IEventRepository _eventRepository;
         private readonly OtpService _otpService;
         private readonly IEmailService _emailService;
+        private readonly IAdminRepository _adminRepository;
 
         #endregion
 
@@ -31,13 +32,15 @@ namespace Event.Business.Services
             IUserRepository userRepository,
             IEventRepository eventRepository,
             OtpService otpService,
-            IEmailService emailService)
+            IEmailService emailService,
+            IAdminRepository adminRepository)
         {
             _httpContextAccessor = httpContextAccessor;
             _userRepository = userRepository;
             _eventRepository = eventRepository;
             _otpService = otpService;
             _emailService = emailService;
+            _adminRepository = adminRepository;
         }
 
         #endregion
@@ -91,16 +94,33 @@ namespace Event.Business.Services
 
         #region UpdateUserProfileAsync
 
-        public async Task<bool> UpdateUserProfileAsync(int userId, string name, string mobileNumber)
+        public async Task<bool> UpdateUserProfileAsync(int userId, UpdateProfileRequest request)
         {
-            // 1. Retrieve the target user profile
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null)
                 throw new NotFoundException($"User with ID {userId} not found.");
 
-            // 2. Modify properties with updated profile values and save to database
-            user.Name = name;
-            user.Mobile_Number = mobileNumber;
+            if (!string.IsNullOrWhiteSpace(request.Email) && !user.Email.Equals(request.Email, StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(request.Otp))
+                    throw new ValidationException("OTP is required to change email address.");
+
+                var emailExists = await _userRepository.GetByEmailAsync(request.Email);
+                if (emailExists != null && emailExists.User_Id != userId)
+                    throw new ConflictException("Email is already registered.");
+
+                var adminEmailExists = await _adminRepository.GetByEmailAsync(request.Email);
+                if (adminEmailExists != null)
+                    throw new ConflictException("Email is already registered.");
+
+                if (!await _otpService.VerifyOtpAsync(request.Email, request.Otp, "email-change"))
+                    throw new UnauthorizedException("Invalid or expired OTP.");
+                
+                user.Email = request.Email;
+            }
+
+            user.Name = request.Name;
+            user.Mobile_Number = request.MobileNumber;
             await _userRepository.UpdateAsync(user);
 
             return true;
@@ -167,7 +187,12 @@ namespace Event.Business.Services
                     Status = ev.Status,
                     Venue_Name = ev.Venue?.Name,
                     Tickets_Sold = ev.TicketTiers?.Sum(t => t.Tickets_Sold) ?? 0,
-                    Net_Earnings = ev.TicketTiers?.Sum(t => t.Tickets_Sold * t.Price) ?? 0m
+                    Net_Earnings = ev.TicketTiers?.Sum(t => t.Tickets_Sold * t.Price) ?? 0m,
+                    Category = ev.Category,
+                    Description_Url = ev.Description_Url,
+                    Title_Update_Count = ev.Title_Update_Count,
+                    Virtual_Url = ev.Virtual_Url,
+                    Virtual_Password_Hash = ev.Virtual_Password_Hash
                 });
             }
             return response;
@@ -216,6 +241,8 @@ namespace Event.Business.Services
                 Venue_Name = ev.Venue?.Name,
                 Virtual_Url = ev.Virtual_Url,
                 Virtual_Password_Hash = ev.Virtual_Password_Hash,
+                Category = ev.Category,
+                Title_Update_Count = ev.Title_Update_Count,
                 TicketTiers = ticketTiers
             };
         }

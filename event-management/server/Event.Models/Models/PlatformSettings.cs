@@ -24,6 +24,9 @@ namespace Event.Models
         [Column(TypeName = "decimal(18,2)")]
         public decimal Ticket_Fixed_Fee { get; set; }
         
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal GST_Percentage { get; set; } = 18.00m;
+        
         public int Max_Tickets_Per_Booking { get; set; }
         
         public DateTime Updated_At { get; set; }

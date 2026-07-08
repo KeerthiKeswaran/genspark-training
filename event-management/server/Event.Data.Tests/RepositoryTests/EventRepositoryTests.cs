@@ -145,13 +145,13 @@ namespace Event.Data.Tests.RepositoryTests
 
             try
             {
-                var searchKeyword = await _repository.SearchEventsAsync("Tech", null, null, null, 1, 10);
+                var searchKeyword = await _repository.SearchEventsAsync("Tech", null, null, null, null, null, null, 1, 10);
                 Assert.That(searchKeyword.Items.Any(e => e.Event_Id == newEvent.Event_Id), Is.True);
 
-                var searchCategory = await _repository.SearchEventsAsync(null, "Physical", null, null, 1, 10);
+                var searchCategory = await _repository.SearchEventsAsync(null, "Physical", null, null, null, null, null, 1, 10);
                 Assert.That(searchCategory.Items.Any(e => e.Event_Id == newEvent.Event_Id), Is.True);
 
-                var searchRegion = await _repository.SearchEventsAsync(null, null, null, deps.regionId, 1, 10);
+                var searchRegion = await _repository.SearchEventsAsync(null, null, null, deps.regionId, null, null, null, 1, 10);
                 Assert.That(searchRegion.Items.Any(e => e.Event_Id == newEvent.Event_Id), Is.True);
 
                 LogTestDetail(Repo, "SearchEventsAsync", "Search events with multiple filters", 

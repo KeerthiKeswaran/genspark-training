@@ -15,6 +15,13 @@ namespace Event.Data.Repositories
         {
         }
 
+        public override async Task<IEnumerable<Staff>> GetAllAsync()
+        {
+            return await _dbSet
+                .Include(s => s.Region)
+                .ToListAsync();
+        }
+
         public async Task<int> GetAvailableStaffCountAsync(string regionId, DateTime dateTime)
         {
             var allocatedStaffIds = _context.EventStaffAllocations

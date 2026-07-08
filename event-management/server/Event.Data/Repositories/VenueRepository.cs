@@ -26,7 +26,7 @@ namespace Event.Data.Repositories
         {
             return await _context.Events
                 .AnyAsync(e => e.Venue_Id == venueId && 
-                               e.Status == "Live" && 
+                               (e.Status == "Live" || e.Status == "Activation Pending") && 
                                e.Date_Time <= dateTime && 
                                dateTime < e.Date_Time.AddHours((double)e.Duration_Hours));
         }

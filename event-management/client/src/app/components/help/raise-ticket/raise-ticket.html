@@ -50,17 +50,15 @@
         <p class="column-sub text-muted">Select booking and categories for mapping your case.</p>
 
         <div class="form-column-group">
-          <!-- Select Booking Dropdown (Renamed) -->
+          <!-- Select Related Item Button -->
           <div class="form-group">
-            <label class="form-label" for="ticketBookingSelect">Select Booking</label>
-            <select id="ticketBookingSelect" class="form-select" [(ngModel)]="ticketBookingId">
-              <option value="">General Support / No Booking</option>
-              @if (isLoggedIn() && bookings().length > 0) {
-                @for (b of bookings(); track b.booking_Id) {
-                  <option [value]="b.booking_Id">Booking #{{ b.booking_Id }} - {{ b.event_Title }}</option>
-                }
-              }
-            </select>
+            <label class="form-label">Related Item *</label>
+            <div class="related-item-selector" (click)="openSelectionModal()">
+              <div class="selected-item-display">
+                <span class="selected-text" [class.placeholder-text]="!selectedItemId()">{{ selectedItemDisplay() }}</span>
+                <button type="button" class="change-item-btn">Select Item</button>
+              </div>
+            </div>
           </div>
 
           <!-- Category Selection -->
@@ -146,6 +144,64 @@
   }
 
 </div>
+
+<!-- Selection Modal -->
+@if (showSelectionModal()) {
+  <div class="settings-modal-overlay">
+    <div class="settings-modal-card selection-modal-card">
+      <div class="modal-header-section">
+        <h2>Select Related Item</h2>
+        <button class="modal-close-x" (click)="closeSelectionModal()">&times;</button>
+      </div>
+
+      <div class="modal-body-section">
+        <div class="modal-tabs">
+          <button class="tab-btn" [class.active]="activeSelectionTab() === 'bookings'" (click)="activeSelectionTab.set('bookings')">My Bookings</button>
+          <button class="tab-btn" [class.active]="activeSelectionTab() === 'events'" (click)="activeSelectionTab.set('events')">My Events</button>
+        </div>
+
+        <div class="modal-tab-content">
+          @if (activeSelectionTab() === 'bookings') {
+            @if (isBookingsLoading()) {
+              <div class="skeleton-loader text-skeleton" style="height: 60px; margin-bottom: 12px; border-radius: 8px;"></div>
+              <div class="skeleton-loader text-skeleton" style="height: 60px; border-radius: 8px;"></div>
+            } @else if (bookings().length === 0) {
+              <p class="empty-state">You have no bookings.</p>
+            } @else {
+              <div class="selection-grid">
+                @for (b of bookings(); track b.booking_Id || b.BookingId || b.bookingId) {
+                  <div class="selection-card" (click)="selectBooking(b)" [class.selected]="selectedItemType() === 'booking' && selectedItemId() === (b.booking_Id || b.BookingId || b.bookingId || b.Booking_Id)">
+                    <div class="card-id">Booking #{{ b.booking_Id || b.BookingId || b.bookingId || b.Booking_Id }}</div>
+                    <div class="card-title">{{ b.event_Title || b.EventTitle || b.eventTitle }}</div>
+                  </div>
+                }
+              </div>
+            }
+          }
+
+          @if (activeSelectionTab() === 'events') {
+            @if (isEventsLoading()) {
+              <div class="skeleton-loader text-skeleton" style="height: 60px; margin-bottom: 12px; border-radius: 8px;"></div>
+              <div class="skeleton-loader text-skeleton" style="height: 60px; border-radius: 8px;"></div>
+            } @else if (events().length === 0) {
+              <p class="empty-state">You have no events.</p>
+            } @else {
+              <div class="selection-grid">
+                @for (e of events(); track (e.event_Id || e.Event_Id || e.eventId)) {
+                  <div class="selection-card" (click)="selectEvent(e)" [class.selected]="selectedItemType() === 'event' && selectedItemId() === (e.event_Id || e.Event_Id || e.eventId)">
+                    <div class="card-id">Event #{{ e.event_Id || e.Event_Id || e.eventId }}</div>
+                    <div class="card-title">{{ e.title || e.Title }}</div>
+                    <div class="card-meta">Status: {{ e.status || e.Status }}</div>
+                  </div>
+                }
+              </div>
+            }
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+}
 
 <!-- Global Footer -->
 <app-footer></app-footer>

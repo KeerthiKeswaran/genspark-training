@@ -19,6 +19,8 @@ namespace Event.Models.DTOs
         public string? Venue_Name { get; set; }
         public string? Virtual_Url { get; set; }
         public string? Virtual_Password_Hash { get; set; }
+        public string? Category { get; set; }
+        public int Title_Update_Count { get; set; }
         public List<TicketTierDetailsDto> TicketTiers { get; set; } = new List<TicketTierDetailsDto>();
     }
 }

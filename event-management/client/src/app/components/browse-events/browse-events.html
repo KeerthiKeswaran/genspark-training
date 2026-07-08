@@ -1,126 +1,7 @@
 <div class="browse-root" (click)="closeDropdowns()">
 
   <!-- Consistent Navigation Bar -->
-  <nav class="navbar">
-    <div class="nav-container">
-      
-      <!-- Left: Logo -->
-      <a class="nav-logo" routerLink="/">
-        <img src="/logo.png" alt="Event Management Logo" class="logo-img">
-      </a>
-
-      <!-- Center: Unified Search Tool in Nav -->
-      <div class="nav-search-bar" (click)="$event.stopPropagation()">
-        <form (ngSubmit)="applyFilters()" class="search-form">
-          <span class="search-icon-wrapper">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-          </span>
-          <input 
-            type="text" 
-            [(ngModel)]="navSearchKeyword" 
-            name="navSearchKeyword" 
-            placeholder="Search events, seminars, concerts..." 
-            class="search-input"
-          />
-          <div class="vertical-divider"></div>
-          <div class="location-picker-trigger" (click)="openLocationModal($event)">
-            <svg class="icon pin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-              <circle cx="12" cy="10" r="3"></circle>
-            </svg>
-            <span class="location-name">{{ currentLocationName }}</span>
-            <svg class="icon arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </div>
-          <button type="submit" class="search-btn">Search</button>
-        </form>
-      </div>
-
-      <!-- Right: Booking, Create Event, and Profile Dropdown -->
-      <div class="nav-actions">
-        @if (isLoggedIn()) {
-          <a class="nav-link" (click)="triggerCreateEventAction()" title="Create Event">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-              <line x1="12" y1="13" x2="12" y2="17"></line>
-              <line x1="10" y1="15" x2="14" y2="15"></line>
-            </svg>
-            <span>Create Event</span>
-          </a>
-
-          <a class="nav-link" (click)="triggerBookingAction()" title="Bookings">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-              <line x1="16" y1="13" x2="8" y2="13"></line>
-              <line x1="16" y1="17" x2="8" y2="17"></line>
-              <polyline points="10 9 9 9 8 9"></polyline>
-            </svg>
-            <span>Bookings</span>
-          </a>
-
-          <div class="profile-container" (click)="$event.stopPropagation()">
-            <button class="profile-btn" (click)="toggleProfileDropdown($event)">
-              <div class="avatar-fallback">
-                {{ (currentUser()?.name || 'U').substring(0, 1).toUpperCase() }}
-              </div>
-              <span class="user-name-label">{{ currentUser()?.name || 'Account' }}</span>
-              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </button>
-
-            <!-- Profile Dropdown -->
-            <div class="dropdown-menu profile-dropdown" [class.show]="isProfileDropdownOpen()">
-              <div class="dropdown-header">
-                <p class="header-name">{{ currentUser()?.name }}</p>
-                <p class="header-email">{{ currentUser()?.email }}</p>
-              </div>
-              <div class="dropdown-divider"></div>
-              
-              <a class="dropdown-item" routerLink="/">
-                Home Page
-              </a>
-              <a class="dropdown-item" (click)="triggerManageMyEventsAction()">
-                Manage My Events
-              </a>
-              <a class="dropdown-item" (click)="triggerBookingAction()">
-                Bookings
-              </a>
-              <a class="dropdown-item" (click)="triggerGetHelpAction()">
-                Get Help
-              </a>
-              <a class="dropdown-item" (click)="triggerAccountSettingsAction()">
-                Account Settings
-              </a>
-              
-              <div class="dropdown-divider"></div>
-              <a class="dropdown-item logout-item" (click)="onLogout()">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                  <polyline points="16 17 21 12 16 7"></polyline>
-                  <line x1="21" y1="12" x2="9" y2="12"></line>
-                </svg>
-                <span>Log out</span>
-              </a>
-            </div>
-          </div>
-        } @else {
-          <a class="btn btn-primary login-nav-btn" routerLink="/login">
-            Login
-          </a>
-        }
-      </div>
-
-    </div>
-  </nav>
+  <app-navbar (openLocation)="openLocationModal()"></app-navbar>
 
   <!-- Page Layout Wrapper -->
   <main class="page-container">
@@ -139,6 +20,7 @@
             <select 
               id="category" 
               [(ngModel)]="filterCategory" 
+              (ngModelChange)="applyFilters()"
               name="filterCategory" 
               class="form-control select-control"
             >
@@ -155,6 +37,7 @@
             <select 
               id="format" 
               [(ngModel)]="filterFormat" 
+              (ngModelChange)="applyFilters()"
               name="filterFormat" 
               class="form-control select-control"
             >
@@ -165,21 +48,25 @@
             </select>
           </div>
 
-          <!-- Max Price Selection -->
+          <!-- Dual Slider Price Filter -->
           <div class="filter-group">
-            <label for="maxPrice">Max Price Limit</label>
-            <select 
-              id="maxPrice" 
-              [(ngModel)]="filterMaxPrice" 
-              name="filterMaxPrice" 
-              class="form-control select-control"
-            >
-              <option [ngValue]="null">Any Price</option>
-              <option [ngValue]="100">Under ₹100</option>
-              <option [ngValue]="200">Under ₹200</option>
-              <option [ngValue]="500">Under ₹500</option>
-              <option [ngValue]="1000">Under ₹1000</option>
-            </select>
+            <label>Price</label>
+            <div class="price-display">
+              ₹{{ filterMinPrice | number }} – ₹{{ filterMaxPrice === 25000 ? '25,000+' : (filterMaxPrice | number) }}
+            </div>
+            
+            <div class="dual-slider-container">
+              <div class="slider-track"></div>
+              <div class="slider-fill" 
+                   [style.left.%]="(filterMinPrice / 25000) * 100" 
+                   [style.width.%]="((filterMaxPrice - filterMinPrice) / 25000) * 100"></div>
+              <input type="range" min="0" max="25000" step="500" 
+                     [(ngModel)]="filterMinPrice" (change)="onMinPriceChange()" 
+                     name="minP" class="slider-thumb min-thumb">
+              <input type="range" min="0" max="25000" step="500" 
+                     [(ngModel)]="filterMaxPrice" (change)="onMaxPriceChange()" 
+                     name="maxP" class="slider-thumb max-thumb">
+            </div>
           </div>
 
           <!-- Sort Options -->
@@ -188,6 +75,7 @@
             <select 
               id="sortBy" 
               [(ngModel)]="filterSortBy" 
+              (ngModelChange)="applyFilters()"
               name="filterSortBy" 
               class="form-control select-control"
             >
@@ -197,12 +85,6 @@
               <option value="priceAsc">Price: Low to High</option>
               <option value="priceDesc">Price: High to Low</option>
             </select>
-          </div>
-
-          <div class="filter-actions">
-            <button type="submit" class="btn btn-primary btn-block">
-              Apply Filters
-            </button>
           </div>
 
         </form>
@@ -217,7 +99,7 @@
       <p class="results-count">{{ totalEvents() }} events found</p>
 
       <!-- Active Filters Chips List -->
-      @if (filterKeyword || filterCategory || filterFormat || filterMaxPrice || filterRegionIds.length > 0) {
+      @if (filterKeyword || filterCategory || filterFormat || (filterMaxPrice !== null && filterMaxPrice < maxAvailablePrice) || filterRegionIds.length > 0) {
         <div class="active-filters-container">
           <span class="active-filters-title">Active Filters:</span>
           <div class="active-filters-list">
@@ -239,7 +121,7 @@
                 <button type="button" class="chip-close-btn" (click)="removeFormatFilter()">&times;</button>
               </div>
             }
-            @if (filterMaxPrice) {
+            @if (filterMaxPrice !== null && filterMaxPrice < maxAvailablePrice) {
               <div class="filter-chip">
                 <span>Max Price: ₹{{ filterMaxPrice }}</span>
                 <button type="button" class="chip-close-btn" (click)="removeMaxPriceFilter()">&times;</button>
@@ -275,7 +157,12 @@
               <div class="event-card" (click)="navigateToBookingFlow(ev)" style="cursor: pointer;">
                 <div class="card-image-wrapper">
                   <img [src]="ev.image_Url || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=500&auto=format&fit=crop&q=80'" [alt]="ev.title" class="card-img">
-                  <div class="card-badge">{{ ev.event_Type }}</div>
+                  <div class="card-badge" [class]="'badge-' + (ev.event_Type ? ev.event_Type.toLowerCase() : 'physical')">{{ ev.event_Type || 'Physical' }}</div>
+                  @if (ev.category) {
+                    <div class="card-badge category-badge" style="left: auto; right: 12px; background: rgba(0, 0, 0, 0.7); color: white;">
+                      {{ ev.category }}
+                    </div>
+                  }
                 </div>
                 <div class="card-body">
                   <div class="card-date">{{ ev.date_Time | date:'MMM d, y • h:mm a' }}</div>

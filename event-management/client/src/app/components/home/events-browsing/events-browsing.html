@@ -51,14 +51,11 @@
           }
         </div>
       } @else {
-        <!-- Empty State for local events -->
-        <div class="empty-state">
-          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="8" y1="12" x2="16" y2="12"></line>
-          </svg>
-          <h3>No local events found</h3>
-          <p>We couldn't find any events in {{ currentLocationName }} right now. Explore other popular regions below!</p>
+        <!-- Skeleton Loading instead of Empty State (per user request) -->
+        <div class="cards-skeleton">
+          @for (item of [1, 2, 3]; track item) {
+            <div class="skeleton-card"></div>
+          }
         </div>
       }
     </div>
@@ -101,13 +98,11 @@
           }
         </div>
       } @else {
-        <!-- Empty State for other events -->
-        <div class="empty-state">
-          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="8" y1="12" x2="16" y2="12"></line>
-          </svg>
-          <h3>No other events found</h3>
+        <!-- Skeleton Loading instead of Empty State (per user request) -->
+        <div class="cards-skeleton">
+          @for (item of [1, 2, 3]; track item) {
+            <div class="skeleton-card"></div>
+          }
         </div>
       }
     </div>

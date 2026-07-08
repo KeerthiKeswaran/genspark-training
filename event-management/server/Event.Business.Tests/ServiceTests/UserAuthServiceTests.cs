@@ -71,7 +71,8 @@ namespace Event.Business.Tests.ServiceTests
                 _userRepositoryMock.Object,
                 _otpService,
                 _jwtGenerator,
-                _termsRepositoryMock.Object
+                _termsRepositoryMock.Object,
+                _adminRepositoryMock.Object
             );
         }
         #endregion

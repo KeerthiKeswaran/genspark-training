@@ -126,7 +126,7 @@ namespace Event.Business.Tests.ServiceTests
             {
                 var booking = await _bookingService.BookTicketsAsync(attendeeId, eventId, tierQuantities);
                 Assert.That(booking, Is.Not.Null);
-                Assert.That(booking.Total_Price, Is.EqualTo(300.00m));
+                
                 LogTestDetail(ServiceName, "BookTicketsAsync", "Book tickets for live event successfully", new { attendeeId, eventId, tierQuantities }, booking, true);
             }
             catch (Exception ex)

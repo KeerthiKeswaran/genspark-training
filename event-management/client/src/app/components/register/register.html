@@ -76,14 +76,15 @@
             <input 
               type="email" 
               id="email" 
-              [(ngModel)]="email" 
+              [ngModel]="email" 
+              (ngModelChange)="onEmailChange($event)"
               name="email" 
               placeholder="Enter your email" 
               required 
               class="form-control"
               [disabled]="isSubmitting()"
             />
-            <button type="button" class="btn btn-outline send-otp-btn" (click)="sendOtp()" [disabled]="isSubmitting() || otpCountdown() > 0">
+            <button type="button" class="btn btn-outline send-otp-btn" (click)="sendOtp()" [disabled]="isSubmitting() || otpCountdown() > 0 || isCheckingEmail() || isEmailAvailable() === false">
               @if (otpCountdown() > 0) {
                 Resend in {{ otpCountdown() }}s
               } @else if (isOtpSent()) {
@@ -93,6 +94,11 @@
               }
             </button>
           </div>
+          @if (isCheckingEmail()) {
+            <span class="field-hint text-warning">Checking availability...</span>
+          } @else if (isEmailAvailable() === true) {
+            <span class="field-hint text-success">Email is available!</span>
+          }
         </div>
 
         <div class="form-group">

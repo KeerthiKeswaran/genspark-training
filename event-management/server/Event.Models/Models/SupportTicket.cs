@@ -22,5 +22,9 @@ namespace Event.Models
         public string? EsclationStatus { get; set; } // "Available", "Unavailable"
         
         public int? RelatedId { get; set; }
+        
+        public string? TargetType { get; set; }
+
+        public DateTime? CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

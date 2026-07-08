@@ -82,9 +82,9 @@
 }
 
 .search-form:focus-within {
-  border-color: var(--color-neutral-dark);
+  border-color: #DAA520;
   background-color: var(--color-canvas-bg);
-  box-shadow: var(--shadow-ambient);
+  box-shadow: 0 0 0 3px rgba(218, 165, 32, 0.2);
 }
 
 .search-icon-wrapper {

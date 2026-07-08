@@ -68,7 +68,7 @@ namespace Event.Business.Services
             }
 
             // 5. Return a signed administrator JWT token
-            return _jwtGenerator.GenerateAdminToken(admin.Admin_Id, admin.Email);
+            return _jwtGenerator.GenerateAdminToken(admin.Admin_Id, admin.Email, admin.Name);
         }
 
         #endregion
@@ -89,7 +89,7 @@ namespace Event.Business.Services
             if (!await _otpService.VerifyOtpAsync(admin.Email, otp, "finance-login"))
                 throw new UnauthorizedException("Invalid or expired OTP.");
 
-            return _jwtGenerator.GenerateAdminToken(admin.Admin_Id, admin.Email);
+            return _jwtGenerator.GenerateAdminToken(admin.Admin_Id, admin.Email, admin.Name);
         }
 
         #endregion
@@ -98,9 +98,16 @@ namespace Event.Business.Services
 
         public async Task<string> ResetAdminPasswordAsync(string email, string otp, string newPassword)
         {
-            // 1. Verify the verification OTP
-            if (!await _otpService.VerifyOtpAsync(email, otp, "admin-password-reset"))
-                throw new UnauthorizedException("Invalid or expired OTP.");
+            // 1. Verify the OTP details (if we're passing it here, maybe they didn't pre-verify)
+            if (await _otpService.IsOtpVerificationExpiredAsync(email, "admin-password-reset"))
+            {
+                // If the marker isn't there, maybe they are doing it in one step. Try to verify the raw OTP.
+                if (!await _otpService.VerifyOtpAsync(email, otp, "admin-password-reset"))
+                    throw new UnauthorizedException("Invalid or expired OTP.");
+            }
+
+            // Consume the marker so it can't be reused
+            await _otpService.ConsumeOtpVerificationAsync(email, "admin-password-reset");
 
             // 2. Retrieve the admin record to update
             var admin = await _adminRepository.GetByEmailAsync(email);

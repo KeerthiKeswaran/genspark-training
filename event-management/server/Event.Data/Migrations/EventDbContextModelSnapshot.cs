@@ -73,9 +73,6 @@ namespace Event.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("ReferenceId")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Remarks")
                         .HasColumnType("text");
 
@@ -252,6 +249,9 @@ namespace Event.Data.Migrations
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<int>("Title_Update_Count")
+                        .HasColumnType("integer");
 
                     b.Property<int?>("Venue_Id")
                         .HasColumnType("integer");
@@ -490,6 +490,9 @@ namespace Event.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Settings_Id"));
 
+                    b.Property<decimal>("GST_Percentage")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<int>("Max_Tickets_Per_Booking")
                         .HasColumnType("integer");
 
@@ -583,6 +586,9 @@ namespace Event.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("EsclationStatus")
                         .HasColumnType("text");
 
@@ -595,6 +601,9 @@ namespace Event.Data.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("TargetType")
                         .HasColumnType("text");
 
                     b.Property<int>("User_Id")

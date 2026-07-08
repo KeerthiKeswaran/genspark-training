@@ -10,5 +10,6 @@ namespace Event.Models.DTOs
         public decimal Ticket_Commission_Percentage { get; set; }
         public decimal Ticket_Fixed_Fee { get; set; }
         public int Max_Tickets_Per_Booking { get; set; }
+        public decimal GST_Percentage { get; set; }
     }
 }

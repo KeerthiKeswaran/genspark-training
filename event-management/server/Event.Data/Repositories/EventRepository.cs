@@ -19,10 +19,13 @@ namespace Event.Data.Repositories
             string? category, 
             DateTime? minDateTime, 
             string? regionId, 
+            string? format, 
+            decimal? maxPrice, 
+            string? sortBy, 
             int page, 
             int size)
         {
-            var query = _dbSet.AsQueryable();
+            var query = _dbSet.Where(e => e.Status == "Live");
 
             if (!string.IsNullOrWhiteSpace(keyword))
             {
@@ -53,6 +56,38 @@ namespace Event.Data.Repositories
                 query = query.Where(e => e.Venue != null && e.Venue.Region_Id == regionId);
             }
 
+            if (!string.IsNullOrWhiteSpace(format))
+            {
+                var lowerFormat = format.ToLower();
+                query = query.Where(e => e.Event_Type.ToLower() == lowerFormat);
+            }
+
+            if (maxPrice.HasValue && maxPrice.Value > 0)
+            {
+                query = query.Where(e => e.TicketTiers != null && e.TicketTiers.Any(t => t.Price <= maxPrice.Value));
+            }
+
+            if (!string.IsNullOrWhiteSpace(sortBy))
+            {
+                var sort = sortBy.ToLower();
+                if (sort == "price-low")
+                {
+                    query = query.OrderBy(e => e.TicketTiers != null ? e.TicketTiers.Min(t => t.Price) : 0);
+                }
+                else if (sort == "price-high")
+                {
+                    query = query.OrderByDescending(e => e.TicketTiers != null ? e.TicketTiers.Min(t => t.Price) : 0);
+                }
+                else
+                {
+                    query = query.OrderByDescending(e => e.Event_Id);
+                }
+            }
+            else
+            {
+                query = query.OrderByDescending(e => e.Event_Id);
+            }
+
             int totalCount = await query.CountAsync();
             var items = await query
                 .Include(e => e.Organizer)
@@ -60,7 +95,6 @@ namespace Event.Data.Repositories
                     .ThenInclude(v => v.Region)
                 .Include(e => e.TicketTiers)
                 .Include(e => e.Reports)
-                .OrderByDescending(e => e.Event_Id)
                 .Skip((page - 1) * size)
                 .Take(size)
                 .ToListAsync();
@@ -195,11 +229,13 @@ namespace Event.Data.Repositories
             // Filter by date range
             if (startDate.HasValue)
             {
-                query = query.Where(e => e.Date_Time >= startDate.Value);
+                var utcStart = DateTime.SpecifyKind(startDate.Value, DateTimeKind.Utc);
+                query = query.Where(e => e.Date_Time >= utcStart);
             }
             if (endDate.HasValue)
             {
-                query = query.Where(e => e.Date_Time <= endDate.Value);
+                var utcEnd = DateTime.SpecifyKind(endDate.Value, DateTimeKind.Utc);
+                query = query.Where(e => e.Date_Time <= utcEnd);
             }
 
             // Sort
@@ -310,5 +346,78 @@ namespace Event.Data.Repositories
                 .ThenByDescending(e => e.Date_Time)
                 .ToListAsync();
         }
-    }
+    
+        public async Task<PagedResult<Event.Models.Event>> GetEventsForPayoutsAsync(string? status, string? sortBy, int page, int size)
+        {
+            var query = _dbSet
+                .Include(e => e.Organizer)
+                .Include(e => e.Bookings)
+                    .ThenInclude(b => b.Payments)
+                .Where(e => e.Status == "Live" || e.Status == "Completed")
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                if (status.Equals("Upcoming", StringComparison.OrdinalIgnoreCase))
+                    query = query.Where(e => e.Status == "Live");
+                else if (status.Equals("Completed", StringComparison.OrdinalIgnoreCase))
+                    query = query.Where(e => e.Status == "Completed");
+            }
+
+            if (!string.IsNullOrWhiteSpace(sortBy))
+            {
+                var parts = sortBy.Split('_');
+                var column = parts[0].ToLower();
+                var direction = parts.Length > 1 ? parts[1].ToLower() : "asc";
+
+                if (column == "status")
+                {
+                    if (direction == "asc")
+                        query = query.OrderBy(e => e.Status);
+                    else
+                        query = query.OrderByDescending(e => e.Status);
+                }
+                else if (column == "date")
+                {
+                    if (direction == "asc")
+                        query = query.OrderBy(e => e.Date_Time);
+                    else
+                        query = query.OrderByDescending(e => e.Date_Time);
+                }
+                else
+                {
+                    query = query.OrderByDescending(e => e.Date_Time);
+                }
+            }
+            else
+            {
+                query = query.OrderByDescending(e => e.Date_Time);
+            }
+
+            int totalCount = await query.CountAsync();
+
+            var items = await query
+                .Skip((page - 1) * size)
+                .Take(size)
+                .ToListAsync();
+
+            return new PagedResult<Event.Models.Event>(items, totalCount, page, size);
+        }
+
+
+        public async Task<bool> HasUserReportedEventAsync(int eventId, int userId)
+        {
+            return false;
+        }
+
+        public async Task<System.Collections.Generic.IEnumerable<int>> GetReportedEventIdsAsync(int userId)
+        {
+            return new List<int>();
+        }
+
+        public async Task<System.Collections.Generic.IEnumerable<Event.Models.EventFeedback>> GetFeedbacksByAttendeeAsync(int attendeeId)
+        {
+            return new List<Event.Models.EventFeedback>();
+        }
+}
 }

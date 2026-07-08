@@ -7,15 +7,15 @@ namespace Event.Contracts.IServices
 {
     public interface IEventService
     {
-        Task<PagedResult<BrowsedEventResponse>> BrowseEventsAsync(string? keyword, string? category, DateTime? minDateTime, string? regionId, int page, int size);
-        Task<EventDetailsResponse?> GetEventDetailsAsync(int eventId);
+        Task<PagedResult<BrowsedEventResponse>> BrowseEventsAsync(string? keyword, string? category, DateTime? minDateTime, string? regionId, string? format, decimal? maxPrice, string? sortBy, int page, int size);
+        Task<EventDetailsResponse?> GetEventDetailsAsync(int eventId, int? currentUserId = null);
         Task<bool> ReportEventAsync(int reporterId, int eventId, string reason);
         Task<bool> SubmitEventFeedbackAsync(int attendeeId, int eventId, int rating, string review);
         Task<Booking> VerifyTicketCheckInAsync(string secretHash);
         Task<EventDetailsResponse> CreateEventAsync(int organizerId, Event.Models.DTOs.CreateEventRequest request);
         Task<Event.Models.DTOs.StaffAvailabilityResponse> CheckStaffAvailabilityAsync(Event.Models.DTOs.CheckStaffAvailabilityRequest request);
         Task<EventDetailsResponse> ConfirmEventUpfrontPaymentAsync(int eventId, string stripeChargeId, string paymentMethod);
-        Task<(bool Success, string SessionId, string SessionUrl, string ErrorMessage)> CreateCheckoutSessionForEventCreationAsync(int eventId, string successUrl, string cancelUrl);
+        Task<(bool Success, string SessionId, string ClientSecret, System.DateTime CreatedAtUTC, string ErrorMessage)> CreateCheckoutSessionForEventCreationAsync(int eventId, string returnUrl);
         Task<Event.Models.DTOs.PlatformSettingsResponse?> GetPlatformSettingsAsync();
         Task<string> SaveDescriptionFileAsync(string text);
         Task<string> SaveImageFileAsync(string fileName, byte[] fileBytes);
@@ -29,5 +29,6 @@ namespace Event.Contracts.IServices
         Task<System.Collections.Generic.IEnumerable<TicketTierCapacityResponse>> GetEventTicketTierCapacitiesAsync(int eventId);
         Task ReleaseCompletedEventsAsync();
         Task ProcessDismissedPayoutsAsync();
+        Task<bool> UpdateEventDetailsAsync(int organizerId, int eventId, UpdateEventDetailsRequest request);
     }
 }

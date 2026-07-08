@@ -15,6 +15,7 @@ namespace Event.Business.Services
         private readonly OtpService _otpService;
         private readonly JwtTokenGenerator _jwtGenerator;
         private readonly ITermsAndConditionsRepository _termsRepository;
+        private readonly IAdminRepository _adminRepository;
 
         #endregion
 
@@ -24,12 +25,14 @@ namespace Event.Business.Services
             IUserRepository userRepository,
             OtpService otpService,
             JwtTokenGenerator jwtGenerator,
-            ITermsAndConditionsRepository termsRepository)
+            ITermsAndConditionsRepository termsRepository,
+            IAdminRepository adminRepository)
         {
             _userRepository = userRepository;
             _otpService     = otpService;
             _jwtGenerator   = jwtGenerator;
             _termsRepository = termsRepository;
+            _adminRepository = adminRepository;
         }
 
         #endregion
@@ -64,7 +67,7 @@ namespace Event.Business.Services
             await _otpService.ConsumeOtpVerificationAsync(user.Email, "registration");
 
             // 5. Return signed JWT for immediate login session activation
-            return _jwtGenerator.GenerateUserToken(user.User_Id, user.Email);
+            return _jwtGenerator.GenerateUserToken(user.User_Id, user.Email, user.Name);
         }
 
         #endregion
@@ -83,7 +86,7 @@ namespace Event.Business.Services
                 throw new UnauthorizedException("Invalid email or password.");
 
             // 3. Generate and return a signed JWT token
-            return _jwtGenerator.GenerateUserToken(user.User_Id, user.Email);
+            return _jwtGenerator.GenerateUserToken(user.User_Id, user.Email, user.Name);
         }
 
         #endregion
@@ -92,9 +95,17 @@ namespace Event.Business.Services
 
         public async Task<string> ResetUserPasswordAsync(string email, string otp, string newPassword)
         {
-            // 1. Verify the OTP details
-            if (!await _otpService.VerifyOtpAsync(email, otp, "password-reset"))
-                throw new UnauthorizedException("Invalid or expired OTP.");
+            // 1. Verify the OTP details (if we're passing it here, maybe they didn't pre-verify)
+            // But since the frontend uses a two-step process, it might be better to just check the marker
+            if (await _otpService.IsOtpVerificationExpiredAsync(email, "password-reset"))
+            {
+                // If the marker isn't there, maybe they are doing it in one step. Try to verify the raw OTP.
+                if (!await _otpService.VerifyOtpAsync(email, otp, "password-reset"))
+                    throw new UnauthorizedException("Invalid or expired OTP.");
+            }
+
+            // Consume the marker so it can't be reused
+            await _otpService.ConsumeOtpVerificationAsync(email, "password-reset");
 
             // 2. Locate target user account
             var user = await _userRepository.GetByEmailAsync(email);
@@ -106,6 +117,19 @@ namespace Event.Business.Services
 
             await _userRepository.UpdateAsync(user);
             return "Password reset successfully.";
+        }
+
+        #endregion
+
+        #region CheckEmailExistsAsync
+
+        public async Task<bool> CheckEmailExistsAsync(string email)
+        {
+            var user = await _userRepository.GetByEmailAsync(email);
+            if (user != null) return true;
+
+            var admin = await _adminRepository.GetByEmailAsync(email);
+            return admin != null;
         }
 
         #endregion

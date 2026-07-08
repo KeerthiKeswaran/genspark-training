@@ -39,22 +39,43 @@
             </div>
           </div>
 
-          <div class="confirm-details">
-            <div class="confirm-detail-row">
+          <div class="confirm-details invoice-style">
+            <div class="invoice-header-row">
               <span class="label">Booking ID</span>
               <span class="value">#{{ confirmedBooking()!.booking_Id }}</span>
             </div>
-            <div class="confirm-detail-row">
+            <div class="invoice-header-row">
               <span class="label">Status</span>
               <span class="value status-confirmed">{{ confirmedBooking()!.booking_Status }}</span>
             </div>
+            
+            <div class="invoice-divider"></div>
+            
             @for (detail of confirmedBooking()!.details; track detail.tier_Name) {
-              <div class="confirm-detail-row">
-                <span class="label">{{ detail.tier_Name }} × {{ detail.quantity }}</span>
-                <span class="value">{{ formatCurrency(detail.price * detail.quantity) }}</span>
+              <div class="invoice-item-row">
+                <span class="item-desc">{{ detail.tier_Name }} × {{ detail.quantity }}</span>
+                <span class="item-amount">{{ formatCurrency(detail.price * detail.quantity) }}</span>
               </div>
             }
-            <div class="confirm-detail-row total-row">
+            
+            <div class="invoice-divider dashed"></div>
+            
+            <div class="invoice-sub-row">
+              <span class="label">Subtotal</span>
+              <span class="value">{{ formatCurrency(invoiceSubtotal()) }}</span>
+            </div>
+            <div class="invoice-sub-row">
+              <span class="label">Platform Fee</span>
+              <span class="value">{{ formatCurrency(invoiceFee()) }}</span>
+            </div>
+            <div class="invoice-sub-row">
+              <span class="label">GST ({{ gstPercentage() }}%)</span>
+              <span class="value">{{ formatCurrency(invoiceGst()) }}</span>
+            </div>
+            
+            <div class="invoice-divider"></div>
+            
+            <div class="invoice-total-row">
               <span class="label">Total Paid</span>
               <span class="value grand-total">{{ formatCurrency(confirmedBooking()!.total_Amount) }}</span>
             </div>
@@ -90,6 +111,17 @@
       </div>
 
       <p class="qr-booking-id">Booking #{{ confirmedBooking()?.booking_Id }}</p>
+      
+      @if (confirmedBooking()?.qr_Code_Path) {
+        <button class="qr-download-btn" (click)="downloadQrCode(confirmedBooking()!.qr_Code_Path!, confirmedBooking()!.booking_Id)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Download QR
+        </button>
+      }
     </div>
   </div>
 }

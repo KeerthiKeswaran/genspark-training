@@ -166,6 +166,7 @@
                 <div class="form-group">
                   <label class="form-label" for="title">Event Title <span class="required">*</span></label>
                   <input type="text" id="title" class="form-control" name="title" [(ngModel)]="title" placeholder="e.g. Global Tech Summit 2026" required (ngModelChange)="saveDraft()" />
+                  @if (fieldError('title')) { <span class="field-error">{{ fieldError('title') }}</span> }
                 </div>
 
                 <div class="form-row-2">
@@ -177,6 +178,7 @@
                         <option [value]="cat">{{ cat }}</option>
                       }
                     </select>
+                    @if (fieldError('category')) { <span class="field-error">{{ fieldError('category') }}</span> }
                   </div>
 
                   <div class="form-group">
@@ -187,30 +189,40 @@
                         <option [value]="opt.key">{{ opt.display }}</option>
                       }
                     </select>
+                    @if (fieldError('ageCategory')) { <span class="field-error">{{ fieldError('ageCategory') }}</span> }
                   </div>
                 </div>
 
                 <div class="form-group">
                   <label class="form-label" for="description">Event Description <span class="required">*</span></label>
                   <textarea id="description" class="form-control" name="descriptionText" [(ngModel)]="descriptionText" placeholder="Describe your event in detail..." rows="6" required (ngModelChange)="saveDraft()"></textarea>
+                  @if (fieldError('description')) { <span class="field-error">{{ fieldError('description') }}</span> }
                 </div>
 
                 <div class="form-group">
                   <label class="form-label">Event Image (Optional)</label>
+                  @if (imageErrorMsg()) {
+                    <div class="alert alert-error" style="margin-bottom: 8px; padding: 8px; font-size: 0.9rem; color: #d32f2f; background-color: #fdeaea; border-radius: 4px;">{{ imageErrorMsg() }}</div>
+                  }
                   <div class="drop-zone" [class.drag-over]="isDragOver()" (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
-                    @if (imagePreviewUrl()) {
+                    @if (isImageProcessing()) {
+                      <div class="drop-zone-placeholder">
+                        <div class="spinner-border" style="width: 2rem; height: 2rem; margin-bottom: 10px; border: 3px solid #e2e8f0; border-top-color: #6366f1; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                        <span>Optimizing image...</span>
+                      </div>
+                    } @else if (imagePreviewUrl()) {
                       <div class="drop-zone-preview">
                         <img [src]="imagePreviewUrl()" alt="Preview" class="preview-img" />
-                        <button type="button" class="remove-image-btn" (click)="imageFile = null; imagePreviewUrl.set(null)">Remove</button>
+                        <button type="button" class="remove-image-btn" (click)="imageFile = null; imagePreviewUrl.set(null); imageErrorMsg.set(null)">Remove</button>
                       </div>
                     } @else {
                       <div class="drop-zone-placeholder">
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                         <span>Drag & drop your image here, or <label for="imageFile" class="browse-link" style="cursor: pointer;">browse</label></span>
-                        <span class="helper-text">Supported formats: JPG, PNG</span>
+                        <span class="helper-text">Supported formats: JPEG, PNG, WebP, GIF, BMP</span>
                       </div>
                     }
-                    <input type="file" id="imageFile" accept="image/jpeg,image/png" (change)="onImageSelected($event)" class="file-input-hidden" />
+                    <input type="file" id="imageFile" accept="image/jpeg,image/png,image/webp,image/gif,image/bmp" (change)="onImageSelected($event)" class="file-input-hidden" />
                   </div>
                 </div>
               </fieldset>
@@ -243,12 +255,51 @@
                 @if (eventType !== 'Virtual') {
                   <div class="form-group mt-3">
                     <label class="form-label" for="venue">Physical Venue <span class="required">*</span></label>
-                    <select id="venue" class="form-control" name="venueId" [(ngModel)]="venueId" (change)="onVenueChange()" required>
-                      <option value="" disabled selected>Select venue...</option>
-                      @for (v of venuesWithCapacity(); track v.venue_Id) {
-                        <option [value]="v.venue_Id">{{ v.name }} (Capacity: {{ v.capacity }})</option>
+                    <div class="custom-venue-dropdown" style="position: relative;">
+
+                      <!-- Selected venue chip shown above search when one is picked -->
+                      @if (venueId) {
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 8px 12px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 0.9rem; color: #1e40af; font-weight: 500;">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                          {{ getSelectedVenueName() }}
+                          <button type="button" (click)="venueId = null; venueSearchKeyword.set(''); onVenueChange()" style="margin-left: auto; background: none; border: none; cursor: pointer; color: #6b7280; font-size: 1rem; line-height: 1;">&#x2715;</button>
+                        </div>
                       }
-                    </select>
+
+                      <!-- Inline search bar — always visible -->
+                      <input
+                        type="text"
+                        class="form-control"
+                        [ngModel]="venueSearchKeyword()"
+                        (ngModelChange)="venueSearchKeyword.set($event)"
+                        [ngModelOptions]="{standalone: true}"
+                        placeholder="Find a venue by name, city, or capacity..."
+                        (focus)="isVenueDropdownOpen.set(true)"
+                        (click)="$event.stopPropagation(); isVenueDropdownOpen.set(true)"
+                        style="width: 100%;"
+                      />
+
+                      <!-- Dropdown list -->
+                      @if (isVenueDropdownOpen()) {
+                        <div class="dropdown-menu" style="position: absolute; top: 100%; left: 0; right: 0; z-index: 1000; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; margin-top: 4px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); overflow: hidden;">
+                          @if (isVenuesLoading()) {
+                            <div style="padding: 20px 12px; text-align: center; color: #64748b; font-size: 0.9rem;">Loading venues...</div>
+                          } @else {
+                            <div class="dropdown-list" style="max-height: 280px; overflow-y: auto;">
+                              @for (v of filteredVenues(); track v.venue_Id) {
+                                <div class="dropdown-item" (click)="selectVenue(v)" style="padding: 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: background 0.2s;" [style.backgroundColor]="v.venue_Id === venueId ? '#eff6ff' : 'transparent'" onmouseover="if(this.style.backgroundColor !== 'rgb(239, 246, 255)' && this.style.backgroundColor !== '#eff6ff') this.style.backgroundColor='#f8fafc'" onmouseout="if(this.style.backgroundColor !== 'rgb(239, 246, 255)' && this.style.backgroundColor !== '#eff6ff') this.style.backgroundColor='transparent'">
+                                  <div style="font-weight: 500; color: #0f172a; font-size: 0.95rem;">{{ v.name }}</div>
+                                  <div style="font-size: 0.85rem; color: #475569; margin-top: 4px;">{{ v.address }}{{ v.city ? ', ' + v.city : '' }}</div>
+                                  <div style="font-size: 0.85rem; color: #64748b; margin-top: 2px;">Total Capacity: <strong style="color: #0f172a;">{{ v.capacity }}</strong> seats</div>
+                                </div>
+                              } @empty {
+                                <div style="padding: 20px 12px; text-align: center; color: #64748b; font-size: 0.9rem;">No venues matched your search.</div>
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+                    </div>
                   </div>
                 }
 
@@ -267,15 +318,21 @@
                     
                     @if (requiresStaff && venueId && dateTime && durationHours) {
                       <div class="staff-result-box">
-                        <button type="button" class="btn-refresh-staff" (click)="calculateStaffEstimation()" title="Re-estimate Staff">
+                        <button type="button" class="btn-refresh-staff" [class.spinning]="isStaffCalculationLoading()" [disabled]="isStaffCalculationLoading()" (click)="calculateStaffEstimation()" title="Re-estimate Staff">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.92-10.26l5.58 5.58"/>
                           </svg>
                         </button>
                         @if (isStaffCalculationLoading()) {
-                          <div class="spinner-container">
-                            <span class="spinner"></span>
-                            <span>Calculating...</span>
+                          <div class="staff-skeleton-loading">
+                            <div class="staff-result-row">
+                              <span class="staff-result-label">Allocated Staff Count:</span>
+                              <div class="skeleton-line" style="width: 80px; height: 16px;"></div>
+                            </div>
+                            <div class="staff-result-row">
+                              <span class="staff-result-label">Staff Service Fee:</span>
+                              <div class="skeleton-line" style="width: 100px; height: 16px; animation-delay: 0.2s;"></div>
+                            </div>
                           </div>
                         } @else if (estimatedStaffCount() > 0) {
                           <div class="staff-result-row">
@@ -288,7 +345,7 @@
                           </div>
                         }
                         @if (staffErrorMsg()) {
-                          <p class="staff-error">{{ staffErrorMsg() }}</p>
+                          <p class="staff-error" style="margin-top: 8px;">{{ staffErrorMsg() }}</p>
                         }
                       </div>
                     }
@@ -307,23 +364,34 @@
                     }
                     @for (tier of ticketTiers; track tier.tierName) {
                       <div class="ticket-tier-setup-row">
-                        <label class="tier-enable-container">
-                          <input type="checkbox" name="tier_enable_{{tier.tierName}}" [(ngModel)]="tier.enabled" (ngModelChange)="saveDraft()" />
-                          <span class="tier-name-title">{{ tier.tierName }} Tier</span>
-                        </label>
+                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 12px; font-size: 1.05rem;">{{ tier.tierName }} Tier</div>
                         
-                        <div class="tier-inputs" [class.disabled]="!tier.enabled">
+                        <div class="tier-inputs">
                           <div class="tier-input-wrap">
-                            <label>Price (₹)</label>
-                            <input type="number" name="tier_price_{{tier.tierName}}" [(ngModel)]="tier.price" [disabled]="!tier.enabled" min="0" (ngModelChange)="saveDraft()" />
+                            <label>Price (₹) <span class="required">*</span></label>
+                            <input type="number" name="tier_price_{{tier.tierName}}" [(ngModel)]="tier.price" min="1" required (ngModelChange)="saveDraft()" />
                           </div>
                           <div class="tier-input-wrap">
-                            <label>Total Seats (Capacity)</label>
-                            <input type="number" name="tier_capacity_{{tier.tierName}}" [(ngModel)]="tier.capacity" [disabled]="!tier.enabled" min="1" (ngModelChange)="saveDraft()" />
+                            <label>Total Seats (Capacity) <span class="required">*</span></label>
+                            <input type="number" name="tier_capacity_{{tier.tierName}}" [(ngModel)]="tier.capacity" min="1" required (ngModelChange)="saveDraft()" readonly class="readonly-input" />
                           </div>
                         </div>
                       </div>
                     }
+
+                    <!-- 
+                    @if (isCapacityExceeded) {
+                      <div class="capacity-alert-inline">
+                        <strong>Capacity Exceeded:</strong> {{ totalAllocatedCapacity }} allocated &gt; {{ currentVenueCapacity }} max venue seats. Reduce tier capacities.
+                      </div>
+                    }
+                    @if (isCapacityUnderutilized) {
+                      <div class="capacity-info-inline">
+                        <strong>Note:</strong> You have only allocated {{ totalAllocatedCapacity }} out of {{ currentVenueCapacity }} available seats in this venue. The remaining {{ currentVenueCapacity - totalAllocatedCapacity }} seats will not be sold.
+                      </div>
+                    }
+                    -->
+                    @if (fieldError('tiers')) { <span class="field-error">{{ fieldError('tiers') }}</span> }
                   </div>
                 </fieldset>
               }
@@ -353,7 +421,7 @@
                       </div>
                     }
                     <div class="summary-row">
-                      <span>GST 18%:</span>
+                      <span>GST {{ platformSettings()?.gsT_Percentage ?? platformSettings()?.GST_Percentage ?? 18 }}%:</span>
                       <span>₹{{ gstAmount | number:'1.2-2' }}</span>
                     </div>
                     <div class="summary-divider"></div>
@@ -380,7 +448,7 @@
                 </div>
 
                 <!-- Submit & Proceed Button -->
-                <button type="submit" class="btn btn-primary btn-checkout" [disabled]="!acceptPolicy">
+                <button type="submit" class="btn btn-primary btn-checkout" [disabled]="!acceptPolicy || isCapacityExceeded">
                   Checkout
                 </button>
               </div>
@@ -418,6 +486,25 @@
             </div>
           </div>
         }
+      </div>
+    }
+
+    <!-- Stripe Cancellation Modal -->
+    @if (showStripeCancelModal()) {
+      <div class="modal-overlay">
+        <div class="modal-content review-modal">
+          <div class="modal-header">
+            <h3>Payment Incomplete</h3>
+          </div>
+          <div class="modal-body">
+            <p style="margin-bottom: 12px; color: #1e293b; font-size: 0.95rem; line-height: 1.5;">You returned from the payment gateway without completing the transaction. Do you wish to discard this event completely, or keep your form data to try again?</p>
+            <p style="font-size: 0.85rem; color: #64748b;">If you try again, a new payment session will be generated.</p>
+          </div>
+          <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end;">
+            <button class="btn btn-secondary" (click)="onKeepStripeDraft()" [disabled]="isRevertingEvent()">Keep my draft</button>
+            <button class="btn btn-primary" style="background-color: #ef4444; border-color: #dc2626; color: white;" (click)="onConfirmStripeCancel()" [disabled]="isRevertingEvent()">Yes, discard event</button>
+          </div>
+        </div>
       </div>
     }
 

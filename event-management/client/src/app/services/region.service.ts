@@ -6,17 +6,25 @@ import { AppStoreService } from '../store/app-store.service';
 import { ActionTypes } from '../store/actions/app.actions';
 import { RegionModel } from '../models/region.model';
 import { RegionPopularResponse } from '../models/event.model';
+import { environment } from '../../environments/environment';
+
 
 @Injectable({
   providedIn: 'root'
 })
 export class RegionService {
-  private readonly baseUrl = 'http://localhost:5106/api';
+  private readonly baseUrl = environment.apiUrl;
 
   constructor(
     private http: HttpClient,
     private store: AppStoreService
   ) {}
+
+  private extractArray(data: any): any[] {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    return data.$values || data.items || data.Items || [];
+  }
 
   // GET /api/regions
   // Returns: RegionResponse[] → { Region_Id, Region_Name, No_Of_Staffs }
@@ -26,7 +34,7 @@ export class RegionService {
 
     return this.http.get<any[]>(`${this.baseUrl}/regions`).pipe(
       map((regions) =>
-        regions.map(r => ({
+        this.extractArray(regions).map(r => ({
           region_Id: r.region_Id,
           name: r.region_Name
         }))
@@ -55,7 +63,7 @@ export class RegionService {
     const params = rankNumber ? `?rankNumber=${rankNumber}` : '';
     return this.http.get<any[]>(`${this.baseUrl}/regions/popular${params}`).pipe(
       map((regions) =>
-        regions.map(r => ({
+        this.extractArray(regions).map(r => ({
           region_Id: r.region_Id,
           region_Name: r.region_Name,
           no_Of_Staffs: r.no_Of_Staffs

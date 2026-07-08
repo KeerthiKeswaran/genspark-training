@@ -4,50 +4,78 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { BookingService } from '../../services/booking.service';
+import { EventService } from '../../services/event.service';
 import { BookingModel, BookingDetail } from '../../models/booking.model';
 import { NavbarComponent } from '../home/navbar/navbar';
 import { FooterComponent } from '../home/footer/footer';
 import { CancelBookingModalComponent } from './cancel-booking-modal/cancel-booking-modal';
+import { ReportEventModalComponent } from '../shared/report-event-modal/report-event-modal';
+import { environment } from '../../../environments/environment';
 
-type FilterStatus = 'All' | 'Confirmed' | 'Pending' | 'Cancelled';
+
+type FilterStatus = 'Upcoming' | 'Completed' | 'Cancelled';
 
 @Component({
   selector: 'app-bookings',
   standalone: true,
-  imports: [CommonModule, FormsModule, NavbarComponent, FooterComponent, CancelBookingModalComponent],
+  imports: [CommonModule, FormsModule, NavbarComponent, FooterComponent, CancelBookingModalComponent, ReportEventModalComponent],
   templateUrl: './bookings.html',
   styleUrl: './bookings.css'
 })
 export class BookingsComponent implements OnInit, OnDestroy {
   public bookings = signal<BookingModel[]>([]);
-  public selectedFilter = signal<FilterStatus>('Confirmed');
+  public selectedFilter = signal<FilterStatus>('Upcoming');
   public isLoading = signal(false);
 
   // QR Modal state
   public activeQrBooking = signal<BookingModel | null>(null);
+  public activeReportBooking = signal<BookingModel | null>(null);
+
+  // -- Feedback State --
+  private feedbackDrafts = signal<Record<number, { rating: number; review: string }>>({});
+  public isSubmittingFeedback = signal<number | null>(null);
+  public showFeedbackSuccess = signal<number | null>(null);
   public showQrModal = signal(false);
 
   // Cancellation modal state
   public showCancelModal = signal(false);
   public bookingToCancel = signal<BookingModel | null>(null);
 
-  // Feedback modal state
-  public showFeedbackModal = signal(false);
-  public activeFeedbackBooking = signal<BookingModel | null>(null);
-  public feedbackRating = signal<number>(0);
-  public feedbackReview = signal<string>('');
+
+
+
+  public virtualLinkMsgBookingId = signal<number | null>(null);
+
+  // Report modal state
+  public showReportModal = signal(false);
+  public activeReportEventId = signal<number>(0);
+  public activeReportEventTitle = signal<string>('');
 
   private subscriptions = new Subscription();
 
   // Computed signals for filtering
   public filteredBookings = computed(() => {
-    const list = this.bookings();
+    let list = this.bookings();
     const filter = this.selectedFilter();
-    return list.filter(b => b.booking_Status === filter);
+    
+    if (filter === 'Upcoming') {
+      list = list.filter(b => b.booking_Status === 'Confirmed' && b.event_Status !== 'Completed');
+    } else if (filter === 'Completed') {
+      list = list.filter(b => b.booking_Status === 'Confirmed' && b.event_Status === 'Completed');
+    } else if (filter === 'Cancelled') {
+      list = list.filter(b => b.booking_Status === 'Cancelled');
+    }
+
+    // Sort newest first
+    return [...list].sort((a, b) => new Date(b.created_At).getTime() - new Date(a.created_At).getTime());
   });
 
   public confirmedCount = computed(() =>
-    this.bookings().filter(b => b.booking_Status === 'Confirmed').length
+    this.bookings().filter(b => b.booking_Status === 'Confirmed' && b.event_Status !== 'Completed').length
+  );
+
+  public completedCount = computed(() =>
+    this.bookings().filter(b => b.booking_Status === 'Confirmed' && b.event_Status === 'Completed').length
   );
 
   public cancelledCount = computed(() =>
@@ -56,6 +84,7 @@ export class BookingsComponent implements OnInit, OnDestroy {
 
   constructor(
     private bookingService: BookingService,
+    private eventService: EventService,
     private router: Router
   ) {}
 
@@ -65,7 +94,7 @@ export class BookingsComponent implements OnInit, OnDestroy {
       return url;
     }
     const cleanUrl = url.startsWith('/') ? url : '/' + url;
-    return `http://localhost:5106${cleanUrl}`;
+    return `${environment.serverUrl}${cleanUrl}`;
   }
 
   ngOnInit(): void {
@@ -127,7 +156,29 @@ export class BookingsComponent implements OnInit, OnDestroy {
     this.activeQrBooking.set(null);
   }
 
+  public downloadQrCode(url: string, bookingId: number | undefined): void {
+    if (!url) return;
+    const bid = bookingId || 'ticket';
+    fetch(url)
+      .then(response => response.blob())
+      .then(blob => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `Booking_${bid}_QR.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      })
+      .catch(err => {
+        console.error('Error downloading QR code', err);
+        window.open(url, '_blank');
+      });
+  }
+
   // ── Cancellation Modal ───────────────────────────────────
+
+  public cancellingBookingId = signal<number | null>(null);
+  public cancelledAnimationId = signal<number | null>(null);
 
   public openCancelModal(booking: BookingModel): void {
     this.bookingToCancel.set(booking);
@@ -139,66 +190,99 @@ export class BookingsComponent implements OnInit, OnDestroy {
     this.bookingToCancel.set(null);
   }
 
-  /** Called by CancelBookingModalComponent (cancelled) output */
-  public onBookingCancelled(updatedBooking: BookingModel): void {
+  /** Called by CancelBookingModalComponent (cancelled) output after animation */
+  public onBookingCancelled(booking: BookingModel): void {
     const updated = this.bookings().map(b =>
-      b.booking_Id === updatedBooking.booking_Id ? updatedBooking : b
+      b.booking_Id === booking.booking_Id ? { ...b, booking_Status: 'Cancelled' as const, checkIn_Status: 'Missed' as const } : b
     );
     this.bookings.set(updated);
   }
 
-  // ── Feedback Modal ───────────────────────────────────────
+  // ── Feedback (Inline) ──────────────────────────────────────────────────
 
-  public openFeedbackModal(booking: BookingModel): void {
-    this.activeFeedbackBooking.set(booking);
-    this.feedbackRating.set(0);
-    this.feedbackReview.set('');
-    this.showFeedbackModal.set(true);
+  public getFeedbackDraft(bookingId: number) {
+    return this.feedbackDrafts()[bookingId];
   }
 
-  public closeFeedbackModal(): void {
-    this.showFeedbackModal.set(false);
-    this.activeFeedbackBooking.set(null);
-    this.feedbackRating.set(0);
-    this.feedbackReview.set('');
-  }
-
-  public setFeedbackRating(star: number): void {
-    this.feedbackRating.set(star);
-  }
-
-  public submitFeedback(): void {
-    const booking = this.activeFeedbackBooking();
-    if (!booking) return;
-
-    console.log('Submitting feedback for event ID:', booking.event_Id, {
-      rating: this.feedbackRating(),
-      review: this.feedbackReview()
+  public setFeedbackRating(bookingId: number, rating: number) {
+    const current = this.feedbackDrafts();
+    this.feedbackDrafts.set({
+      ...current,
+      [bookingId]: { ...current[bookingId], rating }
     });
+  }
 
-    // API call to POST api/event/{eventId}/feedback:
-    this.bookingService.submitEventFeedback(booking.event_Id, {
-      rating: this.feedbackRating(),
-      review: this.feedbackReview()
-    }).subscribe({
+  public setFeedbackReview(bookingId: number, review: string) {
+    const current = this.feedbackDrafts();
+    this.feedbackDrafts.set({
+      ...current,
+      [bookingId]: { ...current[bookingId], review }
+    });
+  }
+
+  public submitFeedback(booking: BookingModel) {
+    const draft = this.getFeedbackDraft(booking.booking_Id);
+    if (!draft || !draft.rating || !draft.review.trim()) return;
+
+    this.isSubmittingFeedback.set(booking.booking_Id);
+    
+    this.eventService.submitFeedback(booking.event_Id, draft.rating, draft.review).subscribe({
       next: () => {
-        alert('Thank you for your feedback!');
-        this.closeFeedbackModal();
+        this.isSubmittingFeedback.set(null);
+        this.showFeedbackSuccess.set(booking.booking_Id);
+        
+        // Update local booking state so inputs gray out
+        this.bookings.update(list => list.map(b => 
+          b.booking_Id === booking.booking_Id 
+            ? { ...b, feedback_Rating: draft.rating, feedback_Review: draft.review }
+            : b
+        ));
+
+        // Hide success animation after 1 second
+        setTimeout(() => {
+          if (this.showFeedbackSuccess() === booking.booking_Id) {
+            this.showFeedbackSuccess.set(null);
+          }
+        }, 1000);
       },
-      error: (err) => {
-        console.error('Failed to submit feedback', err);
-        alert(err?.error?.message || 'Failed to submit feedback.');
+      error: () => {
+        this.isSubmittingFeedback.set(null);
+        alert('Failed to submit feedback.');
       }
     });
   }
 
-  // ── Utilities ────────────────────────────────────────────
+  public openReportModal(booking: BookingModel): void {
+    if (booking.has_Reported === null) {
+      this.router.navigate(['/login']);
+      return;
+    }
+    this.activeReportEventId.set(booking.event_Id);
+    this.activeReportEventTitle.set(booking.event_Title);
+    this.showReportModal.set(true);
+  }
 
-  public joinMeeting(url?: string): void {
+  public hasReported(eventId: number): boolean {
+    if (typeof window === 'undefined') return false;
+    const bk = this.bookings().find(b => b.event_Id === eventId);
+    if (bk && bk.has_Reported === true) return true;
+    const reported = JSON.parse(localStorage.getItem('reportedEvents') || '[]');
+    return reported.includes(eventId);
+  }
+
+  // ── Utils ──────────────────────────────────────────────────
+
+  public joinMeeting(booking: BookingModel): void {
+    const url = booking.virtual_Url;
     if (url && url !== 'Disabled') {
       window.open(url, '_blank');
     } else {
-      alert('Virtual meeting link is not active yet (only enabled during event timing) or the event has ended.');
+      this.virtualLinkMsgBookingId.set(booking.booking_Id);
+      setTimeout(() => {
+        if (this.virtualLinkMsgBookingId() === booking.booking_Id) {
+          this.virtualLinkMsgBookingId.set(null);
+        }
+      }, 3000);
     }
   }
 

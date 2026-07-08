@@ -5,43 +5,53 @@ import { map } from 'rxjs/operators';
 import { AppStoreService } from '../store/app-store.service';
 import { ActionTypes } from '../store/actions/app.actions';
 import { BrowsedEventResponse, PagedResult } from '../models/event.model';
+import { environment } from '../../environments/environment';
+
 
 @Injectable({
   providedIn: 'root'
 })
 export class EventService {
-  private readonly baseUrl = 'http://localhost:5106/api';
+  private readonly baseUrl = environment.apiUrl;
 
   constructor(
     private http: HttpClient,
     private store: AppStoreService
   ) {}
 
+  private extractArray(data: any): any[] {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    return data.$values || data.items || data.Items || [];
+  }
+
   // Helper to map a raw server BrowsedEventResponse (PascalCase) to client model (camelCase)
   private mapEvent(ev: any): BrowsedEventResponse {
-    const tiers: any[] = ev.ticketTiers || ev.TicketTiers || [];
+    const tiers: any[] = this.extractArray(ev.ticketTiers || ev.TicketTiers);
     const minPrice = tiers.length > 0
       ? Math.min(...tiers.map((t: any) => t.price ?? t.Price ?? 0))
       : undefined;
 
     const mapped: BrowsedEventResponse = {
-      event_Id: ev.event_Id ?? ev.Event_Id,
-      event_Type: ev.event_Type ?? ev.Event_Type ?? '',
+      event_Id: ev.event_Id ?? ev.Event_Id ?? ev.eventId,
+      event_Type: ev.event_Type ?? ev.Event_Type ?? ev.eventType ?? '',
       title: ev.title ?? ev.Title ?? '',
       category: ev.category ?? ev.Category,
-      description_Url: ev.description_Url ?? ev.Description_Url,
-      image_Url: this.resolveImageUrl(ev.image_Url ?? ev.Image_Url),
-      date_Time: ev.date_Time ?? ev.Date_Time ?? '',
-      duration_Hours: ev.duration_Hours ?? ev.Duration_Hours ?? 0,
-      venue_Name: ev.venue_Name ?? ev.Venue_Name,
-      venue_Region_Name: ev.venue_Region_Name ?? ev.Venue_Region_Name,
-      region_Id: ev.region_Id ?? ev.Region_Id,
+      description_Url: ev.description_Url ?? ev.Description_Url ?? ev.descriptionUrl,
+      image_Url: this.resolveImageUrl(ev.image_Url ?? ev.Image_Url ?? ev.imageUrl),
+      date_Time: ev.date_Time ?? ev.Date_Time ?? ev.dateTime ?? '',
+      duration_Hours: ev.duration_Hours ?? ev.Duration_Hours ?? ev.durationHours ?? 0,
+      venue_Name: ev.venue?.name ?? ev.Venue?.Name ?? ev.venue_Name ?? ev.Venue_Name ?? ev.venueName,
+      venue_Region_Name: ev.venue?.region_Name ?? ev.Venue?.Region_Name ?? ev.venue_Region_Name ?? ev.Venue_Region_Name ?? ev.venueRegionName,
+      region_Id: ev.venue?.region_Id ?? ev.Venue?.Region_Id ?? ev.region_Id ?? ev.Region_Id ?? ev.regionId,
       status: ev.status ?? ev.Status,
-      organizer_Name: ev.organizer_Name ?? ev.Organizer_Name,
+      organizer_Name: ev.organizer?.name ?? ev.Organizer?.Name ?? ev.organizer_Name ?? ev.Organizer_Name ?? ev.organizerName,
+      organizer_Email: ev.organizer?.email ?? ev.Organizer?.Email ?? ev.organizer_Email ?? ev.Organizer_Email ?? ev.organizerEmail,
       ticketTiers: tiers.map((t: any) => ({
-        tier_Name: t.tier_Name ?? t.Tier_Name ?? '',
+        tier_Name: t.tier_Name ?? t.Tier_Name ?? t.tierName ?? '',
         price: t.price ?? t.Price ?? 0,
-        tickets_Sold: t.tickets_Sold ?? t.Tickets_Sold ?? 0
+        tickets_Sold: t.tickets_Sold ?? t.Tickets_Sold ?? t.ticketsSold ?? 0,
+        capacity: t.capacity ?? t.Capacity
       })),
       minPrice
     };
@@ -56,6 +66,9 @@ export class EventService {
     keyword?: string;
     category?: string;
     regionId?: string;
+    format?: string;
+    maxPrice?: number;
+    sortBy?: string;
     page?: number;
     size?: number;
   }): Observable<PagedResult<BrowsedEventResponse>> {
@@ -65,18 +78,22 @@ export class EventService {
     if (params.keyword)  httpParams = httpParams.set('keyword', params.keyword);
     if (params.category) httpParams = httpParams.set('category', params.category);
     if (params.regionId) httpParams = httpParams.set('regionId', params.regionId);
+    if (params.format)   httpParams = httpParams.set('format', params.format);
+    if (params.maxPrice) httpParams = httpParams.set('maxPrice', String(params.maxPrice));
+    if (params.sortBy)   httpParams = httpParams.set('sortBy', params.sortBy);
     httpParams = httpParams.set('page', String(params.page ?? 1));
     httpParams = httpParams.set('size', String(params.size ?? 24));
 
     return this.http.get<any>(`${this.baseUrl}/Event`, { params: httpParams }).pipe(
       map((res) => {
-        const mapped: BrowsedEventResponse[] = (res.items ?? res.Items ?? []).map((ev: any) => this.mapEvent(ev));
+        const mapped: BrowsedEventResponse[] = this.extractArray(res.items ?? res.Items).map((ev: any) => this.mapEvent(ev));
         return {
           items: mapped,
           totalCount: res.totalCount ?? res.TotalCount ?? 0,
           page: res.page ?? res.Page ?? 1,
           pageSize: res.pageSize ?? res.PageSize ?? (params.size ?? 24),
-          totalPages: res.totalPages ?? res.TotalPages ?? 1
+          totalPages: res.totalPages ?? res.TotalPages ?? 1,
+          maxPrice: res.maxPrice ?? res.MaxPrice ?? 0
         } as PagedResult<BrowsedEventResponse>;
       }),
       tap((result) => {
@@ -104,7 +121,7 @@ export class EventService {
     if (count) httpParams = httpParams.set('count', String(count));
 
     return this.http.get<any[]>(`${this.baseUrl}/Event/trending`, { params: httpParams }).pipe(
-      map((events) => events.map(ev => this.mapEvent(ev))),
+      map((events) => this.extractArray(events).map(ev => this.mapEvent(ev))),
       tap((mapped) => {
         this.store.dispatch({
           type: ActionTypes.LOAD_TRENDING_SUCCESS,
@@ -127,7 +144,7 @@ export class EventService {
     this.store.dispatch({ type: ActionTypes.LOAD_RECOMMENDED_START });
 
     return this.http.get<any[]>(`${this.baseUrl}/Event/recommended`).pipe(
-      map((events) => events.map(ev => this.mapEvent(ev))),
+      map((events) => this.extractArray(events).map(ev => this.mapEvent(ev))),
       tap((mapped) => {
         this.store.dispatch({
           type: ActionTypes.LOAD_RECOMMENDED_SUCCESS,
@@ -151,7 +168,7 @@ export class EventService {
     if (regionsLimit) httpParams = httpParams.set('regionsLimit', String(regionsLimit));
 
     return this.http.get<any[]>(`${this.baseUrl}/Event/popular`, { params: httpParams }).pipe(
-      map((events) => events.map(ev => this.mapEvent(ev)))
+      map((events) => this.extractArray(events).map(ev => this.mapEvent(ev)))
     );
   }
 
@@ -164,7 +181,7 @@ export class EventService {
       .set('size', '5');
 
     return this.http.get<any>(`${this.baseUrl}/Event`, { params: httpParams }).pipe(
-      map((res) => (res.items ?? res.Items ?? []).map((ev: any) => this.mapEvent(ev)))
+      map((res) => this.extractArray(res.items ?? res.Items).map((ev: any) => this.mapEvent(ev)))
     );
   }
 
@@ -230,8 +247,8 @@ export class EventService {
   }
 
   // POST /api/event/{eventId}/create-checkout-session
-  public createCheckoutSession(eventId: number, successUrl: string, cancelUrl: string): Observable<{ sessionId: string, sessionUrl: string }> {
-    return this.http.post<{ sessionId: string, sessionUrl: string }>(`${this.baseUrl}/Event/${eventId}/create-checkout-session`, {
+  public createCheckoutSession(eventId: number, successUrl: string, cancelUrl: string): Observable<{ sessionId: string, clientSecret: string, createdAtUTC: string }> {
+    return this.http.post<{ sessionId: string, clientSecret: string, createdAtUTC: string }>(`${this.baseUrl}/Event/${eventId}/create-checkout-session`, {
       successUrl,
       cancelUrl
     });
@@ -269,15 +286,35 @@ export class EventService {
     return this.http.post<any>(`${this.baseUrl}/Event/${eventId}/revert`, {});
   }
 
-  /**
-   * Helper to resolve relative assets/images URLs to absolute backend URLs.
-   */
+  // PUT /api/event/{eventId}/details  [Authenticated]
+  public updateEventDetails(eventId: number, data: { title?: string; description_Url?: string }): Observable<any> {
+    return this.http.put<any>(`${this.baseUrl}/Event/${eventId}/details`, data);
+  }
+
+  // POST /api/Event/{eventId}/report
+  public reportEvent(eventId: number, reason: string): Observable<any> {
+    return this.http.post(`${this.baseUrl}/Event/${eventId}/report`, { reason });
+  }
+
+  // GET /api/event/{eventId}/seats [AllowAnonymous]
+  public getEventSeats(eventId: number): Observable<any[]> {
+    return this.http.get<any>(`${this.baseUrl}/Event/${eventId}/seats`).pipe(
+      map(res => this.extractArray(res))
+    );
+  }
+
+  // POST /api/Event/{eventId}/feedback
+  public submitFeedback(eventId: number, rating: number, review: string): Observable<any> {
+    return this.http.post(`${this.baseUrl}/Event/${eventId}/feedback`, { rating, review });
+  }
+
+  // Helper method used above
   public resolveImageUrl(url: string | null | undefined): string | undefined {
     if (!url) return undefined;
     if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
       return url;
     }
     const cleanUrl = url.startsWith('/') ? url : '/' + url;
-    return `http://localhost:5106${cleanUrl}`;
+    return `${environment.serverUrl}${cleanUrl}`;
   }
 }

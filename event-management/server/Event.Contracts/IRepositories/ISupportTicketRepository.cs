@@ -8,5 +8,6 @@ namespace Event.Contracts.IRepositories
     {
         Task<IEnumerable<SupportTicket>> GetTicketsByUserIdAsync(int userId);
         Task<IEnumerable<SupportTicket>> GetPendingTicketsAsync();
+        Task<IEnumerable<SupportTicket>> GetAllWithUsersAsync();
     }
 }

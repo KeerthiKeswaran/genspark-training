@@ -39,16 +39,19 @@
 .cancel-modal {
   background: var(--bg-canvas);
   border-radius: 22px;
-  padding: 36px 40px;
+  padding: 48px 40px;
   max-width: 560px;         /* ← increased from 480px */
   width: 100%;
   min-height: 420px;        /* ← ensures comfortable height */
   box-shadow: var(--shadow-lg);
   position: relative;
   animation: slideUpModal 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.cancel-content-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 32px;
 }
 
 @keyframes slideUpModal {
@@ -244,10 +247,10 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: #ef4444;
+  background: #8b0000;
   border: none;
   color: #fff;
-  padding: 11px 28px;
+  padding: 10px 24px;
   border-radius: var(--radius-sm);
   font-size: 13.5px;
   font-weight: 700;
@@ -255,11 +258,12 @@
   transition: var(--transition);
   letter-spacing: 0.1px;
   white-space: nowrap;
+  width: fit-content;
+  margin: 0;
 }
 
 .cancel-modal-btn-confirm:hover:not(:disabled) {
-  background: #dc2626;
-  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.32);
+  background: #7a0016;
   transform: translateY(-1px);
 }
 
@@ -285,7 +289,6 @@
   to { transform: rotate(360deg); }
 }
 
-/* ── Responsive ── */
 @media (max-width: 600px) {
   .cancel-modal {
     padding: 28px 22px;
@@ -293,3 +296,111 @@
   }
 }
 
+/* ──────────────────────────────────────────────────────────
+   IN-MODAL OVERLAY ANIMATION
+   ────────────────────────────────────────────────────────── */
+
+.success-tick-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.75);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  animation: fadeInOverlay 0.3s ease-out;
+}
+
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.success-checkmark-svg-wrap {
+  width: 60px;
+  height: 60px;
+}
+
+.checkmark-svg {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: block;
+  stroke-width: 4;
+  stroke: #000;
+  stroke-miterlimit: 10;
+  box-shadow: inset 0px 0px 0px #000;
+  animation: fillCheckmarkCancel .4s ease-in-out .4s forwards, scaleCheckmarkCancel .3s ease-in-out .9s alternate both;
+}
+
+.checkmark-circle {
+  stroke-dasharray: 166;
+  stroke-dashoffset: 166;
+  stroke-width: 4;
+  stroke-miterlimit: 10;
+  stroke: #000;
+  fill: none;
+  animation: strokeCheckmarkCancel 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.checkmark-check {
+  transform-origin: 50% 50%;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  stroke: #fff;
+  animation: strokeCheckmarkCancel 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+}
+
+@keyframes strokeCheckmarkCancel {
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes fillCheckmarkCancel { 100% { box-shadow: inset 0px 0px 0px 30px #000; } }
+@keyframes scaleCheckmarkCancel {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+@keyframes modalScaleUp {
+  0% { transform: scale(0.8); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-confirm-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #000;
+  opacity: 0;
+  animation: fadeInUpCancel .5s cubic-bezier(0.25, 0.8, 0.25, 1) .2s forwards;
+}
+
+@keyframes fadeInUpCancel {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.success-text {
+  margin-top: 16px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #000;
+  opacity: 0;
+  animation: fadeInUpCancel 0.4s cubic-bezier(0.25, 0.8, 0.25, 1) 0.8s forwards;
+}
+.cancel-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+}
+
+.modal-success-animation {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}

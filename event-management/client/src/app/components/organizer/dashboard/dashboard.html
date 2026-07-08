@@ -38,17 +38,22 @@
       <!-- Metrics Grid -->
       <div class="metrics-grid">
         <div class="metric-card">
-          <span class="metric-label">Total Events</span>
-          <span class="metric-number">{{ totalEvents() }}</span>
+          <span class="metric-label">Live Events</span>
+          <span class="metric-number">{{ liveEventsCount() }}</span>
         </div>
 
         <div class="metric-card">
-          <span class="metric-label">Tickets Sold</span>
-          <span class="metric-number">{{ ticketsSold() | number }}</span>
+          <span class="metric-label">Completed Events</span>
+          <span class="metric-number">{{ completedEventsCount() }}</span>
         </div>
 
-        <div class="metric-card accent">
-          <span class="metric-label">Net Earnings</span>
+        <div class="metric-card">
+          <span class="metric-label">Total Tickets Sold</span>
+          <span class="metric-number">{{ ticketsSold() }}</span>
+        </div>
+
+        <div class="metric-card">
+          <span class="metric-label">Total Earnings</span>
           <span class="metric-number">₹{{ netEarnings() | number:'1.2-2' }}</span>
         </div>
       </div>
@@ -67,7 +72,7 @@
         } @else {
           <div class="upcoming-list">
             @for (event of upcomingEvents(); track event.event_Id) {
-              <div class="upcoming-item-card">
+              <div class="upcoming-item-card" (click)="openEventModal(event)" style="cursor: pointer;">
                 <div class="item-header">
                   <div class="item-title-group">
                     <span class="item-title">{{ event.title }}</span>
@@ -99,5 +104,13 @@
     }
   </div>
 </div>
+
+@if (selectedEvent()) {
+  <app-event-details-modal 
+    [event]="selectedEvent()" 
+    (close)="closeEventModal()"
+    (updated)="refreshEventDetails()">
+  </app-event-details-modal>
+}
 
 <app-footer></app-footer>

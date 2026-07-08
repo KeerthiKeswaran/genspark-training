@@ -20,6 +20,35 @@ namespace Event.API.Controllers
             _financeService = financeService;
         }
 
+        [HttpGet("search")]
+        public async Task<IActionResult> SearchGlobal([FromQuery] string keyword, [FromServices] IAdminService adminService)
+        {
+            try
+            {
+                var result = await adminService.SearchGlobalAsync(keyword);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpGet("related-entity/{type}/{id:int}")]
+        public async Task<IActionResult> GetRelatedEntity(string type, int id, [FromServices] IAdminService adminService)
+        {
+            try
+            {
+                var entity = await adminService.GetRelatedEntityAsync(type, id);
+                if (entity == null) return NotFound(new { Message = "Related entity not found." });
+                return Ok(entity);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
         [HttpGet("actions")]
         public async Task<IActionResult> GetAdminActions()
         {
@@ -149,6 +178,38 @@ namespace Event.API.Controllers
                     page,
                     size);
                 return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpGet("dashboard-stats")]
+        public async Task<IActionResult> GetDashboardStats()
+        {
+            try
+            {
+                var stats = await _financeService.GetDashboardStatsAsync();
+                return Ok(stats);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpGet("payouts")]
+        public async Task<IActionResult> GetOrganizerPayouts(
+            [FromQuery] string? status,
+            [FromQuery] string? sortBy,
+            [FromQuery] int page = 1,
+            [FromQuery] int size = 10)
+        {
+            try
+            {
+                var payouts = await _financeService.GetOrganizerPayoutsPagedAsync(status, sortBy, page, size);
+                return Ok(payouts);
             }
             catch (Exception ex)
             {

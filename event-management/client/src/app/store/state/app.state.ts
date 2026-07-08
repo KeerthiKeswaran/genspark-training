@@ -29,7 +29,7 @@ export interface AppState {
 export const initialAppState: AppState = {
   auth: {
     user: null,
-    token: typeof window !== 'undefined' ? localStorage.getItem('token') : null,
+    token: typeof window !== 'undefined' ? localStorage.getItem('user_token') || localStorage.getItem('admin_token') || localStorage.getItem('finance_token') : null,
     loading: false,
     error: null,
   },

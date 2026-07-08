@@ -72,5 +72,16 @@ namespace Event.API.Controllers
             var message = await _userAuthService.ResetUserPasswordAsync(request.Email, request.Otp, request.NewPassword);
             return Ok(new { Message = message });
         }
+
+        [AllowAnonymous]
+        [HttpGet("check-email")]
+        public async Task<IActionResult> CheckEmail([FromQuery] string email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                return BadRequest(new { Message = "Email is required." });
+
+            var exists = await _userAuthService.CheckEmailExistsAsync(email);
+            return Ok(new { Exists = exists });
+        }
     }
 }

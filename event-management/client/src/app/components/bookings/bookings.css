@@ -154,6 +154,7 @@
 }
 
 .booking-card {
+  position: relative;
   background: var(--bg-canvas);
   border-radius: var(--radius);
   border: 1px solid var(--border);
@@ -216,11 +217,11 @@
 
 /* Card Content Info */
 .booking-info {
-  padding: 24px 28px;
+  padding: 20px 28px 16px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
 }
 
 .booking-card-header {
@@ -256,9 +257,10 @@
   letter-spacing: 0.5px;
 }
 
-.status-confirmed { background: rgba(37, 99, 235, 0.1); color: #2563eb; } /* Steel Blue */
-.status-pending   { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
-.status-cancelled { background: rgba(156, 163, 175, 0.15); color: #6b7280; }
+.status-confirmed  { background: rgba(37, 99, 235, 0.1); color: #2563eb; }  /* Steel Blue */
+.status-completed  { background: rgba(5, 150, 105, 0.1); color: #059669; }  /* Emerald Green */
+.status-pending    { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+.status-cancelled  { background: rgba(156, 163, 175, 0.15); color: #6b7280; }
 
 .booking-type-badge-inline {
   font-size: 11px;
@@ -275,9 +277,10 @@
 
 /* Metadata Grid */
 .booking-meta-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 10px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 24px;
+  row-gap: 12px;
 }
 
 .meta-item {
@@ -294,7 +297,7 @@
 }
 
 .meta-item.location {
-  grid-column: span 2;
+  flex-basis: 100%;
 }
 
 /* Footer Section with Totals */
@@ -340,6 +343,14 @@
   color: var(--accent);
 }
 
+.refunded-amount {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--accent);
+}
+
 /* Actions Row */
 .booking-actions {
   display: flex;
@@ -376,6 +387,68 @@
   border: 1.5px solid transparent;
   color: #fff;
 }
+
+/* ──────────────────────────────────────────────────────────
+   Cancellation States & Overlays
+   ────────────────────────────────────────────────────────── */
+
+.booking-card.is-cancelling {
+  opacity: 0.6;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.booking-card.is-animating {
+  pointer-events: none;
+}
+
+.cancellation-overlay-animation {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.7); /* Slightly transparent background */
+  z-index: 10;
+  border-radius: var(--radius);
+  backdrop-filter: blur(2px);
+}
+
+.stamp-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cancel-stamp {
+  font-size: 48px;
+  font-weight: 900;
+  color: #8b0000;
+  border: 8px solid #8b0000;
+  padding: 10px 30px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  transform: rotate(-15deg) scale(2);
+  opacity: 0;
+  animation: stampIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes stampIn {
+  0% {
+    transform: rotate(-15deg) scale(2);
+    opacity: 0;
+  }
+  100% {
+    transform: rotate(-15deg) scale(1);
+    opacity: 1;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────
+   QR Modal (Existing)
+   ────────────────────────────────────────────────────────── */
 
 .action-btn.join-meeting:hover {
   background: #4f46e5;
@@ -564,6 +637,29 @@
   word-break: break-all;
 }
 
+.qr-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border);
+  color: var(--text-primary);
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-top: 12px;
+}
+
+.qr-download-btn:hover {
+  background: var(--accent-light);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 /* --- Responsive Adjustments --- */
 @media (max-width: 860px) {
   .booking-card {
@@ -739,3 +835,283 @@
   background: var(--accent);
   color: #ffffff;
 }
+
+.join-meeting-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.virtual-link-flag {
+  position: absolute;
+  bottom: 110%; /* Pop out above the button */
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text-primary);
+  color: var(--bg-canvas);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--shadow-md);
+  z-index: 10;
+  animation: popInFlag 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.virtual-link-flag::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: var(--text-primary) transparent transparent transparent;
+}
+
+@keyframes popInFlag {
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(0.9); }
+  100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+/* --- Feedback Row (Inline on Completed Cards) --- */
+.booking-feedback-row {
+  border-top: 1px solid var(--border);
+  padding: 8px 0 0;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.feedback-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.feedback-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.feedback-review-input.compact {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  max-height: 60px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: #fafafa;
+  resize: none;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.feedback-review-input.compact:focus {
+  outline: none;
+  border-color: #6b7280;
+}
+
+.feedback-review-input.compact:disabled {
+  background: #f3f4f6;
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.btn-submit-feedback.compact {
+  padding: 6px 14px;
+  background: var(--text-primary);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s ease;
+}
+
+.btn-submit-feedback.compact:hover:not(:disabled) {
+  background: #374151;
+}
+
+.btn-submit-feedback.compact:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.action-btn.compact-report {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+/* --- Inline feedback success animation --- */
+.feedback-success-inline {
+  flex-direction: row !important;
+  padding: 8px 0 !important;
+  gap: 10px !important;
+  width: 100%;
+  justify-content: center;
+}
+
+.feedback-success-inline .success-checkmark-svg-wrap {
+  width: 36px !important;
+  height: 36px !important;
+}
+
+.feedback-success-inline .checkmark-svg.black {
+  width: 36px !important;
+  height: 36px !important;
+}
+
+.feedback-success-inline .success-text {
+  font-size: 0.9rem !important;
+  margin-top: 0 !important;
+}
+
+.star-rating {
+  display: flex;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.star-rating.disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.star-rating svg {
+  width: 20px;
+  height: 20px;
+  fill: #d1d5db;
+  stroke: #d1d5db;
+  stroke-width: 1;
+  transition: fill 0.15s ease, transform 0.1s ease;
+}
+
+.star-rating:not(.disabled) svg:hover,
+.star-rating:not(.disabled) svg:hover ~ svg {
+  transform: scale(1.15);
+}
+
+.star-rating svg.filled {
+  fill: #f59e0b;
+  stroke: #f59e0b;
+}
+
+.feedback-review-input {
+  width: 100%;
+  min-height: 72px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: #fafafa;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.feedback-review-input:focus {
+  outline: none;
+  border-color: #6b7280;
+}
+
+.feedback-review-input:disabled {
+  background: #f3f4f6;
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.btn-submit-feedback {
+  padding: 9px 20px;
+  background: var(--text-primary);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.btn-submit-feedback:hover:not(:disabled) {
+  background: #374151;
+  transform: translateY(-1px);
+}
+
+.btn-submit-feedback:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* --- Feedback Success Animation (inline within card) --- */
+.feedback-success-animation {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 0;
+  gap: 12px;
+}
+
+.feedback-success-animation .success-checkmark-svg-wrap {
+  width: 56px;
+  height: 56px;
+}
+
+.feedback-success-animation .checkmark-svg.black {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: block;
+  stroke-width: 4;
+  stroke: #111827;
+  stroke-miterlimit: 10;
+  box-shadow: inset 0px 0px 0px #111827;
+  animation: fillCheckmarkBlack .4s ease-in-out .4s forwards, scaleCheckmarkBlack .3s ease-in-out .9s alternate both;
+}
+
+.feedback-success-animation .checkmark-circle.black {
+  stroke-dasharray: 166;
+  stroke-dashoffset: 166;
+  stroke-width: 4;
+  stroke-miterlimit: 10;
+  stroke: #111827;
+  fill: none;
+  animation: strokeCheckmark 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.feedback-success-animation .checkmark-check {
+  transform-origin: 50% 50%;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  stroke: #fff;
+  animation: strokeCheckmark 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+}
+
+.feedback-success-animation .success-text {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+  opacity: 0;
+  animation: fadeInUpFeedback 0.4s cubic-bezier(0.25, 0.8, 0.25, 1) 0.8s forwards;
+}
+
+@keyframes strokeCheckmark { 100% { stroke-dashoffset: 0; } }
+@keyframes scaleCheckmarkBlack { 0%, 100% { transform: none; } 50% { transform: scale3d(1.1, 1.1, 1); } }
+@keyframes fillCheckmarkBlack { 100% { box-shadow: inset 0px 0px 0px 30px #111827; } }
+@keyframes fadeInUpFeedback { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }

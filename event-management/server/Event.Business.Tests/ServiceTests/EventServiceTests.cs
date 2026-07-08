@@ -326,12 +326,12 @@ namespace Event.Business.Tests.ServiceTests
                 Page = 1,
                 PageSize = 10
             };
-            _eventRepositoryMock.Setup(r => r.SearchEventsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>()))
+            _eventRepositoryMock.Setup(r => r.SearchEventsAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<DateTime?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<decimal?>(), It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<int>()))
                 .ReturnsAsync(pagedResult);
 
             try
             {
-                var result = await _eventService.BrowseEventsAsync("keyword", "category", DateTime.UtcNow.AddDays(1), "region", 1, 10);
+                var result = await _eventService.BrowseEventsAsync("keyword", "category", DateTime.UtcNow.AddDays(1), "region", null, null, null, 1, 10);
                 Assert.That(result, Is.Not.Null);
                 Assert.That(result.Items.Count(), Is.EqualTo(1));
                 LogTestDetail(Service, "BrowseEventsAsync", "Browse events with keyword and category", null, result.Items.Count(), true);
@@ -1476,11 +1476,11 @@ namespace Event.Business.Tests.ServiceTests
                 Page = 1,
                 PageSize = 10
             };
-            _eventRepositoryMock.Setup(r => r.SearchEventsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>()))
+            _eventRepositoryMock.Setup(r => r.SearchEventsAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<DateTime?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<decimal?>(), It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<int>()))
                 .ReturnsAsync(pagedResult);
             try
             {
-                var result = await _eventService.BrowseEventsAsync(null, null, null, null, 1, 10);
+                var result = await _eventService.BrowseEventsAsync(null, null, null, null, null, null, null, 1, 10);
                 Assert.That(result.Items.Count(), Is.EqualTo(0));
                 LogTestDetail(Service, "BrowseEventsAsync", "Null items returns empty list", null, result.TotalCount, true);
             }
@@ -1501,11 +1501,11 @@ namespace Event.Business.Tests.ServiceTests
                 Page = 1,
                 PageSize = 10
             };
-            _eventRepositoryMock.Setup(r => r.SearchEventsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>()))
+            _eventRepositoryMock.Setup(r => r.SearchEventsAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<DateTime?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<decimal?>(), It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<int>()))
                 .ReturnsAsync(pagedResult);
             try
             {
-                var result = await _eventService.BrowseEventsAsync(null, null, DateTime.UtcNow.AddDays(-1), null, 1, 10);
+                var result = await _eventService.BrowseEventsAsync(null, null, DateTime.UtcNow.AddDays(-1), null, null, null, null, 1, 10);
                 Assert.That(result, Is.Not.Null);
                 LogTestDetail(Service, "BrowseEventsAsync", "Past minDateTime uses cutoff", DateTime.UtcNow.AddDays(-1), result.TotalCount, true);
             }
@@ -1531,11 +1531,11 @@ namespace Event.Business.Tests.ServiceTests
                 }
             };
             var pagedResult = new PagedResult<Event.Models.Event> { Items = mockEvents, TotalCount = 1, Page = 1, PageSize = 10 };
-            _eventRepositoryMock.Setup(r => r.SearchEventsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>()))
+            _eventRepositoryMock.Setup(r => r.SearchEventsAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<DateTime?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<decimal?>(), It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<int>()))
                 .ReturnsAsync(pagedResult);
             try
             {
-                var result = await _eventService.BrowseEventsAsync(null, null, null, null, 1, 10);
+                var result = await _eventService.BrowseEventsAsync(null, null, null, null, null, null, null, 1, 10);
                 var item = result.Items.First();
                 Assert.That(item.TicketTiers, Has.Count.EqualTo(1));
                 Assert.That(item.Reports, Has.Count.EqualTo(0));

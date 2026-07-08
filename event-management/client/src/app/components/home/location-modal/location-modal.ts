@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, signal, computed, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
@@ -6,6 +6,7 @@ import { AppStoreService } from '../../../store/app-store.service';
 import { AuthService } from '../../../services/auth.service';
 import { RegionService } from '../../../services/region.service';
 import { LocationGeoService } from '../../../services/location-geo.service';
+import { WikipediaImageService } from '../../../services/wikipedia-image.service';
 import { RegionModel } from '../../../models/region.model';
 
 @Component({
@@ -14,7 +15,7 @@ import { RegionModel } from '../../../models/region.model';
   imports: [CommonModule, FormsModule],
   templateUrl: './location-modal.html'
 })
-export class LocationModalComponent implements OnInit, OnDestroy {
+export class LocationModalComponent implements OnInit, OnDestroy, OnChanges {
   @Input() isOpen: boolean = false;
   @Output() isOpenChange = new EventEmitter<boolean>();
 
@@ -27,6 +28,19 @@ export class LocationModalComponent implements OnInit, OnDestroy {
   public selectedRegionId = signal('REG01');
   public isLoggedIn = signal(false);
   public regions = signal<RegionModel[]>([]);
+  public regionImages = signal<Map<string, string | null>>(new Map());
+  
+  public popularRegionIds = ['REG05', 'REG06', 'REG07', 'REG08', 'REG01'];
+  
+  public popularRegions = computed(() => {
+    return this.popularRegionIds
+      .map(id => this.regions().find(r => r.region_Id === id))
+      .filter(r => !!r) as RegionModel[];
+  });
+
+  public nonPopularRegions = computed(() => {
+    return this.regions().filter(r => !this.popularRegionIds.includes(r.region_Id));
+  });
 
   private subscriptions: Subscription = new Subscription();
   private searchTimeout: any;
@@ -35,15 +49,35 @@ export class LocationModalComponent implements OnInit, OnDestroy {
     private store: AppStoreService,
     private authService: AuthService,
     private regionService: RegionService,
-    private locationGeoService: LocationGeoService
+    private locationGeoService: LocationGeoService,
+    private wikiService: WikipediaImageService
   ) {}
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['isOpen'] && changes['isOpen'].currentValue) {
+      this.showAllCities.set(false);
+    }
+  }
 
   ngOnInit(): void {
     this.subscriptions.add(
       this.store.select(state => !!state.auth.token).subscribe(logged => this.isLoggedIn.set(logged))
     );
     this.subscriptions.add(
-      this.store.select(state => state.regions.items).subscribe(regs => this.regions.set(regs))
+      this.store.select(state => state.regions.items).subscribe(regs => {
+        this.regions.set(regs);
+        // Pre-warm Wikipedia image cache for all regions as soon as we have them
+        if (regs && regs.length > 0) {
+          this.wikiService.preloadImages(
+            regs.map(r => ({ id: r.region_Id, name: r.name })),
+            (regionId, url) => {
+              const current = new Map(this.regionImages());
+              current.set(regionId, url);
+              this.regionImages.set(current);
+            }
+          );
+        }
+      })
     );
     this.subscriptions.add(
       this.store.select(state => state.regions.currentRegionId).subscribe(regId => {
@@ -184,5 +218,12 @@ export class LocationModalComponent implements OnInit, OnDestroy {
       this.authService.selectRegion(nearestId).subscribe();
     }
     this.closeLocationModal();
+  }
+  public getRegionImage(regionId: string): string | null {
+    return this.regionImages().get(regionId) ?? null;
+  }
+
+  public getRegionName(regionId: string): string {
+    return this.regions().find(r => r.region_Id === regionId)?.name ?? regionId;
   }
 }

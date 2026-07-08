@@ -170,6 +170,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 8px 32px 8px 12px;
+  height: 40px;
   font-size: 13.5px;
   font-family: var(--font-family);
   color: var(--text-primary);
@@ -216,6 +217,40 @@
   letter-spacing: 0.3px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-surface);
+}
+
+.sortable-header {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s;
+}
+
+.sortable-header:hover {
+  color: var(--text-primary);
+}
+
+.sort-icon {
+  margin-left: 4px;
+  opacity: 0.4;
+  font-size: 11px;
+}
+
+.sort-icon::before {
+  content: '↕';
+}
+
+.sort-icon.asc,
+.sort-icon.desc {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.sort-icon.asc::before {
+  content: '↑';
+}
+
+.sort-icon.desc::before {
+  content: '↓';
 }
 
 .directory-table td {

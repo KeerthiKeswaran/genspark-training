@@ -2,13 +2,15 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { BookingModel, InitiateBookingRequest, ConfirmBookingRequest, InitiateBookingResponse, ConfirmBookingResponse, ActiveVirtualLinkResponse } from '../models/booking.model';
+import { environment } from '../../environments/environment';
+
 
 @Injectable({
   providedIn: 'root'
 })
 export class BookingService {
   private http = inject(HttpClient);
-  private readonly baseUrl = 'http://localhost:5106/api/booking';
+  private readonly baseUrl = `${environment.apiUrl}/booking`;
 
   /**
    * Get all bookings for the authenticated user.
@@ -42,8 +44,8 @@ export class BookingService {
    * Create a Stripe Checkout session.
    * API: POST /api/booking/{bookingId}/create-checkout-session
    */
-  createCheckoutSession(bookingId: number, successUrl: string, cancelUrl: string): Observable<{ sessionId: string, sessionUrl: string }> {
-    return this.http.post<{ sessionId: string, sessionUrl: string }>(`${this.baseUrl}/${bookingId}/create-checkout-session`, { successUrl, cancelUrl });
+  createCheckoutSession(bookingId: number, successUrl: string, cancelUrl: string): Observable<{ sessionId: string, clientSecret: string, createdAtUTC: string }> {
+    return this.http.post<{ sessionId: string, clientSecret: string, createdAtUTC: string }>(`${this.baseUrl}/${bookingId}/create-checkout-session`, { successUrl, cancelUrl });
   }
 
   /**
@@ -63,6 +65,14 @@ export class BookingService {
     Object.values(tierQuantities).forEach(q => count += q);
     // Platform fee calculation: ₹45 handling fee per ticket
     return of({ fee: count * 45 });
+  }
+
+  /**
+   * Calculate refund amount.
+   * API: GET /api/booking/{bookingId}/refund-estimate
+   */
+  getRefundEstimate(bookingId: number): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/${bookingId}/refund-estimate`);
   }
 
   /**
@@ -86,14 +96,22 @@ export class BookingService {
    * API: POST /api/event/{eventId}/feedback
    */
   submitEventFeedback(eventId: number, feedback: { rating: number; review: string }): Observable<any> {
-    return this.http.post<any>(`http://localhost:5106/api/event/${eventId}/feedback`, feedback);
+    return this.http.post<any>(`${environment.apiUrl}/event/${eventId}/feedback`, feedback);
   }
 
   /**
    * Submit support ticket.
    * API: POST /api/support/tickets
    */
-  submitSupportTicket(payload: { subject: string; message: string; requestType: string; relatedId?: number }): Observable<any> {
-    return this.http.post<any>(`http://localhost:5106/api/support/tickets`, payload);
+  submitSupportTicket(payload: { subject: string; message: string; requestType: string; relatedId?: number; targetType?: string }): Observable<any> {
+    return this.http.post<any>(`${environment.apiUrl}/support/tickets`, payload);
+  }
+
+  /**
+   * Get my support tickets.
+   * API: GET /api/support/tickets
+   */
+  getMySupportTickets(): Observable<any[]> {
+    return this.http.get<any[]>(`${environment.apiUrl}/support/tickets`);
   }
 }
